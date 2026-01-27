@@ -45,7 +45,7 @@ post_install do |installer|
     
     # Amr AI - Set minimum deployment target
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
       
       # Fix for screen_protector and media_kit
