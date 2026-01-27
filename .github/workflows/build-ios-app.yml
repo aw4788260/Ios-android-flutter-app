@@ -1,4 +1,4 @@
-name: Build iOS App (Appetize Fixed Final)
+name: Build iOS App (Fixed Firebase)
 
 on:
   workflow_dispatch:
@@ -38,7 +38,6 @@ jobs:
           flutter clean
           flutter pub get
 
-      # ✅ 4. توليد الأيقونات
       - name: Generate App Icons
         run: flutter pub run flutter_launcher_icons
 
@@ -48,42 +47,66 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 5. إعداد ملف فايربيس
+      # 5. إنشاء ملف فايربيس من السر
       - name: Create Firebase Config
         env:
           GOOGLE_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
         run: |
           if [ -n "$GOOGLE_PLIST_DATA" ]; then
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "✅ GoogleService-Info.plist created successfully."
+          else
+            echo "❌ Error: GOOGLE_SERVICE_INFO_PLIST_BASE64 secret is missing or empty!"
+            exit 1
           fi
 
-      # 6. البناء والتوقيع اليدوي
+      # ✅ 6. خطوة جديدة وحاسمة: ربط الملف بالمشروع برمجياً
+      # هذه الخطوة تستخدم مكتبة xcodeproj لإضافة الملف إلى إعدادات المشروع
+      - name: Link Firebase Config to Xcode
+        run: |
+          gem install xcodeproj
+          ruby -e '
+            require "xcodeproj"
+            project_path = "ios/Runner.xcodeproj"
+            file_name = "GoogleService-Info.plist"
+            project = Xcodeproj::Project.open(project_path)
+            
+            # البحث عن الملف داخل المشروع
+            runner_group = project.main_group.find_subpath(File.join("Runner"), true)
+            
+            # التحقق مما إذا كان الملف مضافاً بالفعل لتجنب التكرار
+            unless runner_group.find_file_by_path(file_name)
+              file_ref = runner_group.new_reference(file_name)
+              target = project.targets.first # الهدف الأول هو Runner عادة
+              target.add_resources([file_ref])
+              project.save
+              puts "✅ Successfully linked #{file_name} to Xcode project."
+            else
+              puts "ℹ️ #{file_name} is already linked."
+            end
+          '
+
+      # 7. البناء والتوقيع اليدوي
       - name: Build & Sign for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          # بناء نسخة Debug للمحاكي
           flutter build ios --simulator --debug --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
           
-          # توقيع المكتبات الداخلية (يحل مشكلة Ass.framework error)
           echo "Signing frameworks..."
           find build/ios/iphonesimulator/Runner.app/Frameworks -name "*.framework" -type d -exec codesign --force --sign - {} \;
           
-          # ✅ التعديل هنا: توقيع التطبيق بدون استخدام ملف entitlements مفقود
-          # نستخدم --deep للتأكد من توقيع كل المحتويات
           echo "Signing app bundle..."
           codesign --force --deep --sign - build/ios/iphonesimulator/Runner.app
 
-      # 7. الضغط اليدوي الصحيح
+      # 8. الضغط اليدوي
       - name: Compress for Appetize
         run: |
           cd build/ios/iphonesimulator
-          # استخدام -y للحفاظ على الروابط الرمزية
-          zip -r -y -9 Medaad_Appetize.zip Runner.app
+          zip -r -y -9 Medaad_Appetize_Fixed.zip Runner.app
 
-      # 8. رفع الملف
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Medaad-iOS-Appetize
-          path: build/ios/iphonesimulator/Medaad_Appetize.zip
+          name: Medaad-iOS-Appetize-Fixed
+          path: build/ios/iphonesimulator/Medaad_Appetize_Fixed.zip
