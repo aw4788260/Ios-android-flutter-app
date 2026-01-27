@@ -50,10 +50,10 @@ class StorageService {
   }
 
   // ==========================================================
-  // 🆕 دوال جديدة لحفظ البيانات بشكل دائم (تستخدم للأوفلاين)
+  // 🆕 دوال حفظ البيانات (للأوفلاين)
   // ==========================================================
 
-  // 1. حفظ واسترجاع رقم الهاتف (للعلامة المائية)
+  // 1. حفظ واسترجاع رقم الهاتف (للعلامة المائية - وصول سريع)
   static Future<void> saveUserPhone(String phone) async {
     final box = await openBox('auth_box');
     await box.put('user_phone_watermark', phone);
@@ -64,7 +64,7 @@ class StorageService {
     return box.get('user_phone_watermark');
   }
 
-  // 2. حفظ واسترجاع معلومات التواصل (واتساب / تليجرام)
+  // 2. حفظ واسترجاع معلومات التواصل (واتساب / تليجرام - وصول سريع)
   static Future<void> saveContactInfo({required String whatsapp, required String telegram}) async {
     final box = await openBox('settings_box');
     await box.put('contact_whatsapp', whatsapp);
@@ -77,5 +77,19 @@ class StorageService {
       'whatsapp': box.get('contact_whatsapp'),
       'telegram': box.get('contact_telegram'),
     };
+  }
+
+  // ✅ 3. حفظ كامل بيانات التطبيق (Init Data) للعمل أوفلاين
+  // يقوم بتخزين الرد الكامل (JSON) القادم من السيرفر
+  static const String _keyFullAppInitData = 'full_app_init_data';
+
+  static Future<void> saveFullAppInitData(Map<String, dynamic> data) async {
+    final box = await openBox('app_cache');
+    await box.put(_keyFullAppInitData, data);
+  }
+
+  static Future<Map<dynamic, dynamic>?> getFullAppInitData() async {
+    final box = await openBox('app_cache');
+    return box.get(_keyFullAppInitData);
   }
 }
