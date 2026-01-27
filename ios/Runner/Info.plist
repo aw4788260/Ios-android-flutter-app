@@ -46,23 +46,17 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	
-	<!-- ==================== Amr AI - Medaad Permissions ==================== -->
-	
-	<!-- Camera Permission (للكاميرا في رفع الإيصالات والصور) -->
 	<key>NSCameraUsageDescription</key>
 	<string>نحتاج للوصول إلى الكاميرا لتصوير الإيصالات وإثبات الدفع</string>
 	
-	<!-- Photo Library Permission (لاختيار الصور من المعرض) -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>نحتاج للوصول إلى معرض الصور لاختيار صور الإيصالات</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>نحتاج للوصول لحفظ الشهادات والملفات في معرض الصور</string>
 	
-	<!-- File Access Permission (للوصول للملفات المخزنة محلياً) -->
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>نحتاج للوصول إلى الملفات لحفظ المحتوى التعليمي للمشاهدة بدون إنترنت</string>
 	
-	<!-- Background Modes (للتشغيل في الخلفية) -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -70,23 +64,19 @@
 		<string>processing</string>
 	</array>
 	
-	<!-- Audio Session Permission (لحماية الصوت من التسجيل) -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>لا نستخدم الميكروفون، هذا للحماية من تسجيل الصوت</string>
+	<string>نحتاج لإدارة جلسة الصوت لضمان حماية المحتوى ومنع التعارض مع تطبيقات التسجيل</string>
 	
-	<!-- Network Usage -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
 	
-	<!-- Prevent Screenshot & Recording -->
 	<key>UIFileSharingEnabled</key>
 	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
 	
-	<!-- ==================== End of Permissions ==================== -->
-</dict>
+	</dict>
 </plist>
