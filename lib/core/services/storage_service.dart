@@ -48,4 +48,34 @@ class StorageService {
       );
     }
   }
+
+  // ==========================================================
+  // 🆕 دوال جديدة لحفظ البيانات بشكل دائم (تستخدم للأوفلاين)
+  // ==========================================================
+
+  // 1. حفظ واسترجاع رقم الهاتف (للعلامة المائية)
+  static Future<void> saveUserPhone(String phone) async {
+    final box = await openBox('auth_box');
+    await box.put('user_phone_watermark', phone);
+  }
+
+  static Future<String?> getUserPhone() async {
+    final box = await openBox('auth_box');
+    return box.get('user_phone_watermark');
+  }
+
+  // 2. حفظ واسترجاع معلومات التواصل (واتساب / تليجرام)
+  static Future<void> saveContactInfo({required String whatsapp, required String telegram}) async {
+    final box = await openBox('settings_box');
+    await box.put('contact_whatsapp', whatsapp);
+    await box.put('contact_telegram', telegram);
+  }
+
+  static Future<Map<String, String?>> getContactInfo() async {
+    final box = await openBox('settings_box');
+    return {
+      'whatsapp': box.get('contact_whatsapp'),
+      'telegram': box.get('contact_telegram'),
+    };
+  }
 }
