@@ -1,4 +1,4 @@
-name: Build iOS App (Appetize Fixed)
+name: Build iOS App (Appetize Fixed Final)
 
 on:
   workflow_dispatch:
@@ -11,14 +11,12 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. إعداد البيئة
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      # 2. الكاش (لتسريع البناء)
       - name: Cache Pub packages
         uses: actions/cache@v4
         with:
@@ -33,7 +31,6 @@ jobs:
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
           restore-keys: ${{ runner.os }}-pods-
 
-      # 3. تنظيف وتثبيت المكتبات
       - name: Clean and Install
         run: |
           rm -f pubspec.lock
@@ -41,7 +38,7 @@ jobs:
           flutter clean
           flutter pub get
 
-      # ✅ 4. توليد الأيقونات (يعتمد على تعديلك لـ pubspec.yaml)
+      # ✅ 4. توليد الأيقونات
       - name: Generate App Icons
         run: flutter pub run flutter_launcher_icons
 
@@ -60,7 +57,7 @@ jobs:
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
           fi
 
-      # 6. البناء والتوقيع اليدوي (لحل مشكلة الانهيار)
+      # 6. البناء والتوقيع اليدوي
       - name: Build & Sign for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
@@ -69,20 +66,22 @@ jobs:
           flutter build ios --simulator --debug --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
           
           # توقيع المكتبات الداخلية (يحل مشكلة Ass.framework error)
+          echo "Signing frameworks..."
           find build/ios/iphonesimulator/Runner.app/Frameworks -name "*.framework" -type d -exec codesign --force --sign - {} \;
           
-          # توقيع التطبيق نفسه
-          codesign --force --sign - --entitlements ios/Runner/Runner.entitlements build/ios/iphonesimulator/Runner.app
+          # ✅ التعديل هنا: توقيع التطبيق بدون استخدام ملف entitlements مفقود
+          # نستخدم --deep للتأكد من توقيع كل المحتويات
+          echo "Signing app bundle..."
+          codesign --force --deep --sign - build/ios/iphonesimulator/Runner.app
 
-      # ✅ 7. الضغط اليدوي الصحيح (يحل مشكلة بعثرة الملفات)
+      # 7. الضغط اليدوي الصحيح
       - name: Compress for Appetize
         run: |
           cd build/ios/iphonesimulator
-          # هذا الأمر يضع Runner.app داخل ملف مضغوط اسمه Medaad_Appetize.zip
-          # استخدام -y يحافظ على الروابط الرمزية (Symlinks) المهمة للمحاكي
+          # استخدام -y للحفاظ على الروابط الرمزية
           zip -r -y -9 Medaad_Appetize.zip Runner.app
 
-      # 8. رفع الملف المضغوط الجاهز
+      # 8. رفع الملف
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
