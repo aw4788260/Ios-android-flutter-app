@@ -1,56 +1,90 @@
-name: Build iOS .app (No Signing)
+name: Build iOS App
 
 on:
-  workflow_dispatch: # تشغيل يدوي
+  workflow_dispatch:
 
 jobs:
-  build-unsigned-app:
-    name: Build Unsigned iOS App
-    runs-on: macos-latest
+  build:
+    runs-on: macos-latest # 🍎 يجب أن يكون ماك للايفون
 
     steps:
-      # 1. سحب الكود
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. إعداد Flutter
-      - name: Setup Flutter
+      # لا نحتاج لـ Java في الايفون، بل نحتاج CocoaPods (يتم تثبيتها تلقائياً مع الماك)
+
+      # ✅ 1. تسريع التحميل عبر الكاش (CocoaPods بدلاً من Gradle)
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           flutter-version: '3.27.1'
-          cache: true
+          cache: true # ✅ تفعيل كاش الفلاتر
 
-      # 3. تثبيت الحزم (مع حل مشكلة pubspec.lock التالف)
-      - name: Install Dependencies
+      # ✅ 2. تسريع تحميل مكتبات Dart (مطابق للاندرويد)
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PUB_CACHE }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Clean and Get Packages
         run: |
           echo "Removing corrupted pubspec.lock..."
           rm -f pubspec.lock
-          echo "Running flutter pub get..."
+          flutter clean
           flutter pub get
 
-      # 4. تثبيت مكتبات iOS
+      # ✅ 3. تثبيت مكتبات الايفون (خطوة إضافية ضرورية للايفون)
       - name: Install Pods
         run: |
           cd ios
           pod install --repo-update
           cd ..
 
-      # 5. بناء التطبيق (بدون توقيع)
-      - name: Build iOS App (No Codesign)
+      - name: Generate App Icons
+        run: flutter pub run flutter_launcher_icons
+
+      # ✅ 4. إعداد ملفات فايربيز (مطابق لخطوة google-services.json)
+      # ملاحظة: هذه الخطوة اختيارية إذا كنت تعتمد على firebase_options.dart
+      # ولكن وضعتها لتطابق كود الاندرويد "بالظبط"
+      - name: Create Firebase Config
+        env:
+          # تحتاج لإضافة هذا السر في GitHub إذا أردت استخدام الملف
+          IOS_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [ -n "$IOS_PLIST_DATA" ]; then
+            echo "$IOS_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "GoogleService-Info.plist created!"
+          else
+            echo "Skipping GoogleService-Info.plist (Not found in secrets)"
+          fi
+
+      # ✅ 5. البناء (iOS Release)
+      # نستخدم --no-codesign لأننا لم نقم بإعداد الشهادات المعقدة
+      # هذا يخرج ملف .app بدلاً من .ipa
+      - name: Build iOS App (Release)
         run: |
           flutter build ios --release --no-codesign
 
-      # 6. ضغط ملف .app
+      # ✅ 6. ضغط الملف (لأن .app عبارة عن مجلد)
       - name: Compress .app
         run: |
           cd build/ios/iphoneos
-          tar -czf medaad_app_unsigned.tar.gz Runner.app
+          tar -czf medaad_ios_app.tar.gz Runner.app
 
-      # 7. رفع الملف الناتج (تم تصحيح المسار)
-      - name: Upload .app Artifact
+      - name: Upload iOS App
         uses: actions/upload-artifact@v4
         with:
-          name: medaad-ios-app-unsigned
-          # تم تعديل المسار ليعمل من الجذر مباشرة
-          path: build/ios/iphoneos/medaad_app_unsigned.tar.gz
+          name: app-release-ios
+          path: build/ios/iphoneos/medaad_ios_app.tar.gz
