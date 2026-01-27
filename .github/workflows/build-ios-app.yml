@@ -65,15 +65,14 @@ jobs:
           fi
 
       # 7. بناء النسخة المخصصة للمحاكي (Simulator Build)
-      # التغيير هنا: أضفنا --simulator
+      # التغيير هنا: استخدمنا --debug بدلاً من --release لأن المحاكي لا يدعم Release
       - name: Build iOS App for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          flutter build ios --simulator --release --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
+          flutter build ios --simulator --debug --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
 
       # 8. رفع الملف الناتج (مجلد Runner.app مضغوط)
-      # التغيير هنا: المسار أصبح iphonesimulator
       - name: Upload iOS Simulator App
         uses: actions/upload-artifact@v4
         with:
