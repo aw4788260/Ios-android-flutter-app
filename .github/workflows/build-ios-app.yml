@@ -1,4 +1,4 @@
-name: Build iOS App (Simulator)
+name: Build iOS App (Appetize Ready)
 
 on:
   workflow_dispatch:
@@ -11,51 +11,47 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. إعداد فلاتر
+      # 1. إعداد بيئة العمل
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      # 2. كاش مكتبات Dart
+      # 2. كاش لتسريع البناء
       - name: Cache Pub packages
         uses: actions/cache@v4
         with:
           path: ${{ env.PUB_CACHE }}
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+          restore-keys: ${{ runner.os }}-pub-
 
-      # 3. كاش CocoaPods
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
           path: ios/Pods
           key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
+          restore-keys: ${{ runner.os }}-pods-
 
-      # 4. تنظيف وتهيئة
+      # 3. تنظيف وتثبيت المكتبات
       - name: Clean and Get Packages
         run: |
-          echo "Removing corrupted pubspec.lock..."
+          echo "Fixing dependencies..."
           rm -f pubspec.lock
           rm -f ios/Podfile.lock
           flutter clean
           flutter pub get
 
-      - name: Generate App Icons
+      - name: Generate Icons
         run: flutter pub run flutter_launcher_icons
 
-      # 5. تثبيت مكتبات iOS
       - name: Install CocoaPods
         run: |
           cd ios
           pod install --repo-update
           cd ..
 
-      # 6. إعداد ملف فايربيس
+      # 4. إعداد ملف فايربيس
       - name: Create Firebase Config
         env:
           GOOGLE_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
@@ -64,17 +60,25 @@ jobs:
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
           fi
 
-      # 7. بناء النسخة المخصصة للمحاكي (Simulator Build)
-      # التغيير هنا: استخدمنا --debug بدلاً من --release لأن المحاكي لا يدعم Release
-      - name: Build iOS App for Simulator
+      # 5. بناء التطبيق (نسخة المحاكي - Debug)
+      - name: Build for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
+          # نستخدم --debug لأن --release غير مدعوم للمحاكي
           flutter build ios --simulator --debug --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
 
-      # 8. رفع الملف الناتج (مجلد Runner.app مضغوط)
-      - name: Upload iOS Simulator App
+      # 6. ضغط الملف يدوياً (للحفاظ على Runner.app وتقليل الحجم)
+      - name: Compress for Appetize
+        run: |
+          cd build/ios/iphonesimulator
+          # ضغط Runner.app داخل ملف اسمه Medaad_Appetize.zip
+          # الرقم -9 يعني أقصى ضغط ممكن لتقليل الحجم
+          zip -r -9 Medaad_Appetize.zip Runner.app
+
+      # 7. رفع الملف المضغوط الجاهز
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-simulator-build
-          path: build/ios/iphonesimulator/Runner.app
+          name: Medaad-iOS-Simulator
+          path: build/ios/iphonesimulator/Medaad_Appetize.zip
