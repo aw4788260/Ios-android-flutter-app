@@ -5,21 +5,20 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest # 🍎 تغيير ضروري: الأيفون يحتاج ماك
+    runs-on: macos-latest # 🍎 الفرق الوحيد: الأيفون يحتاج ماك
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ⚠️ الجافا غير مطلوبة للأيفون، تم إزالتها
-
+      # 1. إعداد فلاتر على القناة المستقرة (مثل الأندرويد تماماً)
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: 'stable' # ✅ بناءً على طلبك
           cache: true
 
-      # ✅ 1. تسريع تحميل مكتبات Dart (نفس كود الأندرويد)
+      # 2. كاش لمكتبات Dart (نسخة طبق الأصل من ملف الأندرويد)
       - name: Cache Pub packages
         uses: actions/cache@v4
         with:
@@ -28,7 +27,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # 🍎 2. تسريع تحميل CocoaPods (بديل Gradle في الأندرويد)
+      # 3. كاش لـ CocoaPods (المكافئ لـ Gradle في الأندرويد لتسريع البناء)
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
@@ -37,7 +36,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      # ✅ 3. التنظيف وحل المشاكل (نفس المنطق المطلوب)
+      # 4. التنظيف الشامل وحذف ملف القفل (نفس المنطق الذي نجح معك في الأندرويد)
       - name: Clean and Get Packages
         run: |
           echo "Removing corrupted pubspec.lock..."
@@ -48,15 +47,15 @@ jobs:
       - name: Generate App Icons
         run: flutter pub run flutter_launcher_icons
 
-      # 🍎 4. تثبيت مكتبات الأيفون (Pod Install)
+      # 5. تثبيت مكتبات الأيفون (خطوة إضافية ضرورية لـ iOS)
       - name: Install CocoaPods
         run: |
           cd ios
           pod install --repo-update
           cd ..
 
-      # 🔐 5. إعداد ملف GoogleService-Info.plist (بديل google-services.json)
-      # تأكد من إضافة GOOGLE_SERVICE_INFO_PLIST_BASE64 في أسرار Github
+      # 6. إعداد ملف إعدادات فايربيس
+      # ⚠️ تأكد من إضافة GOOGLE_SERVICE_INFO_PLIST_BASE64 في أسرار Github
       - name: Create Firebase Config
         env:
           GOOGLE_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
@@ -65,14 +64,14 @@ jobs:
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
           fi
 
-      # 🏗️ 6. بناء التطبيق (بدون توقيع لتجنب أخطاء الشهادات في الوقت الحالي)
+      # 7. بناء التطبيق (بدون توقيع لتجنب مشاكل الشهادات حالياً)
       - name: Build iOS App (No Codesign)
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
           flutter build ios --release --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
 
-      # 📤 7. رفع التطبيق الناتج
+      # 8. رفع الملف الناتج
       - name: Upload iOS App
         uses: actions/upload-artifact@v4
         with:
