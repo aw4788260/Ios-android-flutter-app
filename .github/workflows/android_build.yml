@@ -1,0 +1,80 @@
+name: Build Android App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # ✅ 1. تسريع التحميل عبر الكاش (Gradle)
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true # ✅ تفعيل كاش الفلاتر نفسه
+
+      # ✅ 2. تسريع تحميل مكتبات Dart
+      - name: Cache Pub packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PUB_CACHE }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Clean and Get Packages
+        run: |
+          flutter clean
+          flutter pub get
+
+      - name: Generate App Icons
+        run: flutter pub run flutter_launcher_icons
+        
+      - name: Create and Verify Keystore
+        env:
+          DATA: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+          KEYSTORE_DATA: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          echo "$DATA" | tr -d '[:space:]' | base64 -d > android/app/google-services.json
+          echo "$KEYSTORE_DATA" | tr -d '[:space:]' | base64 -d > android/app/upload-keystore.jks
+
+      # ✅ 3. البناء الموحد (ملف واحد شامل للمعالجين)
+      - name: Build Fat APK (Universal)
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+        run: |
+          # التعديل: إزالة --split-per-abi لإنتاج ملف واحد يحتوي على المعماريات المحددة
+          flutter build apk --release --target-platform android-arm,android-arm64 --dart-define=APP_SECRET="$APP_SECRET" 
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          # المسار الافتراضي للملف الموحد
+          path: build/app/outputs/flutter-apk/app-release.apk
