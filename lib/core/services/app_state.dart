@@ -25,7 +25,7 @@ class AppState {
   bool isGuest = false;
 
   // ============================================================
-  // 🌓 إدارة الثيم (Theme Management) - جديد
+  // 🌓 إدارة الثيم (Theme Management)
   // ============================================================
 
   // ✅ 1. إضافة متغير لمراقبة الثيم (ValueNotifier) لتحديث الواجهة فورياً
@@ -43,7 +43,6 @@ class AppState {
   }
 
   // ✅ 4. دالة التبديل بين الوضعين (عند ضغط الزر)
-  // ⚠️ تم التعديل هنا: تغيير void إلى Future<void> لإصلاح خطأ الـ await
   Future<void> toggleTheme() async {
     bool currentIsDark = themeNotifier.value == ThemeMode.dark;
     
@@ -111,9 +110,6 @@ class AppState {
     if (castedData['user'] != null) {
       userData = Map<String, dynamic>.from(castedData['user']);
       isGuest = false; 
-      
-      // ✅ [تمت الإضافة] التأكد من وجود مفتاح الصورة في الـ userData
-      // ملاحظة: الـ API يرسل 'profile_image' داخل كائن 'user' كما عدلناه سابقاً
     }
 
     // 3. أرقام الاشتراكات (فقط إذا لم يكن ضيفاً)
@@ -139,32 +135,31 @@ class AppState {
   // ✅ محاولة تحميل البيانات من الذاكرة المحلية (Offline Mode)
   Future<bool> loadOfflineData() async {
     try {
-      // فتح صندوق الكاش
-      var cacheBox = await StorageService.openBox('app_cache');
-      var authBox = await StorageService.openBox('auth_box');
-      
-      // جلب البيانات
-      final cachedData = cacheBox.get('init_data');
+      // ✅ استخدام الدالة الجديدة لجلب البيانات الكاملة المخزنة
+      final cachedData = await StorageService.getFullAppInitData();
 
       if (cachedData != null) {
         // تحديث التطبيق بالبيانات المخبأة
         updateFromInitData(cachedData);
         
-        // ⚠️ استرجاع نوع المستخدم (role) وصورة البروفايل من auth_box لضمان التزامن
+        // ⚠️ استرجاع نوع المستخدم وصورته من auth_box لضمان التزامن
+        var authBox = await StorageService.openBox('auth_box');
         if (userData != null) {
            if (authBox.containsKey('role')) {
              userData!['role'] = authBox.get('role');
            }
-           // ✅ [تمت الإضافة] استرجاع الصورة محلياً لضمان ظهورها أوفلاين
            if (authBox.containsKey('profile_image')) {
              userData!['profile_image'] = authBox.get('profile_image');
+           }
+           // ✅ استرجاع رقم الهاتف من التخزين السريع إذا لم يكن موجوداً
+           if (userData!['phone'] == null) {
+             userData!['phone'] = await StorageService.getUserPhone();
            }
         }
         
         return true; // تم التحميل بنجاح
       }
     } catch (e) {
-      // ignore: avoid_print
       if (kDebugMode) print("Offline Load Error: $e");
     }
     return false; // فشل التحميل أو لا توجد بيانات
@@ -196,13 +191,28 @@ class AppState {
       );
 
       if (response.statusCode == 200) {
-        updateFromInitData(response.data); // تحديث القوائم في الذاكرة
+        final data = response.data;
         
-        // تحديث الكاش أيضاً لضمان التزامن
-        var cacheBox = await StorageService.openBox('app_cache');
-        await cacheBox.put('init_data', response.data);
+        // 1. تحديث الذاكرة الحية (RAM)
+        updateFromInitData(data); 
         
-        if (kDebugMode) print("✅ App Init Reloaded & Synced (Fresh Data)!");
+        // 2. ✅ حفظ كامل الرد في الذاكرة الدائمة (للأوفلاين)
+        await StorageService.saveFullAppInitData(Map<String, dynamic>.from(data));
+        
+        // 3. ✅ حفظ رقم الهاتف للعلامة المائية (وصول سريع)
+        if (data['user'] != null && data['user']['phone'] != null) {
+          await StorageService.saveUserPhone(data['user']['phone']);
+        }
+
+        // 4. ✅ حفظ معلومات التواصل (وصول سريع)
+        if (data['contactInfo'] != null) {
+           await StorageService.saveContactInfo(
+             whatsapp: data['contactInfo']['whatsapp'] ?? '',
+             telegram: data['contactInfo']['telegram'] ?? '',
+           );
+        }
+        
+        if (kDebugMode) print("✅ App Init Reloaded & Full Data Persisted!");
       }
     } catch (e) {
       if (kDebugMode) print("❌ App Init Reload Error: $e");
