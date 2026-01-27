@@ -43,8 +43,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
+      # ✅ التعديل الحاسم هنا: حذف ملف القفل التالف قبل التثبيت
       - name: Clean and Get Packages
         run: |
+          echo "Removing corrupted pubspec.lock..."
+          rm -f pubspec.lock
           flutter clean
           flutter pub get
 
@@ -58,8 +61,14 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$DATA" | tr -d '[:space:]' | base64 -d > android/app/google-services.json
-          echo "$KEYSTORE_DATA" | tr -d '[:space:]' | base64 -d > android/app/upload-keystore.jks
+          # التحقق من وجود الأسرار قبل فك التشفير لتجنب الأخطاء
+          if [ -n "$DATA" ]; then
+            echo "$DATA" | tr -d '[:space:]' | base64 -d > android/app/google-services.json
+          fi
+          
+          if [ -n "$KEYSTORE_DATA" ]; then
+            echo "$KEYSTORE_DATA" | tr -d '[:space:]' | base64 -d > android/app/upload-keystore.jks
+          fi
 
       # ✅ 3. البناء الموحد (ملف واحد شامل للمعالجين)
       - name: Build Fat APK (Universal)
@@ -69,12 +78,11 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          # التعديل: إزالة --split-per-abi لإنتاج ملف واحد يحتوي على المعماريات المحددة
+          # بناء APK واحد يحتوي على كل المعماريات
           flutter build apk --release --target-platform android-arm,android-arm64 --dart-define=APP_SECRET="$APP_SECRET" 
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          # المسار الافتراضي للملف الموحد
           path: build/app/outputs/flutter-apk/app-release.apk
