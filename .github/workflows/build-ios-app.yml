@@ -1,24 +1,24 @@
-name: Build iOS App
+name: Build iOS App (Simulator)
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest # 🍎 الفرق الوحيد: الأيفون يحتاج ماك
+    runs-on: macos-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. إعداد فلاتر على القناة المستقرة (مثل الأندرويد تماماً)
+      # 1. إعداد فلاتر
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable' # ✅ بناءً على طلبك
+          channel: 'stable'
           cache: true
 
-      # 2. كاش لمكتبات Dart (نسخة طبق الأصل من ملف الأندرويد)
+      # 2. كاش مكتبات Dart
       - name: Cache Pub packages
         uses: actions/cache@v4
         with:
@@ -27,7 +27,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pub-
 
-      # 3. كاش لـ CocoaPods (المكافئ لـ Gradle في الأندرويد لتسريع البناء)
+      # 3. كاش CocoaPods
       - name: Cache CocoaPods
         uses: actions/cache@v4
         with:
@@ -36,7 +36,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pods-
 
-      # 4. التنظيف الشامل وحذف ملف القفل (نفس المنطق الذي نجح معك في الأندرويد)
+      # 4. تنظيف وتهيئة
       - name: Clean and Get Packages
         run: |
           echo "Removing corrupted pubspec.lock..."
@@ -48,15 +48,14 @@ jobs:
       - name: Generate App Icons
         run: flutter pub run flutter_launcher_icons
 
-      # 5. تثبيت مكتبات الأيفون (خطوة إضافية ضرورية لـ iOS)
+      # 5. تثبيت مكتبات iOS
       - name: Install CocoaPods
         run: |
           cd ios
           pod install --repo-update
           cd ..
 
-      # 6. إعداد ملف إعدادات فايربيس
-      # ⚠️ تأكد من إضافة GOOGLE_SERVICE_INFO_PLIST_BASE64 في أسرار Github
+      # 6. إعداد ملف فايربيس
       - name: Create Firebase Config
         env:
           GOOGLE_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
@@ -65,16 +64,18 @@ jobs:
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
           fi
 
-      # 7. بناء التطبيق (بدون توقيع لتجنب مشاكل الشهادات حالياً)
-      - name: Build iOS App (No Codesign)
+      # 7. بناء النسخة المخصصة للمحاكي (Simulator Build)
+      # التغيير هنا: أضفنا --simulator
+      - name: Build iOS App for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          flutter build ios --release --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
+          flutter build ios --simulator --release --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
 
-      # 8. رفع الملف الناتج
-      - name: Upload iOS App
+      # 8. رفع الملف الناتج (مجلد Runner.app مضغوط)
+      # التغيير هنا: المسار أصبح iphonesimulator
+      - name: Upload iOS Simulator App
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-ios
-          path: build/ios/iphoneos/Runner.app
+          name: ios-simulator-build
+          path: build/ios/iphonesimulator/Runner.app
