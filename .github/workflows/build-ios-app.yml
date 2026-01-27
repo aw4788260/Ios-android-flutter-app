@@ -41,6 +41,7 @@ jobs:
         run: |
           echo "Removing corrupted pubspec.lock..."
           rm -f pubspec.lock
+          rm -f ios/Podfile.lock
           flutter clean
           flutter pub get
 
