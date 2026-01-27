@@ -27,7 +27,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
-   
+    
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
 
@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-    
+     
     _bounceAnimation = Tween<double>(begin: 0.0, end: 15.0).animate(
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
@@ -121,7 +121,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
-                
+                 
                 ListTile(
                   dense: true,
                   leading: Icon(LucideIcons.fileText, color: AppColors.accentOrange, size: 20),
@@ -194,14 +194,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
       if (userId == null || deviceId == null) {
         if (mounted) {
-           // ✅ 3. التحقق الأمني قبل الانتقال لتسجيل الدخول
-           if (!await SecurityManager.instance.checkSecurity()) return;
+            // ✅ 3. التحقق الأمني قبل الانتقال لتسجيل الدخول
+            if (!await SecurityManager.instance.checkSecurity()) return;
 
-           // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
-           Navigator.of(context).pushAndRemoveUntil(
-             MaterialPageRoute(builder: (_) => const LoginScreen()),
-             (route) => false,
-           );
+            // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
         }
         return;
       }
@@ -274,10 +274,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        await box.put('cached_init_data', response.data);
+        // ✅ 1. تحديث الحالة في الذاكرة الحية
         AppState().updateFromInitData(response.data);
 
-        // ✅ حفظ/تحديث نوع المستخدم (معلم/طالب) إذا كان موجوداً في الرد
+        // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
+        await StorageService.saveFullAppInitData(response.data);
+
+        // ✅ 3. تخزين بيانات الوصول السريع (العلامة المائية ومعلومات التواصل)
+        if (response.data['user'] != null && response.data['user']['phone'] != null) {
+          await StorageService.saveUserPhone(response.data['user']['phone']);
+        }
+        if (response.data['contactInfo'] != null) {
+           await StorageService.saveContactInfo(
+             whatsapp: response.data['contactInfo']['whatsapp'] ?? '',
+             telegram: response.data['contactInfo']['telegram'] ?? '',
+           );
+        }
+
+        // ✅ 4. حفظ بيانات الجلسة الأساسية
         if (response.data['user'] != null) {
            final userData = response.data['user'];
            
@@ -285,7 +299,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
              await box.put('role', userData['role']);
            }
            
-           // ✅ حفظ صورة البروفايل إذا كانت موجودة (للمدرسين)
            if (userData['profile_image'] != null) {
              await box.put('profile_image', userData['profile_image']);
            }
@@ -293,16 +306,13 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
         bool isLoggedIn = response.data['isLoggedIn'] ?? false;
 
-        // إذا قال السيرفر أن المستخدم غير مسجل (مثلاً التوكن منتهي أو محظور)
+        // إذا قال السيرفر أن المستخدم غير مسجل
         if (!isLoggedIn) {
           await box.clear(); // حذف البيانات القديمة
           await box.put('terms_accepted', true); 
           
           if (mounted) {
-            // ✅ 6. التحقق الأمني قبل الرجوع لتسجيل الدخول
             if (!await SecurityManager.instance.checkSecurity()) return;
-
-            // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (_) => const LoginScreen()),
               (route) => false,
@@ -312,10 +322,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         }
 
         if (mounted) {
-          // ✅ 7. التحقق الأمني قبل الدخول للتطبيق
           if (!await SecurityManager.instance.checkSecurity()) return;
-
-          // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const MainWrapper()),
             (route) => false,
@@ -327,13 +334,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     } catch (serverError) {
       FirebaseCrashlytics.instance.log("Splash Offline Mode: $serverError");
-      final cachedData = box.get('cached_init_data');
       
-      if (cachedData != null) {
-         try {
-           AppState().updateFromInitData(Map<String, dynamic>.from(cachedData));
-         } catch (_) {}
-
+      // ✅ 5. محاولة الدخول بوضع الأوفلاين باستخدام البيانات المخزنة الكاملة
+      bool offlineSuccess = await AppState().loadOfflineData();
+      
+      if (offlineSuccess) {
          if (mounted) {
            ScaffoldMessenger.of(context).showSnackBar(
              SnackBar(
@@ -343,10 +348,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
              ),
            );
            
-           // ✅ 8. التحقق الأمني قبل الدخول في وضع الأوفلاين
            if (!await SecurityManager.instance.checkSecurity()) return;
-
-           // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
            Navigator.of(context).pushAndRemoveUntil(
              MaterialPageRoute(builder: (_) => const MainWrapper()),
              (route) => false,
@@ -358,10 +360,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
              const SnackBar(content: Text("Offline Mode (Limited Access)"), backgroundColor: Colors.grey),
            );
            
-           // ✅ 9. التحقق الأمني الأخير
            if (!await SecurityManager.instance.checkSecurity()) return;
-
-           // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
            Navigator.of(context).pushAndRemoveUntil(
              MaterialPageRoute(builder: (_) => const MainWrapper()),
              (route) => false,
@@ -380,11 +379,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    // حسابات الأبعاد لجعل التصميم متجاوب
     final size = MediaQuery.of(context).size;
     final isLandscape = size.width > size.height;
     final isTablet = size.shortestSide > 600;
-
     final logoWidth = size.width * (isLandscape ? 0.25 : (isTablet ? 0.4 : 0.6));
 
     return Scaffold(
