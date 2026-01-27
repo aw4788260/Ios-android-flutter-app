@@ -1,4 +1,4 @@
-name: Build iOS App (Appetize Ready)
+name: Build iOS App (Appetize Fixed)
 
 on:
   workflow_dispatch:
@@ -11,14 +11,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. إعداد بيئة العمل
+      # 1. إعداد البيئة
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      # 2. كاش لتسريع البناء
+      # 2. الكاش (لتسريع البناء)
       - name: Cache Pub packages
         uses: actions/cache@v4
         with:
@@ -34,15 +34,15 @@ jobs:
           restore-keys: ${{ runner.os }}-pods-
 
       # 3. تنظيف وتثبيت المكتبات
-      - name: Clean and Get Packages
+      - name: Clean and Install
         run: |
-          echo "Fixing dependencies..."
           rm -f pubspec.lock
           rm -f ios/Podfile.lock
           flutter clean
           flutter pub get
 
-      - name: Generate Icons
+      # ✅ 4. توليد الأيقونات (يعتمد على تعديلك لـ pubspec.yaml)
+      - name: Generate App Icons
         run: flutter pub run flutter_launcher_icons
 
       - name: Install CocoaPods
@@ -51,7 +51,7 @@ jobs:
           pod install --repo-update
           cd ..
 
-      # 4. إعداد ملف فايربيس
+      # 5. إعداد ملف فايربيس
       - name: Create Firebase Config
         env:
           GOOGLE_PLIST_DATA: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
@@ -60,25 +60,31 @@ jobs:
             echo "$GOOGLE_PLIST_DATA" | base64 --decode > ios/Runner/GoogleService-Info.plist
           fi
 
-      # 5. بناء التطبيق (نسخة المحاكي - Debug)
-      - name: Build for Simulator
+      # 6. البناء والتوقيع اليدوي (لحل مشكلة الانهيار)
+      - name: Build & Sign for Simulator
         env:
           APP_SECRET: ${{ secrets.APP_SECRET }}
         run: |
-          # نستخدم --debug لأن --release غير مدعوم للمحاكي
+          # بناء نسخة Debug للمحاكي
           flutter build ios --simulator --debug --no-codesign --dart-define=APP_SECRET="$APP_SECRET"
+          
+          # توقيع المكتبات الداخلية (يحل مشكلة Ass.framework error)
+          find build/ios/iphonesimulator/Runner.app/Frameworks -name "*.framework" -type d -exec codesign --force --sign - {} \;
+          
+          # توقيع التطبيق نفسه
+          codesign --force --sign - --entitlements ios/Runner/Runner.entitlements build/ios/iphonesimulator/Runner.app
 
-      # 6. ضغط الملف يدوياً (للحفاظ على Runner.app وتقليل الحجم)
+      # ✅ 7. الضغط اليدوي الصحيح (يحل مشكلة بعثرة الملفات)
       - name: Compress for Appetize
         run: |
           cd build/ios/iphonesimulator
-          # ضغط Runner.app داخل ملف اسمه Medaad_Appetize.zip
-          # الرقم -9 يعني أقصى ضغط ممكن لتقليل الحجم
-          zip -r -9 Medaad_Appetize.zip Runner.app
+          # هذا الأمر يضع Runner.app داخل ملف مضغوط اسمه Medaad_Appetize.zip
+          # استخدام -y يحافظ على الروابط الرمزية (Symlinks) المهمة للمحاكي
+          zip -r -y -9 Medaad_Appetize.zip Runner.app
 
-      # 7. رفع الملف المضغوط الجاهز
+      # 8. رفع الملف المضغوط الجاهز
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Medaad-iOS-Simulator
+          name: Medaad-iOS-Appetize
           path: build/ios/iphonesimulator/Medaad_Appetize.zip
