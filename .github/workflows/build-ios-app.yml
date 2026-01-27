@@ -1,0 +1,56 @@
+name: Build iOS .app (No Signing)
+
+on:
+  workflow_dispatch: # تشغيل يدوي
+
+jobs:
+  build-unsigned-app:
+    name: Build Unsigned iOS App
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ./webapp # مسار مشروعك
+
+    steps:
+      # 1. سحب الكود
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. إعداد Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.27.1' # نفس الإصدار المستخدم في مشروعك
+          cache: true
+
+      # 3. تثبيت الحزم
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 4. تثبيت مكتبات iOS
+      - name: Install Pods
+        run: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      # 5. بناء التطبيق (بدون توقيع)
+      # هذا الأمر ينتج Runner.app بدلاً من IPA
+      - name: Build iOS App (No Codesign)
+        run: |
+          flutter build ios --release --no-codesign
+
+      # 6. ضغط ملف .app
+      # لأن .app هو مجلد في نظام ماك، يجب ضغطه ليتم رفعه كملف واحد
+      - name: Compress .app
+        run: |
+          cd build/ios/iphoneos
+          tar -czf medaad_app_unsigned.tar.gz Runner.app
+
+      # 7. رفع الملف الناتج
+      - name: Upload .app Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: medaad-ios-app-unsigned
+          path: webapp/build/ios/iphoneos/medaad_app_unsigned.tar.gz
