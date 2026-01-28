@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/app_colors.dart';
 import 'exam_result_screen.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class ExamViewScreen extends StatefulWidget {
   final String examId;
@@ -47,7 +48,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
   String? _token; 
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
 
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
