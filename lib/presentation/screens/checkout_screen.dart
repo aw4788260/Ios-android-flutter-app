@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import 'main_wrapper.dart'; 
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final double amount;
@@ -38,8 +39,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isLoadingPaymentData = false;
   late Map<String, dynamic> _currentPaymentInfo;
 
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
-
+  final String _baseUrl = ApiConstants.baseUrl;
   @override
   void initState() {
     super.initState();
