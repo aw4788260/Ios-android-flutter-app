@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 // ✅ استيراد main.dart للوصول لخاصية إعادة التشغيل
 import '../../main.dart'; 
@@ -32,7 +33,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
   bool _isTeacher = false;
   String? _profileImage; // ✅ متغير لتخزين رابط الصورة
 
