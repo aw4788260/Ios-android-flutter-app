@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // ✅ ضروري لـ ThemeMode و ValueNotifier
@@ -94,51 +95,92 @@ class AppState {
     }
   }
 
-  // تحديث البيانات القادمة من الـ API (Init Data)
-  void updateFromInitData(Map<dynamic, dynamic> data) {
-    // تحويل البيانات إلى Map<String, dynamic> لضمان التوافق
-    final castedData = Map<String, dynamic>.from(data);
-
-    // 1. استقبال كورسات المتجر (متاحة للجميع: مسجلين وضيوف)
-    if (castedData['courses'] != null) {
-      allCourses = (castedData['courses'] as List)
-          .map((e) => CourseModel.fromJson(e))
-          .toList();
+  // 🔥 دالة مساعدة سحرية لتحويل البيانات القادمة من Hive بأمان
+  // تحول أي Map<dynamic, dynamic> إلى Map<String, dynamic> لتجنب أخطاء النوع
+  Map<String, dynamic> _makeSafeMap(dynamic data) {
+    if (data == null) return {};
+    // إذا كانت البيانات Map عادية، نحولها بشكل صريح
+    if (data is Map) {
+      return data.map((key, value) => MapEntry(key.toString(), value));
     }
-    
-    // 2. بيانات المستخدم (إذا وجد في الرد، فهو ليس ضيفاً)
-    if (castedData['user'] != null) {
-      userData = Map<String, dynamic>.from(castedData['user']);
-      isGuest = false; 
+    // كحل أخير، نحاول التحويل عبر JSON (أبطأ قليلاً لكنه الأضمن في الحالات المعقدة)
+    try {
+      return jsonDecode(jsonEncode(data));
+    } catch (_) {
+      return {};
     }
+  }
 
-    // 3. أرقام الاشتراكات (فقط إذا لم يكن ضيفاً)
-    if (!isGuest && castedData['myAccess'] != null) {
-      myCourseIds = (castedData['myAccess']['courses'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ?? [];
+  // تحديث البيانات القادمة من الـ API (Init Data) أو الذاكرة المحلية
+  void updateFromInitData(dynamic data) {
+    if (data == null) return;
 
-      mySubjectIds = (castedData['myAccess']['subjects'] as List?)
-              ?.map((e) => e.toString())
-              .toList() ?? [];
-    }
+    try {
+      // 1. "تعقيم" البيانات: تحويل أي Map<dynamic, dynamic> إلى Map<String, dynamic>
+      // هذه الخطوة تضمن أن البيانات القادمة من Hive تتصرف تماماً مثل JSON القادم من الإنترنت
+      final Map<String, dynamic> castedData = _makeSafeMap(data);
 
-    // 4. استقبال مكتبة الطالب الجاهزة
-    if (!isGuest && castedData['library'] != null) {
-      myLibrary = List<Map<String, dynamic>>.from(castedData['library']);
-    } else {
-      // إذا كان ضيفاً، نجعل المكتبة فارغة دائماً
-      myLibrary = [];
+      // 2. استقبال كورسات المتجر (متاحة للجميع: مسجلين وضيوف)
+      if (castedData['courses'] != null) {
+        allCourses = (castedData['courses'] as List)
+            .map((e) => CourseModel.fromJson(_makeSafeMap(e))) // ✅ استخدام التحويل الآمن هنا
+            .toList();
+      } else {
+        allCourses = [];
+      }
+      
+      // 3. بيانات المستخدم (إذا وجد في الرد، فهو ليس ضيفاً)
+      if (castedData['user'] != null) {
+        userData = _makeSafeMap(castedData['user']);
+        isGuest = false; 
+      }
+
+      // 4. أرقام الاشتراكات (فقط إذا لم يكن ضيفاً)
+      if (!isGuest && castedData['myAccess'] != null) {
+        final access = _makeSafeMap(castedData['myAccess']);
+
+        myCourseIds = (access['courses'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ?? [];
+
+        mySubjectIds = (access['subjects'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ?? [];
+      } else {
+        myCourseIds = [];
+        mySubjectIds = [];
+      }
+
+      // 5. استقبال مكتبة الطالب الجاهزة
+      if (!isGuest && castedData['library'] != null) {
+        myLibrary = (castedData['library'] as List)
+            .map((e) => _makeSafeMap(e)) // ✅ تحويل آمن لكل عنصر في المكتبة
+            .toList();
+      } else {
+        // إذا كان ضيفاً، نجعل المكتبة فارغة دائماً
+        myLibrary = [];
+      }
+
+      if (kDebugMode) {
+        print("✅ Data Updated: Courses: ${allCourses.length}, Library: ${myLibrary.length}");
+      }
+
+    } catch (e, stack) {
+      if (kDebugMode) print("❌ Error parsing init data: $e\n$stack");
     }
   }
 
   // ✅ محاولة تحميل البيانات من الذاكرة المحلية (Offline Mode)
   Future<bool> loadOfflineData() async {
     try {
+      if (kDebugMode) print("📂 Attempting to load offline data...");
+
       // ✅ استخدام الدالة الجديدة لجلب البيانات الكاملة المخزنة
       final cachedData = await StorageService.getFullAppInitData();
 
       if (cachedData != null) {
+        if (kDebugMode) print("📂 Found cached data, processing...");
+
         // تحديث التطبيق بالبيانات المخبأة
         updateFromInitData(cachedData);
         
@@ -157,10 +199,15 @@ class AppState {
            }
         }
         
-        return true; // تم التحميل بنجاح
+        // إذا نجحنا في تحميل الكورسات أو المكتبة، نعتبر العملية ناجحة
+        if (allCourses.isNotEmpty || myLibrary.isNotEmpty) {
+          return true; 
+        }
+      } else {
+        if (kDebugMode) print("⚠️ No offline data found in storage.");
       }
     } catch (e) {
-      if (kDebugMode) print("Offline Load Error: $e");
+      if (kDebugMode) print("❌ Offline Load Error: $e");
     }
     return false; // فشل التحميل أو لا توجد بيانات
   }
@@ -197,6 +244,7 @@ class AppState {
         updateFromInitData(data); 
         
         // 2. ✅ حفظ كامل الرد في الذاكرة الدائمة (للأوفلاين)
+        // نقوم بتحويل البيانات إلى Map<String, dynamic> قبل الحفظ للتأكد
         await StorageService.saveFullAppInitData(Map<String, dynamic>.from(data));
         
         // 3. ✅ حفظ رقم الهاتف للعلامة المائية (وصول سريع)
