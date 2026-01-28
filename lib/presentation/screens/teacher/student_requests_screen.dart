@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/app_colors.dart'; 
 import '../../../core/services/teacher_service.dart';
 import '../../../core/services/storage_service.dart'; 
+import '../../../core/constants/api_constants.dart';
 
 class StudentRequestsScreen extends StatefulWidget {
   const StudentRequestsScreen({Key? key}) : super(key: key);
@@ -21,7 +22,7 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
   String? _deviceId;
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
 
-  final String _baseUrl = "https://courses.aw478260.dpdns.org"; 
+  final String _baseUrl = ApiConstants.baseUrl;
   String get _receiptProxyUrl => "$_baseUrl/api/admin/file-proxy?type=receipts&filename=";
 
   @override
