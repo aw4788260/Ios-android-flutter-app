@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/storage_service.dart';
 // أو المسار المناسب حسب مكان الملف
+import '../../core/constants/api_constants.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -18,7 +19,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _newPassController = TextEditingController();
   final _confirmPassController = TextEditingController();
   bool _isLoading = false;
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   Future<void> _changePassword() async {
     // 1. التحقق من تطابق كلمة السر الجديدة قبل الإرسال
