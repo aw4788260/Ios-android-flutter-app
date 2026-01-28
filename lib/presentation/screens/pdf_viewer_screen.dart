@@ -35,7 +35,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
-  // --- متغيرات فك التشفير (تم إزالة البروكسي واستبداله بمتغيرات مباشرة) ---
+  // --- متغيرات فك التشفير ---
   File? _encryptedFile;
   int? _originalFileSize;
   String? _sessionToken; // توكن أمني للجلسة الحالية
@@ -84,8 +84,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   /// ✅ دالة القراءة المخصصة (Custom Read Function)
-  /// هذه الدالة هي البديل المباشر لـ PdfDocumentProvider في الإصدار الجديد.
-  /// تقوم المكتبة باستدعائها عندما تحتاج لقراءة جزء محدد من الملف.
   Future<int> _customRead(Uint8List buffer, int position, int size) async {
     try {
       // 1. التحقق من التوكن الأمني لضمان أن الاستدعاء شرعي
@@ -93,7 +91,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       if (_encryptedFile == null) throw Exception("File not initialized");
 
       // 2. فك تشفير الجزء المطلوب فقط (Chunked Decryption)
-      // position هنا تعني الـ offset في الملف الأصلي
       final decryptedData = await FileCryptoService.readAndDecryptRange(
         _encryptedFile!, 
         position, 
@@ -182,7 +179,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           final totalSize = await file.length();
           
           // حساب الحجم الأصلي (استبعاد الـ Nonce المضاف لكل جزء)
-          // هذا الحساب ضروري ليقوم قارئ PDF بطلب الأجزاء الصحيحة
           int numChunks = (totalSize / FileCryptoService.ENCRYPTED_CHUNK_SIZE).ceil();
           int originalSize = totalSize - (numChunks * FileCryptoService.NONCE_LENGTH);
 
@@ -213,6 +209,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         'x-device-id': deviceId ?? '',
         'x-app-secret': const String.fromEnvironment('APP_SECRET'),
       };
+      
       _onlineUrl = '${ApiConstants.apiUrl}/secure/get-pdf?pdfId=${widget.pdfId}';
       
       if (mounted) setState(() => _loading = false);
@@ -412,6 +409,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       backgroundColor: AppColors.backgroundPrimary,
       textSelectionParams: const PdfTextSelectionParams(enabled: false), // منع النسخ
       scrollPhysics: const BouncingScrollPhysics(),
+      
+      // ✅ تمت إضافة شاشة الانتظار أثناء تحميل الصفحات أونلاين
+      loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black54, 
+              borderRadius: BorderRadius.circular(12)
+            ),
+            child: CircularProgressIndicator(color: AppColors.accentYellow),
+          ),
+        );
+      },
+
       onDocumentChanged: (document) {
         if (mounted) setState(() => _totalPages = document?.pages.length ?? 0);
       },
