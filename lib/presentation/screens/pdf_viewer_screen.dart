@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:typed_data'; // ✅ تم الإصلاح: ضروري لتعريف Uint8List
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart'; 
 import 'package:hive_flutter/hive_flutter.dart';
@@ -114,7 +115,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void dispose() {
     if (_isOffline) _saveDrawingsToHive();
-    // لا حاجة لحذف ملفات مؤقتة بعد الآن لأنها لا تُنشأ أصلاً
     super.dispose();
   }
 
@@ -276,7 +276,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           _isOffline && _customProvider != null
             ? PdfViewer.custom(
-                _customProvider!,
+                documentProvider: _customProvider!, // ✅ تم الإصلاح: استخدام المعامل المسمى
                 controller: _pdfController,
                 params: _buildPdfParams(),
               )
