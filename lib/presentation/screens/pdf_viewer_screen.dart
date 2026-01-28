@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart'; 
 import 'package:hive_flutter/hive_flutter.dart';
@@ -15,6 +16,47 @@ import '../../core/services/file_crypto_service.dart';
 import '../../core/models/drawing_model.dart';
 import '../../core/services/storage_service.dart';
 
+// --- فئة مزود البيانات المؤمن (البروكسي الداخلي) ---
+class EncryptedPdfProvider extends PdfDocumentProvider {
+  final File encryptedFile;
+  final int originalSize;
+  final String accessContextToken;
+
+  EncryptedPdfProvider({
+    required this.encryptedFile, 
+    required this.originalSize,
+    required this.accessContextToken,
+  });
+
+  @override
+  Future<int> read(Uint8List buffer, int offset, int length) async {
+    try {
+      // التحقق من توكن الجلسة قبل السماح بفك التشفير
+      if (accessContextToken.isEmpty) throw Exception("Unauthorized access");
+
+      // استدعاء دالة القراءة وفك التشفير للجزء المطلوب فقط
+      final decryptedData = await FileCryptoService.readAndDecryptRange(
+        encryptedFile, 
+        offset, 
+        length
+      );
+      
+      buffer.setRange(0, decryptedData.length, decryptedData);
+      return decryptedData.length;
+    } catch (e) {
+      debugPrint("Security Violation or Read Error: $e");
+      return 0;
+    }
+  }
+
+  @override
+  int get fileSize => originalSize;
+
+  @override
+  String get sourceName => encryptedFile.path;
+}
+
+// --- الشاشة الرئيسية ---
 class PdfViewerScreen extends StatefulWidget {
   final String pdfId;
   final String title;
@@ -33,10 +75,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
-  File? _decryptedTempFile; 
+  // نظام فك التشفير عند الطلب
+  EncryptedPdfProvider? _customProvider;
+  String? _sessionToken; 
   
   // متغيرات الحالة للعرض
-  String? _filePath; 
+  String? _onlineUrl; 
   Map<String, String>? _onlineHeaders; 
 
   bool _loading = true;
@@ -47,13 +91,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   // --- أدوات الرسم ---
   bool _isDrawingMode = false;
-  
-  // 0 = Pen, 1 = Highlighter, 2 = Eraser
-  int _selectedTool = 0; 
-  
-  // لون واحد موحد لجميع الأدوات
+  int _selectedTool = 0; // 0 = Pen, 1 = Highlighter, 2 = Eraser
   Color _selectedColor = Colors.red;
-  
   double _penSize = 0.003; 
   double _highlightSize = 0.035; 
   double _eraserSize = 0.04; 
@@ -66,6 +105,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void initState() {
     super.initState();
+    // توليد توكن أمني فريد لهذه الجلسة فقط
+    _sessionToken = _generateSecureToken();
     _initWatermarkText(); 
     _preparePdf();
   }
@@ -73,22 +114,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   void dispose() {
     if (_isOffline) _saveDrawingsToHive();
-    
-    // تنظيف الملف المؤقت
-    if (_decryptedTempFile != null && _decryptedTempFile!.existsSync()) {
-      try { _decryptedTempFile!.deleteSync(); } catch (_) {}
-    }
-    
+    // لا حاجة لحذف ملفات مؤقتة بعد الآن لأنها لا تُنشأ أصلاً
     super.dispose();
+  }
+
+  String _generateSecureToken() {
+    final random = Random.secure();
+    final values = List<int>.generate(32, (i) => random.nextInt(256));
+    return base64Url.encode(values);
   }
 
   Future<void> _initWatermarkText() async {
     String displayText = '';
-
     if (AppState().userData != null) {
       displayText = AppState().userData!['phone'] ?? '';
     }
-
     if (displayText.isEmpty) {
       try {
         final box = await StorageService.openBox('auth_box');
@@ -97,7 +137,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         debugPrint("Error fetching offline watermark: $e");
       }
     }
-
     if (mounted) {
       setState(() => _watermarkText = displayText.isNotEmpty ? displayText : 'User');
     }
@@ -140,7 +179,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   Future<void> _preparePdf() async {
     setState(() {
       _loading = true;
-      _loadingMessage = "جار التحقق من الملف...";
+      _loadingMessage = "جار تهيئة الوصول الأمن...";
     });
 
     try {
@@ -150,58 +189,49 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final downloadsBox = await StorageService.openBox('downloads_box');
       final downloadItem = downloadsBox.get(widget.pdfId);
 
-      String? offlinePath;
-      bool fileExistsLocally = false;
-
       if (downloadItem != null && downloadItem['path'] != null) {
-        offlinePath = downloadItem['path'];
-        if (await File(offlinePath!).exists()) {
-          fileExistsLocally = true;
+        final file = File(downloadItem['path']);
+        if (await file.exists()) {
+          final totalSize = await file.length();
+          
+          // حساب الحجم الأصلي للملف (بدون زيادة الـ Nonce لكل 32KB)
+          int numChunks = (totalSize / FileCryptoService.ENCRYPTED_CHUNK_SIZE).ceil();
+          int originalSize = totalSize - (numChunks * FileCryptoService.NONCE_LENGTH);
+
+          if (mounted) {
+            setState(() {
+              _isOffline = true;
+              _customProvider = EncryptedPdfProvider(
+                encryptedFile: file,
+                originalSize: originalSize,
+                accessContextToken: _sessionToken!,
+              );
+              _loading = false;
+            });
+          }
+          return;
         }
       }
 
-      if (fileExistsLocally) {
-        setState(() {
-          _isOffline = true;
-          _loadingMessage = "جار فك التشفير...";
-        });
-          
-        _decryptedTempFile = await FileCryptoService.decryptToTempFile(offlinePath!);
+      // في حالة البث (Streaming)
+      setState(() {
+        _isOffline = false;
+        _loadingMessage = "جار التحميل...";
+      });
         
-        if (mounted) {
-          setState(() {
-            _filePath = _decryptedTempFile!.path;
-            _loading = false;
-          });
-        }
+      var box = await StorageService.openBox('auth_box');
+      final String? token = box.get('jwt_token');
+      final String? deviceId = box.get('device_id');
+      
+      _onlineHeaders = {
+        'Authorization': 'Bearer $token', 
+        'x-device-id': deviceId ?? '',
+        'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+      };
+      _onlineUrl = 'https://courses.aw478260.dpdns.org/api/secure/get-pdf?pdfId=${widget.pdfId}';
+      
+      if (mounted) setState(() => _loading = false);
 
-      } else {
-        setState(() {
-          _isOffline = false;
-          _loadingMessage = "جار التحميل...";
-        });
-          
-        var box = await StorageService.openBox('auth_box');
-          
-        final String? token = box.get('jwt_token');
-        final String? deviceId = box.get('device_id');
-        
-        final headers = {
-          'Authorization': 'Bearer $token', 
-          'x-device-id': deviceId ?? '',
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
-        };
-          
-        final url = 'https://courses.aw478260.dpdns.org/api/secure/get-pdf?pdfId=${widget.pdfId}';
-        
-        if (mounted) {
-          setState(() {
-            _filePath = url;
-            _onlineHeaders = headers;
-            _loading = false;
-          });
-        }
-      }
     } catch (e, stack) {
       FirebaseCrashlytics.instance.recordError(e, stack, reason: "PDF Open Error");
       if (mounted) setState(() { _error = "Failed to load PDF."; _loading = false; });
@@ -240,132 +270,24 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: AppColors.backgroundPrimary,
-        
-      endDrawer: Drawer(
-        backgroundColor: AppColors.backgroundSecondary,
-        width: 250,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
-              child: Text("PAGE INDEX", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.5)),
-            ),
-            const Divider(color: Colors.white10),
-            Expanded(
-              child: _totalPages == 0 
-                ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow)) 
-                : ListView.builder(
-                    itemCount: _totalPages,
-                    itemBuilder: (context, index) {
-                      final pageNum = index + 1;
-                      final isCurrent = _pdfController.pageNumber == pageNum;
-                      return ListTile(
-                        // ✅ تم تعديل لون النص هنا ليكون أسود في النهار وأبيض في الليل
-                        title: Text(
-                          "Page $pageNum", 
-                          style: TextStyle(
-                            color: isCurrent ? AppColors.accentYellow : AppColors.textPrimary, 
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal
-                          )
-                        ),
-                        // ✅ تم تعديل لون الأيقونة هنا أيضاً
-                        leading: Icon(
-                          LucideIcons.fileText, 
-                          color: isCurrent ? AppColors.accentYellow : AppColors.textSecondary, 
-                          size: 18
-                        ),
-                        onTap: () {
-                          _pdfController.goToPage(pageNumber: pageNum);
-                          Navigator.pop(context);
-                        },
-                      );
-                    },
-                  ),
-            ),
-          ],
-        ),
-      ),
-
-      appBar: AppBar(
-        title: Row(
-          children: [
-            // ✅ تم تعديل لون عنوان الملف ليتبع الثيم
-            Expanded(
-              child: Text(
-                widget.title, 
-                style: TextStyle(fontSize: 14, color: AppColors.textPrimary), 
-                overflow: TextOverflow.ellipsis
-              )
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _isOffline ? Colors.green.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _isOffline ? Colors.green : Colors.blue, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Icon(_isOffline ? LucideIcons.hardDrive : LucideIcons.cloud, size: 12, color: _isOffline ? Colors.green : Colors.blue),
-                  const SizedBox(width: 4),
-                  Text(_isOffline ? "Offline" : "Stream", style: TextStyle(fontSize: 10, color: _isOffline ? Colors.green : Colors.blue, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-              
-            if (_isOffline) ...[
-              const SizedBox(width: 12),
-              GestureDetector(
-                onTap: () => setState(() => _isDrawingMode = !_isDrawingMode),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: _isDrawingMode ? AppColors.accentYellow : Colors.transparent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.accentYellow.withOpacity(0.5))
-                  ),
-                  child: Icon(
-                    LucideIcons.penTool, 
-                    color: _isDrawingMode ? Colors.black : AppColors.accentYellow, 
-                    size: 16
-                  ),
-                ),
-              ),
-            ]
-          ],
-        ),
-        backgroundColor: AppColors.backgroundSecondary,
-        leading: BackButton(
-          color: AppColors.accentYellow,
-          onPressed: () async {
-             if(_isOffline) await _saveDrawingsToHive();
-             if(context.mounted) Navigator.pop(context);
-          }
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-          ),
-        ],
-      ),
+      endDrawer: _buildDrawer(),
+      appBar: _buildAppBar(),
       body: Stack(
         children: [
-          if (_isOffline)
-            PdfViewer.file(
-              _filePath!,
-              controller: _pdfController,
-              params: _buildPdfParams(),
-            )
-          else
-            PdfViewer.uri(
-              Uri.parse(_filePath!),
-              headers: _onlineHeaders, 
-              controller: _pdfController,
-              params: _buildPdfParams(),
-            ),
+          _isOffline && _customProvider != null
+            ? PdfViewer.custom(
+                _customProvider!,
+                controller: _pdfController,
+                params: _buildPdfParams(),
+              )
+            : PdfViewer.uri(
+                Uri.parse(_onlineUrl!),
+                headers: _onlineHeaders, 
+                controller: _pdfController,
+                params: _buildPdfParams(),
+              ),
 
+          // العلامة المائية
           IgnorePointer(
             child: Center(
               child: Opacity(
@@ -403,26 +325,124 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              widget.title, 
+              style: TextStyle(fontSize: 14, color: AppColors.textPrimary), 
+              overflow: TextOverflow.ellipsis
+            )
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOffline ? Colors.green.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _isOffline ? Colors.green : Colors.blue, width: 1),
+            ),
+            child: Row(
+              children: [
+                Icon(_isOffline ? LucideIcons.hardDrive : LucideIcons.cloud, size: 12, color: _isOffline ? Colors.green : Colors.blue),
+                const SizedBox(width: 4),
+                Text(_isOffline ? "Offline" : "Stream", style: TextStyle(fontSize: 10, color: _isOffline ? Colors.green : Colors.blue, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          if (_isOffline) ...[
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () => setState(() => _isDrawingMode = !_isDrawingMode),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _isDrawingMode ? AppColors.accentYellow : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.accentYellow.withOpacity(0.5))
+                ),
+                child: Icon(
+                  LucideIcons.penTool, 
+                  color: _isDrawingMode ? Colors.black : AppColors.accentYellow, 
+                  size: 16
+                ),
+              ),
+            ),
+          ]
+        ],
+      ),
+      backgroundColor: AppColors.backgroundSecondary,
+      leading: BackButton(
+        color: AppColors.accentYellow,
+        onPressed: () async {
+           if(_isOffline) await _saveDrawingsToHive();
+           if(context.mounted) Navigator.pop(context);
+        }
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
+          onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      backgroundColor: AppColors.backgroundSecondary,
+      width: 250,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
+            child: Text("PAGE INDEX", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.5)),
+          ),
+          const Divider(color: Colors.white10),
+          Expanded(
+            child: _totalPages == 0 
+              ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow)) 
+              : ListView.builder(
+                  itemCount: _totalPages,
+                  itemBuilder: (context, index) {
+                    final pageNum = index + 1;
+                    final isCurrent = _pdfController.pageNumber == pageNum;
+                    return ListTile(
+                      title: Text(
+                        "Page $pageNum", 
+                        style: TextStyle(
+                          color: isCurrent ? AppColors.accentYellow : AppColors.textPrimary, 
+                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal
+                        )
+                      ),
+                      leading: Icon(
+                        LucideIcons.fileText, 
+                        color: isCurrent ? AppColors.accentYellow : AppColors.textSecondary, 
+                        size: 18
+                      ),
+                      onTap: () {
+                        _pdfController.goToPage(pageNumber: pageNum);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
       backgroundColor: AppColors.backgroundPrimary,
       textSelectionParams: const PdfTextSelectionParams(enabled: false), 
       scrollPhysics: const BouncingScrollPhysics(),
-      
-      loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
-        return Center(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
-            child: CircularProgressIndicator(color: AppColors.accentYellow),
-          ),
-        );
-      },
-      
       onDocumentChanged: (document) {
         if (mounted) setState(() => _totalPages = document?.pages.length ?? 0);
       },
-
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
         return [
@@ -439,62 +459,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   ignoring: !_isDrawingMode,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onPanStart: (details) {
-                      if (!_isDrawingMode) return;
-                      final renderBox = context.findRenderObject() as RenderBox;
-                      final localPos = renderBox.globalToLocal(details.globalPosition);
-                      final relativePoint = Offset(
-                        localPos.dx / pageRect.width,
-                        localPos.dy / pageRect.height,
-                      );
-                      setState(() {
-                        _activePage = page.pageNumber;
-                         
-                        // ✅ منطق الرسم الموحد
-                        double width = _penSize;
-                        int colorValue = _selectedColor.value;
-                        bool isHighlighter = false;
-                        bool isEraser = false;
-
-                        if (_selectedTool == 1) { // Highlighter Mode
-                          width = _highlightSize;
-                          isHighlighter = true;
-                        } else if (_selectedTool == 2) { // Eraser Mode
-                          width = _eraserSize;
-                          colorValue = 0; 
-                          isEraser = true;
-                        }
-
-                        _currentLine = DrawingLine(
-                          points: [relativePoint],
-                          color: colorValue,
-                          strokeWidth: width,
-                          isHighlighter: isHighlighter,
-                          isEraser: isEraser,
-                        );
-                      });
-                    },
-                    onPanUpdate: (details) {
-                      if (!_isDrawingMode || _currentLine == null) return;
-                      final renderBox = context.findRenderObject() as RenderBox;
-                      final localPos = renderBox.globalToLocal(details.globalPosition);
-                      final relativePoint = Offset(
-                        localPos.dx / pageRect.width,
-                        localPos.dy / pageRect.height,
-                      );
-                      setState(() {
-                        _currentLine!.points.add(relativePoint);
-                      });
-                    },
-                    onPanEnd: (details) {
-                      if (_currentLine != null) {
-                        setState(() {
-                          if (_pageDrawings[page.pageNumber] == null) _pageDrawings[page.pageNumber] = [];
-                          _pageDrawings[page.pageNumber]!.add(_currentLine!);
-                          _currentLine = null;
-                        });
-                      }
-                    },
+                    onPanStart: (details) => _onPanStart(details, context, pageRect, page),
+                    onPanUpdate: (details) => _onPanUpdate(details, context, pageRect),
+                    onPanEnd: (details) => _onPanEnd(page),
                     child: CustomPaint(
                       painter: RelativeSketchPainter(
                         lines: allLines,
@@ -511,13 +478,57 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
+  void _onPanStart(DragStartDetails details, BuildContext context, Rect pageRect, PdfPage page) {
+    if (!_isDrawingMode) return;
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+    final relativePoint = Offset(
+      localPos.dx / pageRect.width,
+      localPos.dy / pageRect.height,
+    );
+    setState(() {
+      _activePage = page.pageNumber;
+      double width = _selectedTool == 2 ? _eraserSize : (_selectedTool == 1 ? _highlightSize : _penSize);
+      _currentLine = DrawingLine(
+        points: [relativePoint],
+        color: _selectedTool == 2 ? 0 : _selectedColor.value,
+        strokeWidth: width,
+        isHighlighter: _selectedTool == 1,
+        isEraser: _selectedTool == 2,
+      );
+    });
+  }
+
+  void _onPanUpdate(DragUpdateDetails details, BuildContext context, Rect pageRect) {
+    if (!_isDrawingMode || _currentLine == null) return;
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+    final relativePoint = Offset(
+      localPos.dx / pageRect.width,
+      localPos.dy / pageRect.height,
+    );
+    setState(() {
+      _currentLine!.points.add(relativePoint);
+    });
+  }
+
+  void _onPanEnd(PdfPage page) {
+    if (_currentLine != null) {
+      setState(() {
+        if (_pageDrawings[page.pageNumber] == null) _pageDrawings[page.pageNumber] = [];
+        _pageDrawings[page.pageNumber]!.add(_currentLine!);
+        _currentLine = null;
+      });
+    }
+  }
+
   Widget _buildToolbar() {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
+        boxShadow: [const BoxShadow(color: Colors.black54, blurRadius: 10)],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -533,7 +544,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 const SizedBox(width: 8),
                 _buildToolButton(LucideIcons.eraser, 2),
                 const SizedBox(width: 8),
-                
                 IconButton(
                   icon: const Icon(LucideIcons.undo, color: Colors.white),
                   onPressed: () {
@@ -544,11 +554,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       }
                   },
                 ),
-            
                 const SizedBox(width: 8),
                 Container(width: 1, height: 24, color: Colors.grey),
                 const SizedBox(width: 8),
-                
                 if (_selectedTool != 2) ...[
                   _buildColorButton(Colors.black),
                   _buildColorButton(Colors.red),
@@ -567,15 +575,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          
           Row(
             children: [
               const Icon(LucideIcons.circle, size: 8, color: Colors.white70),
               Expanded(
                 child: Slider(
                   value: _getCurrentSize(),
-                  min: 0.001,
-                  max: 0.08, 
+                  min: 0.001, max: 0.08, 
                   activeColor: _selectedTool == 2 ? Colors.white : _selectedColor,
                   inactiveColor: Colors.grey,
                   onChanged: (val) {
@@ -615,17 +621,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       onTap: () {
         setState(() {
           _selectedColor = color;
-          if (_selectedTool == 2) {
-             _selectedTool = 0;
-          }
+          if (_selectedTool == 2) _selectedTool = 0;
         });
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         width: 26, height: 26,
         decoration: BoxDecoration(
-          color: color, 
-          shape: BoxShape.circle, 
+          color: color, shape: BoxShape.circle, 
           border: isSelected ? Border.all(color: Colors.white, width: 2.5) : Border.all(color: Colors.white24, width: 1)
         ),
       ),
@@ -642,7 +645,6 @@ class RelativeSketchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height), Paint());
-
     for (var line in lines) {
       final paint = Paint()
         ..style = PaintingStyle.stroke
@@ -662,7 +664,6 @@ class RelativeSketchPainter extends CustomPainter {
         final path = Path();
         var start = Offset(line.points[0].dx * pageSize.width, line.points[0].dy * pageSize.height);
         path.moveTo(start.dx, start.dy);
-
         for (int i = 1; i < line.points.length; i++) {
           var p = Offset(line.points[i].dx * pageSize.width, line.points[i].dy * pageSize.height);
           path.lineTo(p.dx, p.dy);
@@ -673,7 +674,6 @@ class RelativeSketchPainter extends CustomPainter {
         canvas.drawPoints(PointMode.points, [p], paint);
       }
     }
-      
     canvas.restore();
   }
 
