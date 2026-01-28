@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import 'checkout_screen.dart';
 import 'teacher_profile_screen.dart'; 
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class CourseDetailsScreen extends StatefulWidget {
   final String courseCode;
@@ -20,7 +21,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   Map<String, dynamic>? _courseData;
   List<String> _selectedSubjectIds = [];
   bool _isFullCourse = false;
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
    
   bool _isTeacher = false; // ✅ متغير لحفظ الدور
 
