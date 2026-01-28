@@ -7,6 +7,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class ExamResultScreen extends StatefulWidget {
   final String attemptId;
@@ -27,7 +28,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
   String? _deviceId;
   String? _token; // ✅ التوكن ضروري للصور والطلبات
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
