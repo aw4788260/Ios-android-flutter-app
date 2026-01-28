@@ -18,18 +18,17 @@ class StorageService {
     if (keyString == null) {
       // 3. إذا لم يوجد (أول مرة)، قم بتوليد مفتاح عشوائي جديد وحفظه
       final key = Hive.generateSecureKey();
-      // ✅ تصحيح: استخدام base64Url.encode
+      // استخدام base64Url لضمان سلامة النص
       await _secureStorage.write(key: 'hive_key', value: base64Url.encode(key));
       _encryptionKey = key;
     } else {
       // 4. إذا وجد، قم بفك تشفيره لاستخدامه
-      // ✅ تصحيح: استخدام base64Url.decode
       _encryptionKey = base64Url.decode(keyString);
     }
     return _encryptionKey!;
   }
 
-  /// ✅ الدالة الرئيسية: فتح أي صندوق بنظام التشفير
+  /// الدالة الرئيسية: فتح أي صندوق بنظام التشفير
   static Future<Box> openBox(String boxName) async {
     try {
       final key = await _getKey();
@@ -50,7 +49,7 @@ class StorageService {
   }
 
   // ==========================================================
-  // 🆕 دوال حفظ البيانات (للأوفلاين)
+  // دوال حفظ البيانات (للأوفلاين)
   // ==========================================================
 
   // 1. حفظ واسترجاع رقم الهاتف (للعلامة المائية - وصول سريع)
@@ -79,8 +78,7 @@ class StorageService {
     };
   }
 
-  // ✅ 3. حفظ كامل بيانات التطبيق (Init Data) للعمل أوفلاين
-  // يقوم بتخزين الرد الكامل (JSON) القادم من السيرفر
+  // 3. حفظ واسترجاع كامل بيانات التطبيق (Init Data)
   static const String _keyFullAppInitData = 'full_app_init_data';
 
   static Future<void> saveFullAppInitData(Map<String, dynamic> data) async {
@@ -88,7 +86,8 @@ class StorageService {
     await box.put(_keyFullAppInitData, data);
   }
 
-  static Future<Map<dynamic, dynamic>?> getFullAppInitData() async {
+  // ✅ التعديل هنا: إرجاع dynamic لتجنب مشاكل Casting مع Hive
+  static Future<dynamic> getFullAppInitData() async {
     final box = await openBox('app_cache');
     return box.get(_keyFullAppInitData);
   }
