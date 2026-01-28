@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class MyRequestsScreen extends StatefulWidget {
   const MyRequestsScreen({super.key});
@@ -15,7 +16,7 @@ class MyRequestsScreen extends StatefulWidget {
 class _MyRequestsScreenState extends State<MyRequestsScreen> {
   bool _loading = true;
   List<dynamic> _requests = [];
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
