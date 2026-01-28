@@ -7,6 +7,7 @@ import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
 import 'subject_materials_screen.dart';
 import 'teacher/manage_content_screen.dart';
+import '../../core/constants/api_constants.dart';
 
 class CourseMaterialsScreen extends StatefulWidget {
   final String courseId;
@@ -31,7 +32,7 @@ class CourseMaterialsScreen extends StatefulWidget {
 class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
   bool _loading = true;
   List<dynamic> _ownedSubjects = [];
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
   bool _isTeacher = false;
 
   @override
