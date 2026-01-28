@@ -13,6 +13,7 @@ import '../utils/encryption_helper.dart'; // للفيديو (AES)
 import 'file_crypto_service.dart'; // ✅ للملفات (ChaCha20)
 import 'notification_service.dart';
 import '../../core/services/storage_service.dart';
+import '../constants/api_constants.dart';
 
 class DownloadManager with WidgetsBindingObserver {
   static final DownloadManager _instance = DownloadManager._internal();
@@ -50,8 +51,7 @@ class DownloadManager with WidgetsBindingObserver {
   static final Map<String, CancelToken> _cancelTokens = {}; 
   
   static final ValueNotifier<Map<String, double>> downloadingProgress = ValueNotifier({});
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
-
+  final String _baseUrl = ApiConstants.baseUrl;
   Timer? _keepAliveTimer;
 
   bool isFileDownloading(String id) => _activeDownloads.contains(id);
