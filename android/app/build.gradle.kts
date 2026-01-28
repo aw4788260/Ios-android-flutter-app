@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-    namespace = "medaad.app"
+    namespace = "medaad.app.com"
     compileSdk = 36 
 
     defaultConfig {
-        applicationId = "medaad.app"
+        applicationId = "medaad.app.com"
         minSdk = 24
         targetSdk = 36 
         versionCode = flutter.versionCode
