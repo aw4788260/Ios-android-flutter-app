@@ -5,6 +5,7 @@ import 'package:flutter/material.dart'; // ✅ ضروري لـ ThemeMode و Valu
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../data/models/course_model.dart';
 import '../../core/services/storage_service.dart';
+import '../constants/api_constants.dart';
 
 class AppState {
   // Singleton Pattern
@@ -226,7 +227,7 @@ class AppState {
 
       // ✅ التعديل هنا: إضافة timestamp لمنع الكاش وإجبار السيرفر على جلب بيانات جديدة
       final response = await Dio().get(
-        'https://courses.aw478260.dpdns.org/api/public/get-app-init-data', 
+        '${ApiConstants.apiUrl}/public/get-app-init-data', 
         queryParameters: {
           't': DateTime.now().millisecondsSinceEpoch, // 👈 هذا السطر يمنع الكاش
         },
