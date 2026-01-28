@@ -15,6 +15,7 @@ import '../../core/services/app_state.dart';
 import '../../core/services/file_crypto_service.dart';
 import '../../core/models/drawing_model.dart';
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfId;
@@ -212,7 +213,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         'x-device-id': deviceId ?? '',
         'x-app-secret': const String.fromEnvironment('APP_SECRET'),
       };
-      _onlineUrl = 'https://courses.aw478260.dpdns.org/api/secure/get-pdf?pdfId=${widget.pdfId}';
+      _onlineUrl = '${ApiConstants.apiUrl}/secure/get-pdf?pdfId=${widget.pdfId}';
       
       if (mounted) setState(() => _loading = false);
 
