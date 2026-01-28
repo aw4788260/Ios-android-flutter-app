@@ -13,7 +13,6 @@ import '../utils/encryption_helper.dart'; // للفيديو (AES)
 import 'file_crypto_service.dart'; // ✅ للملفات (ChaCha20)
 import 'notification_service.dart';
 import '../../core/services/storage_service.dart';
-// أو المسار المناسب حسب مكان الملف
 
 class DownloadManager with WidgetsBindingObserver {
   static final DownloadManager _instance = DownloadManager._internal();
@@ -264,7 +263,7 @@ class DownloadManager with WidgetsBindingObserver {
 
       // Execution
       if (isPdf) {
-        // ✅ تحميل PDF (ChaCha20)
+        // ✅ تحميل PDF وتشفيره بنظام الأجزاء لتمكين فك التشفير عند الطلب
         await _downloadAndEncryptPdfNew(
           url: finalVideoUrl,
           savePath: videoSavePath,
@@ -426,7 +425,7 @@ class DownloadManager with WidgetsBindingObserver {
   }
 
   // ---------------------------------------------------------------------------
-  // 📄 New PDF Downloader (ChaCha20) - تحميل ثم تشفير
+  // 📄 New PDF Downloader (ChaCha20) - تحميل ثم تشفير بالأجزاء
   // ---------------------------------------------------------------------------
   Future<void> _downloadAndEncryptPdfNew({
     required String url,
@@ -452,15 +451,19 @@ class DownloadManager with WidgetsBindingObserver {
 
       if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
 
-      // 2. التشفير باستخدام ChaCha20 ونقله للمكان الدائم
-      await FileCryptoService.encryptFile(tempPath, savePath);
+      // 2. التعديل الجوهري: التشفير بنظام الأجزاء (encryptFileChunked) بدلاً من التشفير المستمر
+      // هذا يسمح بفك التشفير عند الطلب لاحقاً دون تحميل الملف كاملاً في الذاكرة
+      await FileCryptoService.encryptFileChunked(tempPath, savePath);
 
       // 3. حذف الملف الخام
       final tempFile = File(tempPath);
       if (await tempFile.exists()) await tempFile.delete();
 
     } catch (e) {
-      try { await File(tempPath).delete(); } catch (_) {}
+      try {
+        final f = File(tempPath);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
       rethrow;
     }
   }
