@@ -1,4 +1,4 @@
-package medaad.app
+package medaad.app.com
 
 import android.os.Bundle
 import android.app.NotificationManager
