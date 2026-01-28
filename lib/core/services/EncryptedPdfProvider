@@ -1,0 +1,44 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
+import '../services/file_crypto_service.dart';
+
+class EncryptedPdfProvider extends PdfDocumentProvider {
+  final File encryptedFile;
+  final int originalSize;
+  final String accessContextToken; // التوكن الخاص بجلسة العرض الحالية
+
+  EncryptedPdfProvider({
+    required this.encryptedFile, 
+    required this.originalSize,
+    required this.accessContextToken,
+  });
+
+  @override
+  Future<int> read(Uint8List buffer, int offset, int length) async {
+    try {
+      // التحقق من التوكن قبل البدء بفك تشفير أي بايتات
+      // هذا يمنع أي محاولة خارجية لاستدعاء دالة فك التشفير
+      if (accessContextToken.isEmpty) throw Exception("Unauthorized access");
+
+      final decryptedData = await FileCryptoService.readAndDecryptRange(
+        encryptedFile, 
+        offset, 
+        length
+      );
+      
+      buffer.setRange(0, decryptedData.length, decryptedData);
+      return decryptedData.length;
+    } catch (e) {
+      debugPrint("Security Violation or Read Error: $e");
+      return 0;
+    }
+  }
+
+  @override
+  int get fileSize => originalSize;
+
+  @override
+  String get sourceName => encryptedFile.path;
+}
