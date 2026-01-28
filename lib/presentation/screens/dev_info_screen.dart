@@ -2,12 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
-// استيراد الصفحات الجديدة
+import '../../core/services/storage_service.dart'; // ✅ استيراد خدمة التخزين
 import 'privacy_policy_screen.dart';
 import 'terms_conditions_screen.dart';
 
-class DevInfoScreen extends StatelessWidget {
+class DevInfoScreen extends StatefulWidget {
   const DevInfoScreen({super.key});
+
+  @override
+  State<DevInfoScreen> createState() => _DevInfoScreenState();
+}
+
+class _DevInfoScreenState extends State<DevInfoScreen> {
+  String? whatsappLink;
+  String? telegramLink;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContactInfo();
+  }
+
+  // ✅ تحميل بيانات التواصل المخزنة (التي تم جلبها من السيرفر)
+  Future<void> _loadContactInfo() async {
+    final info = await StorageService.getContactInfo();
+    if (mounted) {
+      setState(() {
+        whatsappLink = info['whatsapp'];
+        telegramLink = info['telegram'];
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,21 +115,30 @@ class DevInfoScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 32),
                           
-                          // أزرار التواصل (Amr AI)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _buildSocialBtn(
-                                icon: LucideIcons.mail, 
-                                url: "mailto:amr.01090991769.ai@gmail.com", 
-                              ),
-                              const SizedBox(width: 24),
-                              _buildSocialBtn(
-                                icon: LucideIcons.messageCircle, 
-                                url: "https://wa.me/201090991769", 
-                              ),
-                            ],
-                          )
+                          // ✅ أزرار التواصل الديناميكية (تظهر فقط إذا توفرت الروابط)
+                          if (isLoading)
+                             const CircularProgressIndicator(strokeWidth: 2)
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (whatsappLink != null && whatsappLink!.isNotEmpty)
+                                  _buildSocialBtn(
+                                    icon: LucideIcons.messageCircle, // أيقونة واتساب
+                                    url: whatsappLink!, 
+                                  ),
+                                
+                                if ((whatsappLink != null && whatsappLink!.isNotEmpty) && 
+                                    (telegramLink != null && telegramLink!.isNotEmpty))
+                                  const SizedBox(width: 24),
+
+                                if (telegramLink != null && telegramLink!.isNotEmpty)
+                                  _buildSocialBtn(
+                                    icon: LucideIcons.send, // أيقونة تليجرام
+                                    url: telegramLink!, 
+                                  ),
+                              ],
+                            )
                         ],
                       ),
                     ),
@@ -127,7 +163,6 @@ class DevInfoScreen extends StatelessWidget {
                       clipBehavior: Clip.antiAlias,
                       child: Column(
                         children: [
-                          // ✅ ربط صفحة سياسة الخصوصية
                           _buildDocItem(
                             context: context,
                             icon: LucideIcons.shield, 
@@ -137,7 +172,6 @@ class DevInfoScreen extends StatelessWidget {
                             }
                           ),
                           const Divider(height: 1, color: Colors.white10),
-                          // ✅ ربط صفحة الشروط والأحكام
                           _buildDocItem(
                             context: context,
                             icon: LucideIcons.fileText, 
@@ -147,18 +181,20 @@ class DevInfoScreen extends StatelessWidget {
                             }
                           ),
                           const Divider(height: 1, color: Colors.white10),
-                          // ✅ ربط زر الدعم الفني بالرقم المطلوب
+                          // ✅ زر الدعم الفني يستخدم رابط الواتساب الديناميكي
                           _buildDocItem(
                             context: context,
                             icon: LucideIcons.phone, 
                             title: "Contact Support",
                             onTap: () async {
-                              final Uri whatsappUri = Uri.parse("https://wa.me/201090991769");
-                              if (await canLaunchUrl(whatsappUri)) {
-                                await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+                              if (whatsappLink != null && whatsappLink!.isNotEmpty) {
+                                final Uri uri = Uri.parse(whatsappLink!);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                }
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: const Text("Could not open WhatsApp"), backgroundColor: AppColors.error),
+                                  SnackBar(content: const Text("Support contact not available"), backgroundColor: AppColors.error),
                                 );
                               }
                             }
@@ -183,10 +219,6 @@ class DevInfoScreen extends StatelessWidget {
                     Text(
                       "01090991769",
                       style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                    ),
-                    Text(
-                      "amr.01090991769.ai@gmail.com",
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 48),
                   ],
