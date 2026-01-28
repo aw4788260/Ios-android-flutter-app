@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart'; // ✅ ضروري لفتح ال
 import '../../core/constants/app_colors.dart';
 import 'course_details_screen.dart'; 
 import '../../core/services/storage_service.dart';
+import '../../core/constants/api_constants.dart';
 
 class TeacherProfileScreen extends StatefulWidget {
   final String teacherId;
@@ -32,7 +33,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
       final String? deviceId = box.get('device_id');
 
       final res = await Dio().get(
-        'https://courses.aw478260.dpdns.org/api/public/get-teacher-details',
+        '${ApiConstants.apiUrl}/public/get-teacher-details',
         queryParameters: {'teacherId': widget.teacherId},
         options: Options(
           headers: {
