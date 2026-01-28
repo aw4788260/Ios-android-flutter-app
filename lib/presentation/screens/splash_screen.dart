@@ -278,7 +278,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         AppState().updateFromInitData(response.data);
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
-        await StorageService.saveFullAppInitData(response.data);
+        // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ
+await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data));
 
         // ✅ 3. تخزين بيانات الوصول السريع (العلامة المائية ومعلومات التواصل)
         if (response.data['user'] != null && response.data['user']['phone'] != null) {
