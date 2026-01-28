@@ -34,7 +34,7 @@ class FileCryptoService {
     _key = SecretKey(keyBytes);
   }
 
-  /// ✅ التعديل الجديد: تشفير الملف بنظام الأجزاء (Chunks)
+  /// ✅ تشفير الملف بنظام الأجزاء (Chunks)
   /// هذا التنسيق يسمح لنا بالذهاب إلى أي مكان في الملف وفك تشفير جزء صغير منه فوراً
   static Future<void> encryptFileChunked(String inputPath, String outputPath) async {
     await init();
@@ -74,47 +74,80 @@ class FileCryptoService {
     }
   }
 
-  /// ✅ التعديل الجديد: فك تشفير نطاق محدد من البايتات "عند الطلب"
-  /// تُستخدم هذه الدالة من قبل مشغل الـ PDF لقراءة الأجزاء المطلوبة فقط للعرض
+  /// ✅ التعديل الجوهري: دعم قراءة البيانات عبر حدود الكتل المتعددة
+  /// هذه الدالة تقوم بتجميع البيانات المطلوبة حتى لو كانت موزعة على أكثر من جزء مشفر
   static Future<Uint8List> readAndDecryptRange(File encryptedFile, int offset, int length) async {
     await init();
     final raf = await encryptedFile.open(mode: FileMode.read);
     
+    // استخدام BytesBuilder لتجميع البيانات من عدة كتل بكفاءة
+    final builder = BytesBuilder(copy: false);
+    
     try {
-      // 1. تحديد أي جزء (Chunk) نحتاج لقراءته بناءً على الـ offset
-      int chunkIndex = offset ~/ CHUNK_SIZE;
-      int internalOffset = offset % CHUNK_SIZE;
-      
-      // 2. الانتقال إلى بداية الجزء المشفر في الملف
-      await raf.setPosition(chunkIndex * ENCRYPTED_CHUNK_SIZE);
-      
-      // 3. قراءة الكتلة المشفرة كاملة (Nonce + Ciphertext)
-      final encryptedData = await raf.read(ENCRYPTED_CHUNK_SIZE);
-      if (encryptedData.isEmpty) return Uint8List(0);
+      final int fileSize = await encryptedFile.length();
+      int currentReadOffset = offset;
+      int remainingLength = length;
 
-      final nonce = encryptedData.sublist(0, NONCE_LENGTH);
-      final cipherText = encryptedData.sublist(NONCE_LENGTH);
+      // حلقة تكرارية لجمع البيانات حتى نغطي الطول المطلوب (length) كاملاً
+      while (remainingLength > 0) {
+        // 1. تحديد أي كتلة (Chunk) نحن فيها الآن بناءً على الإزاحة الحالية
+        int chunkIndex = currentReadOffset ~/ CHUNK_SIZE;
+        
+        // 2. حساب مكان بداية هذه الكتلة في الملف المشفر
+        int chunkStartInFile = chunkIndex * ENCRYPTED_CHUNK_SIZE;
+        
+        // إذا وصلنا لنهاية الملف الحقيقي نتوقف
+        if (chunkStartInFile >= fileSize) break;
 
-      // 4. فك تشفير هذا الجزء الصغير في الذاكرة
-      final decrypted = await _algorithm.decrypt(
-        SecretBox(cipherText, nonce: nonce, mac: Mac.empty),
-        secretKey: _key!,
-      );
+        // 3. الانتقال وقراءة الكتلة المشفرة الحالية
+        await raf.setPosition(chunkStartInFile);
+        
+        // نقرأ الحد الأقصى المتوقع للكتلة المشفرة (قد تكون الأخيرة أصغر)
+        final encryptedBlock = await raf.read(ENCRYPTED_CHUNK_SIZE);
+        
+        // إذا لم نجد بيانات كافية (أقل من حجم الـ Nonce)، نتوقف
+        if (encryptedBlock.isEmpty || encryptedBlock.length <= NONCE_LENGTH) break;
 
-      final decryptedBytes = Uint8List.fromList(decrypted);
+        // 4. استخراج Nonce والبيانات وفك التشفير لهذه الكتلة
+        final nonce = encryptedBlock.sublist(0, NONCE_LENGTH);
+        final cipherText = encryptedBlock.sublist(NONCE_LENGTH);
+
+        final decryptedChunk = await _algorithm.decrypt(
+          SecretBox(cipherText, nonce: nonce, mac: Mac.empty),
+          secretKey: _key!,
+        );
+
+        // 5. تحديد الجزء المطلوب بالضبط من داخل هذه الكتلة المفكوكة
+        // حساب الإزاحة النسبية داخل الكتلة الحالية
+        int startInChunk = currentReadOffset % CHUNK_SIZE;
+        
+        // حساب كم تبقى من بيانات صالحة في هذه الكتلة بدءاً من الإزاحة النسبية
+        int availableInChunk = decryptedChunk.length - startInChunk;
+        
+        if (availableInChunk <= 0) break; // حماية إضافية
+
+        // نأخذ الكمية الأقل بين: ما تبقى في الكتلة، أو ما تبقى من الطلب الكلي
+        int bytesToTake = min(remainingLength, availableInChunk);
+        
+        // إضافة البيانات المستخلصة إلى المجمع النهائي
+        builder.add(decryptedChunk.sublist(startInChunk, startInChunk + bytesToTake));
+
+        // تحديث العدادات للدورة القادمة (للانتقال للكتلة التالية إذا لزم الأمر)
+        currentReadOffset += bytesToTake;
+        remainingLength -= bytesToTake;
+      }
+
+      return builder.toBytes();
       
-      // 5. استخراج البيانات المطلوبة بالضبط من داخل الجزء المفكوك
-      int end = (internalOffset + length) > decryptedBytes.length 
-          ? decryptedBytes.length 
-          : (internalOffset + length);
-          
-      return decryptedBytes.sublist(internalOffset, end);
+    } catch (e) {
+      // في حالة حدوث خطأ، نعيد مصفوفة فارغة ليتعامل معها العارض بدلاً من تحطيم التطبيق
+      return Uint8List(0);
     } finally {
       await raf.close();
     }
   }
 
-  // ملاحظة: تم الاحتفاظ بالدوال القديمة للتوافق، ولكن يُنصح باستخدام encryptFileChunked للـ PDF
+  // دالة التشفير القديمة (مبقاة للتوافق مع الملفات القديمة أو الفيديوهات إن وجدت)
   static Future<void> encryptFile(String inputPath, String outputPath) async {
     await init();
     final inFile = File(inputPath);
