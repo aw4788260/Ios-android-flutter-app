@@ -10,6 +10,7 @@ import 'video_player_screen.dart';
 import 'youtube_player_screen.dart';
 import 'pdf_viewer_screen.dart';
 import 'teacher/manage_content_screen.dart';
+import '../../core/constants/api_constants.dart';
 
 class ChapterContentsScreen extends StatefulWidget {
   final Map<String, dynamic> chapter;
@@ -32,7 +33,7 @@ class ChapterContentsScreen extends StatefulWidget {
 
 class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   String activeTab = 'videos';
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
   bool _isTeacher = false;
   late Map<String, dynamic> _currentChapter;
   bool _isLoading = false;
