@@ -10,6 +10,7 @@ import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/teacher_service.dart'; 
 import '../widgets/custom_text_field.dart';
+import '../../core/constants/api_constants.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -43,7 +44,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isTeacher = false;
    
   final TeacherService _teacherService = TeacherService(); 
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
