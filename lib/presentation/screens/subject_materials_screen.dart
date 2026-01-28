@@ -12,6 +12,7 @@ import 'exam_result_screen.dart';
 import 'teacher/manage_content_screen.dart';
 import 'teacher/create_exam_screen.dart';
 import 'teacher/exam_stats_screen.dart';
+import '../../core/constants/api_constants.dart';
 
 class SubjectMaterialsScreen extends StatefulWidget {
   final String subjectId;
@@ -34,7 +35,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   Map<String, dynamic>? _content;
   bool _isTeacher = false;
    
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
+  final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
