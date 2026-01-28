@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../core/constants/app_colors.dart';
 import 'login_screen.dart';
+import '../../core/constants/api_constants.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,8 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPassFocus = FocusNode();
 
   final Dio _dio = Dio();
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
-
+  final String _baseUrl = ApiConstants.baseUrl;
   bool _isLoading = false;
   String? _errorMessage;
 
