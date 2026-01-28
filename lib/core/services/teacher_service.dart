@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import '../services/storage_service.dart';
+import '../constants/api_constants.dart';
 
 class TeacherService {
   final Dio _dio = Dio();
   // ⚠️ تأكد من أن هذا الرابط صحيح ويعمل
-  final String baseUrl = "https://courses.aw478260.dpdns.org/api";
+  final String baseUrl = ApiConstants.apiUrl;
   
   // يفضل تعريف Secret التطبيق هنا أو جلبه من البيئة لضمان المرور من حماية السيرفر
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
