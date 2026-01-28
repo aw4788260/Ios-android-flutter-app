@@ -13,6 +13,7 @@ import 'main_wrapper.dart';
 import 'register_screen.dart';
 import '../../core/services/storage_service.dart';
 // تأكد من أن المسارات صحيحة لمشروعك
+import '../../core/constants/api_constants.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,8 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final FocusNode _passFocus = FocusNode();
 
   final Dio _dio = Dio();
-  final String _baseUrl = 'https://courses.aw478260.dpdns.org';
-
+  final String _baseUrl = ApiConstants.baseUrl;
   bool _isLoading = false;
   String? _errorMessage;
 
