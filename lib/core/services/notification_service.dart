@@ -25,17 +25,46 @@ class NotificationService {
       iOS: initializationSettingsDarwin,
     );
 
-    // طلب الأذونات (مهم لأندرويد 13+)
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.requestNotificationsPermission();
-
+    // 1. تهيئة البلاغن
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
         // التعامل مع الضغط على الإشعار
       },
     );
+
+    // 2. طلب الأذونات (أندرويد 13+)
+    final androidImplementation = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    
+    await androidImplementation?.requestNotificationsPermission();
+
+    // 3. ✅ إنشاء قنوات الإشعارات يدوياً لتفادي RemoteServiceException
+    if (androidImplementation != null) {
+      
+      // القناة الأولى: للتحميل (صامتة للـ Foreground Service)
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'downloads_channel', // نفس الـ ID المستخدم في main.dart و showProgressNotification
+          'Active Downloads',
+          description: 'Shows progress of active downloads',
+          importance: Importance.low, // Low = يظهر بدون صوت (مناسب لشريط التقدم)
+          playSound: false,
+          showBadge: false,
+        ),
+      );
+
+      // القناة الثانية: عند اكتمال التحميل (بصوت)
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'download_completed_channel',
+          'Download Completed',
+          description: 'Notifies when a download finishes',
+          importance: Importance.high, // High = يظهر بصوت وتنبيه
+          playSound: true,
+        ),
+      );
+    }
   }
 
   Future<void> cancelNotification(int id) async {
@@ -61,23 +90,23 @@ class NotificationService {
     required int progress,
     required int maxProgress,
   }) async {
-    // ✅ تصحيح: استخدام نفس ID القناة الموجود في main.dart بالضبط
+    // استخدام القناة التي أنشأناها بالأعلى
     const String channelId = 'downloads_channel'; 
     
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       channelId, 
-      'Downloads',
-      channelDescription: 'Notifications for file downloads',
+      'Active Downloads',
+      channelDescription: 'Shows progress of active downloads',
       importance: Importance.low, 
       priority: Priority.low,
       showProgress: true,
       maxProgress: maxProgress,
       progress: progress,
-      onlyAlertOnce: true,
-      ongoing: true,
+      onlyAlertOnce: true, // تحديث الشريط دون إعادة إصدار صوت/اهتزاز
+      ongoing: true, // يمنع المستخدم من حذفه أثناء التحميل
       autoCancel: false,
-      // ❌ تم حذف foregroundServiceBehavior لحل مشكلة البناء
+      playSound: false,
     );
 
     final NotificationDetails platformChannelSpecifics =
@@ -102,7 +131,7 @@ class NotificationService {
         AndroidNotificationDetails(
       channelId,
       'Download Completed',
-      channelDescription: 'Notifications for completed downloads',
+      channelDescription: 'Notifies when a download finishes',
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,

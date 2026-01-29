@@ -98,7 +98,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _populateListControllers(_instapayLinkControllers, paymentDetails['instapay_links']);
 
       } else {
-        // للطالب: الاعتماد على البيانات المحلية
+        // للطالب: الاعتماد على البيانات المحلية + AppState
         await _loadFromCacheFallback();
       }
     } catch (e) {
@@ -135,18 +135,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // دالة التحميل من الكاش (الاحتياطية)
+  // ✅ دالة التحميل من الكاش (الاحتياطية + AppState) المعدلة
   Future<void> _loadFromCacheFallback() async {
     var box = await StorageService.openBox('auth_box');
-    _nameController.text = box.get('first_name') ?? "";
-    _phoneController.text = box.get('phone') ?? "";
-    _usernameController.text = box.get('username') ?? "";
+    
+    // ✅ التعديل: محاولة جلب البيانات من AppState أولاً (حيث توجد بيانات init-data)
+    final userData = AppState().userData;
+
+    // الأولية لـ AppState، ثم Hive، ثم قيمة فارغة
+    _nameController.text = userData?['first_name'] ?? userData?['name'] ?? box.get('first_name') ?? "";
+    
+    // ✅ هنا الإصلاح الأساسي لرقم الهاتف
+    _phoneController.text = userData?['phone'] ?? box.get('phone') ?? "";
+    
+    _usernameController.text = userData?['username'] ?? box.get('username') ?? "";
     
     if (_isTeacher) {
-      _bioController.text = box.get('bio') ?? "";
-      _specialtyController.text = box.get('specialty') ?? "";
-      _whatsappController.text = box.get('whatsapp_number') ?? "";
-      _currentImageUrl = box.get('profile_image');
+      // للمدرسين أيضاً نستخدم نفس المنطق للبيانات الإضافية
+      _bioController.text = userData?['bio'] ?? box.get('bio') ?? "";
+      _specialtyController.text = userData?['specialty'] ?? box.get('specialty') ?? "";
+      _whatsappController.text = userData?['whatsapp_number'] ?? box.get('whatsapp_number') ?? "";
+      
+      _currentImageUrl = userData?['profile_image'] ?? box.get('profile_image');
       
       _populateListControllers(_cashNumberControllers, box.get('cash_numbers', defaultValue: []));
       _populateListControllers(_instapayNumberControllers, box.get('instapay_numbers', defaultValue: []));
@@ -253,7 +263,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           await box.put('bio', _bioController.text);
           await box.put('specialty', _specialtyController.text);
           await box.put('whatsapp_number', _whatsappController.text);
-          // ✅ حفظ القوائم في Hive أيضاً لكي تظهر في ProfileScreen إذا كان يقرأ من Hive
+          // حفظ القوائم في Hive أيضاً لكي تظهر في ProfileScreen إذا كان يقرأ من Hive
           await box.put('cash_numbers', cashList);
           await box.put('instapay_numbers', instaNumList);
           await box.put('instapay_links', instaLinkList);
@@ -419,9 +429,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           prefixIcon: LucideIcons.messageCircle,
                           keyboardType: TextInputType.phone,
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6, left: 8, bottom: 20),
-                          child: Text("Enter number with country code without '+' (e.g. 201xxxxxxxxx)", style: TextStyle(color: Colors.white38, fontSize: 11)),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 8, bottom: 20),
+                          // ✅ تم التعديل هنا: استخدام AppColors.textSecondary بدلاً من Colors.white38
+                          child: Text("Enter number with country code without '+' (e.g. 201xxxxxxxxx)", style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                         ),
                         
                         CustomTextField(

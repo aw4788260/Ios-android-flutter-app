@@ -212,13 +212,8 @@ class _DevInfoScreenState extends State<DevInfoScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "Amr AI",
+                      "A7MeD & 5@LiD   WaLiD",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accentYellow),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "01090991769",
-                      style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 48),
                   ],

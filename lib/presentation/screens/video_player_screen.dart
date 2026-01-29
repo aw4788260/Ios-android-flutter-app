@@ -352,9 +352,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
 
     _seekDebounceTimer = Timer(const Duration(milliseconds: 600), () async {
       try {
-        if (_player.state.duration == Duration.zero) return;
+        final duration = _player.state.duration;
+        // تأكد من أن مدة الفيديو صالحة
+        if (duration == Duration.zero) return;
+        
         final currentPos = _player.state.position;
-        final targetPos = currentPos + _accumulatedSeekAmount;
+        var targetPos = currentPos + _accumulatedSeekAmount;
+
+        // ✅ إصلاح مشكلة الرجوع: إذا كان الناتج أقل من صفر، اجعله صفر (بداية الفيديو)
+        if (targetPos < Duration.zero) {
+          targetPos = Duration.zero;
+        }
+
+        // ✅ إصلاح مشكلة التقديم: إذا كان الناتج أكبر من مدة الفيديو، اجعله في النهاية
+        if (targetPos > duration) {
+          targetPos = duration;
+        }
+
         await _player.seek(targetPos);
       } catch (e) {
         FirebaseCrashlytics.instance.recordError(e, null, reason: 'Seek Error');
