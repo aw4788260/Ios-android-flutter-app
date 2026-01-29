@@ -245,7 +245,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       if (res.statusCode == 200 && res.data['success'] == true) {
-        // تحديث الـ AppState فوراً لضمان تزامن البيانات
         if (AppState().userData != null) {
           AppState().userData!['first_name'] = _nameController.text;
           AppState().userData!['username'] = _usernameController.text;
@@ -430,9 +429,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           prefixIcon: LucideIcons.messageCircle,
                           keyboardType: TextInputType.phone,
                         ),
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6, left: 8, bottom: 20),
-                          child: Text("Enter number with country code without '+' (e.g. 201xxxxxxxxx)", style: TextStyle(color: Colors.white38, fontSize: 11)),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 8, bottom: 20),
+                          // ✅ تم التعديل هنا: استخدام AppColors.textSecondary بدلاً من Colors.white38
+                          child: Text("Enter number with country code without '+' (e.g. 201xxxxxxxxx)", style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                         ),
                         
                         CustomTextField(
