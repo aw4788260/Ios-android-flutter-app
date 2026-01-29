@@ -66,10 +66,10 @@ jobs:
           <dict>
               <key>keychain-access-groups</key>
               <array>
-                  <string>$(AppIdentifierPrefix)medaad.app.com</string>
+                  <string>$(AppIdentifierPrefix)com.medaad.edu</string>
               </array>
               <key>application-identifier</key>
-              <string>$(AppIdentifierPrefix)medaad.app.com</string>
+              <string>$(AppIdentifierPrefix)com.medaad.edu</string>
           </dict>
           </plist>
           EOF
