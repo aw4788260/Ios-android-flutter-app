@@ -212,7 +212,7 @@ class _DevInfoScreenState extends State<DevInfoScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "A7MeD WaLiD & 5@LiD",
+                      "A7MeD & 5@LiD   WaLiD",
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accentYellow),
                     ),
                     const SizedBox(height: 48),
