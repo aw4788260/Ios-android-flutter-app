@@ -834,31 +834,38 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                   
                   Expanded(
                     child: ValueListenableBuilder(
-                      valueListenable: Hive.box('downloads_box').listenable(),
-                      builder: (context, Box box, widget) {
-                        bool isDownloaded = DownloadManager().isFileDownloaded(videoId);
-                        bool isDownloading = DownloadManager().isFileDownloading(videoId);
+                      // ✅ التعديل هنا: الاستماع لتقدم التحميل من DownloadManager
+                      valueListenable: DownloadManager.downloadingProgress,
+                      builder: (context, Map<String, double> progresses, child) {
+                        return ValueListenableBuilder(
+                          valueListenable: Hive.box('downloads_box').listenable(),
+                          builder: (context, Box box, _) {
+                            bool isDownloaded = box.containsKey(videoId);
+                            // ✅ التحقق من أن الفيديو قيد التحميل حالياً
+                            bool isDownloading = progresses.containsKey(videoId);
 
-                        String? sizeStr;
-                        if (isDownloaded) {
-                           final item = box.get(videoId);
-                           if (item != null) {
-                             int bytes = item['size'] ?? 0;
-                             sizeStr = "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
-                           }
-                        }
+                            String? sizeStr;
+                            if (isDownloaded) {
+                               final item = box.get(videoId);
+                               if (item != null) {
+                                 int bytes = item['size'] ?? 0;
+                                 sizeStr = "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
+                               }
+                            }
 
-                        if (isDownloaded) {
-                           return _buildStatusButton("SAVED ${sizeStr != null ? '($sizeStr)' : ''}", AppColors.success, LucideIcons.checkCircle);
-                        }
-                        // ✅ عرض "PROCESSING..." أثناء التحميل لمنع التكرار
-                        else if (isDownloading) {
-                           return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
-                        }
-                        else return _buildActionButton(
-                          "Download", 
-                          AppColors.textSecondary, 
-                          () => _prepareVideoDownload(videoId, video['title'], duration)
+                            if (isDownloaded) {
+                               return _buildStatusButton("SAVED ${sizeStr != null ? '($sizeStr)' : ''}", AppColors.success, LucideIcons.checkCircle);
+                            }
+                            // ✅ سيتم عرض هذا الزر فوراً عند بدء التحميل
+                            else if (isDownloading) {
+                               return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
+                            }
+                            else return _buildActionButton(
+                              "Download", 
+                              AppColors.textSecondary, 
+                              () => _prepareVideoDownload(videoId, video['title'], duration)
+                            );
+                          },
                         );
                       },
                     ),
@@ -948,15 +955,20 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                   Container(width: 1, height: 48, color: AppColors.textSecondary.withOpacity(0.1)),
                   Expanded(
                     child: ValueListenableBuilder(
-                      valueListenable: Hive.box('downloads_box').listenable(),
-                      builder: (context, Box box, widget) {
-                        bool isDownloaded = DownloadManager().isFileDownloaded(pdfId);
-                        bool isDownloading = DownloadManager().isFileDownloading(pdfId);
+                      // ✅ التعديل هنا أيضاً للـ PDFs
+                      valueListenable: DownloadManager.downloadingProgress,
+                      builder: (context, Map<String, double> progresses, child) {
+                        return ValueListenableBuilder(
+                          valueListenable: Hive.box('downloads_box').listenable(),
+                          builder: (context, Box box, _) {
+                            bool isDownloaded = box.containsKey(pdfId);
+                            bool isDownloading = progresses.containsKey(pdfId);
 
-                        if (isDownloaded) return _buildStatusButton("SAVED", AppColors.success, LucideIcons.checkCircle);
-                        // ✅ عرض "PROCESSING..." أثناء تحميل الـ PDF
-                        else if (isDownloading) return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
-                        else return _buildActionButton("Download", AppColors.textSecondary, () => _startPdfDownload(pdfId, pdf['title']));
+                            if (isDownloaded) return _buildStatusButton("SAVED", AppColors.success, LucideIcons.checkCircle);
+                            else if (isDownloading) return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
+                            else return _buildActionButton("Download", AppColors.textSecondary, () => _startPdfDownload(pdfId, pdf['title']));
+                          },
+                        );
                       },
                     ),
                   ),
