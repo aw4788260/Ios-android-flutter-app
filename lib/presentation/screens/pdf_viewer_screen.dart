@@ -171,7 +171,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await FileCryptoService.init();
 
       final downloadsBox = await StorageService.openBox('downloads_box');
-      final downloadItem = downloadsBox.get(widget.pdfId);
+      final downloadItem = downloadsBox.get('pdf_${widget.pdfId}');
+
 
       if (downloadItem != null && downloadItem['path'] != null) {
         final file = File(downloadItem['path']);
