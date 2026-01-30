@@ -38,7 +38,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // --- متغيرات فك التشفير ---
   File? _encryptedFile;
   int? _originalFileSize;
-  String? _sessionToken; // توكن أمني للجلسة الحالية
+  String? _sessionToken; 
   
   // --- متغيرات العرض الأونلاين ---
   String? _onlineUrl; 
@@ -59,10 +59,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   double _penSize = 0.003; 
   double _highlightSize = 0.035; 
   double _eraserSize = 0.04; 
-  double _textSize = 0.03; // حجم أيقونة التعليق
+  double _textSize = 0.02; // ✅ تم تقليل الحجم الافتراضي للأيقونة
 
   Map<int, List<DrawingLine>> _pageDrawings = {};
-  Map<int, List<TextAnnotation>> _pageTexts = {}; // ✅ تخزين النصوص
+  Map<int, List<TextAnnotation>> _pageTexts = {}; 
 
   DrawingLine? _currentLine;
   int _activePage = 0; 
@@ -78,7 +78,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
-    if (_isOffline) _saveDataToHive(); // ✅ حفظ الرسم والنصوص
+    if (_isOffline) _saveDataToHive(); 
     super.dispose();
   }
 
@@ -88,7 +88,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     return base64Url.encode(values);
   }
 
-  /// ✅ دالة القراءة المخصصة (Custom Read Function)
   Future<int> _customRead(Uint8List buffer, int position, int size) async {
     try {
       if (_sessionToken == null) throw Exception("Unauthorized access context");
@@ -129,10 +128,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ✅ دالة الحفظ الموحدة (رسم + نصوص)
   Future<void> _saveDataToHive() async {
     try {
-      // 1. حفظ الرسم
       if (_pageDrawings.isNotEmpty) {
         final box = await StorageService.openBox('pdf_drawings_db');
         for (var entry in _pageDrawings.entries) {
@@ -145,7 +142,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         }
       }
 
-      // 2. حفظ النصوص (التعليقات)
       if (_pageTexts.isNotEmpty) {
         final textBox = await StorageService.openBox('pdf_texts_db');
         for (var entry in _pageTexts.entries) {
@@ -179,7 +175,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ✅ دالة استرجاع النصوص
   Future<List<TextAnnotation>> _getTextsForPage(int pageNumber) async {
     if (_pageTexts.containsKey(pageNumber)) {
       return _pageTexts[pageNumber]!;
@@ -209,8 +204,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await FileCryptoService.init();
 
       final downloadsBox = await StorageService.openBox('downloads_box');
-      
-      // ✅ استخدام المفتاح الجديد مع البادئة 'pdf_'
       final downloadItem = downloadsBox.get('pdf_${widget.pdfId}');
 
       if (downloadItem != null && downloadItem['path'] != null) {
@@ -258,19 +251,20 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ✅ دالة إضافة ملاحظة جديدة
+  // ✅ دالة إضافة ملاحظة جديدة (تم تعديل الألوان)
   void _addTextAnnotation(BuildContext context, Rect pageRect, PdfPage page, Offset relativeTapPos) {
     TextEditingController textController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.backgroundSecondary,
-        title: const Text("إضافة ملاحظة", style: TextStyle(color: Colors.white)),
+        // ✅ استخدام AppColors.textPrimary لضمان الظهور في الوضعين
+        title: Text("إضافة ملاحظة", style: TextStyle(color: AppColors.textPrimary)),
         content: TextField(
           controller: textController,
-          style: const TextStyle(color: Colors.white),
+          // ✅ لون النص يتكيف مع الوضع
+          style: TextStyle(color: AppColors.textPrimary), 
           maxLines: 3,
-          // ✅ تم إزالة const لإصلاح الخطأ
           decoration: InputDecoration(
             hintText: "اكتب ملاحظتك هنا...",
             hintStyle: const TextStyle(color: Colors.grey),
@@ -284,7 +278,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            // ✅ تم إزالة const لإصلاح الخطأ
             child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
             onPressed: () {
               if (textController.text.trim().isNotEmpty) {
@@ -306,7 +299,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  // ✅ دالة عرض وتعديل الملاحظة
+  // ✅ دالة عرض وتعديل الملاحظة (تم إصلاح الوضوح)
   void _showNoteDialog(BuildContext context, TextAnnotation annotation, int pageNumber) {
     TextEditingController textController = TextEditingController(text: annotation.text);
     bool isEditing = false;
@@ -321,15 +314,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               children: [
                 Icon(LucideIcons.messageCircle, color: Color(annotation.color)),
                 const SizedBox(width: 8),
-                const Text("ملاحظة", style: TextStyle(color: Colors.white)),
+                // ✅ تعديل اللون ليكون ديناميكياً
+                Text("ملاحظة", style: TextStyle(color: AppColors.textPrimary)),
               ],
             ),
             content: isEditing
                 ? TextField(
                     controller: textController,
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: AppColors.textPrimary), // ✅ تعديل
                     maxLines: 5,
-                    // ✅ تم إزالة const لإصلاح الخطأ
                     decoration: InputDecoration(
                       hintText: "اكتب ملاحظتك هنا...",
                       hintStyle: const TextStyle(color: Colors.grey),
@@ -340,7 +333,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 : SingleChildScrollView(
                     child: Text(
                       annotation.text,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      // ✅ تعديل: لون النص ديناميكي وحجم خط مناسب
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
                     ),
                   ),
             actions: [
@@ -356,7 +350,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               const Spacer(),
               if (isEditing)
                 TextButton(
-                  // ✅ تم إزالة const لإصلاح الخطأ
                   child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
                   onPressed: () {
                     if (textController.text.trim().isNotEmpty) {
@@ -369,7 +362,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 )
               else
                 TextButton(
-                  // ✅ تم إزالة const لإصلاح الخطأ
                   child: Text("تعديل", style: TextStyle(color: AppColors.accentYellow)),
                   onPressed: () {
                     setStateDialog(() => isEditing = true);
@@ -431,10 +423,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ✅ تم إزالة const لإصلاح الخطأ
             CircularProgressIndicator(color: AppColors.accentYellow),
             const SizedBox(height: 20),
-            // ✅ تم إزالة const لإصلاح الخطأ
             Text(_loadingMessage, style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
           ],
         ),
@@ -542,7 +532,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
-            // ✅ تم إزالة const لإصلاح الخطأ
             child: Text("فهرس الصفحات", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           const Divider(color: Colors.white10),
@@ -644,6 +633,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     top: annotation.position.dy * pageRect.height,
                     child: GestureDetector(
                       onTap: () => _showNoteDialog(context, annotation, page.pageNumber),
+                      // ✅ تحريك التعليق فقط عند تفعيل أداة النص
                       onPanUpdate: _isDrawingMode && _selectedTool == 3 ? (details) {
                         setState(() {
                           double newDx = annotation.position.dx + (details.delta.dx / pageRect.width);
@@ -656,7 +646,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         child: Icon(
                           LucideIcons.messageCircle,
                           color: Color(annotation.color),
-                          size: annotation.fontSize * pageRect.width * 20, 
+                          // ✅ تم تقليل معامل الضرب إلى 5 لجعل الحجم منطقياً
+                          size: annotation.fontSize * pageRect.width * 5, 
                           shadows: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
                         ),
                       ),
