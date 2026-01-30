@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:typed_data'; // ✅ ضروري لتعريف Uint8List
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart'; 
 import 'package:hive_flutter/hive_flutter.dart';
@@ -38,7 +38,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // --- متغيرات فك التشفير ---
   File? _encryptedFile;
   int? _originalFileSize;
-  String? _sessionToken; 
+  String? _sessionToken; // توكن أمني للجلسة الحالية
   
   // --- متغيرات العرض الأونلاين ---
   String? _onlineUrl; 
@@ -50,20 +50,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isOffline = false;
   String _watermarkText = '';
 
-  // --- أدوات الرسم والنصوص ---
+  // --- أدوات الرسم ---
   bool _isDrawingMode = false;
-  // 0 = Pen, 1 = Highlighter, 2 = Eraser, 3 = Text Comment
-  int _selectedTool = 0; 
+  int _selectedTool = 0; // 0 = Pen, 1 = Highlighter, 2 = Eraser
   Color _selectedColor = Colors.red;
-  
   double _penSize = 0.003; 
   double _highlightSize = 0.035; 
   double _eraserSize = 0.04; 
-  double _textSize = 0.02; // ✅ تم تقليل الحجم الافتراضي للأيقونة
 
   Map<int, List<DrawingLine>> _pageDrawings = {};
-  Map<int, List<TextAnnotation>> _pageTexts = {}; 
-
   DrawingLine? _currentLine;
   int _activePage = 0; 
   int _totalPages = 0;
@@ -78,7 +73,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
-    if (_isOffline) _saveDataToHive(); 
+    if (_isOffline) _saveDrawingsToHive();
     super.dispose();
   }
 
@@ -88,17 +83,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     return base64Url.encode(values);
   }
 
+  /// ✅ دالة القراءة المخصصة (Custom Read Function)
   Future<int> _customRead(Uint8List buffer, int position, int size) async {
     try {
+      // 1. التحقق من التوكن الأمني لضمان أن الاستدعاء شرعي
       if (_sessionToken == null) throw Exception("Unauthorized access context");
       if (_encryptedFile == null) throw Exception("File not initialized");
 
+      // 2. فك تشفير الجزء المطلوب فقط (Chunked Decryption)
       final decryptedData = await FileCryptoService.readAndDecryptRange(
         _encryptedFile!, 
         position, 
         size
       );
       
+      // 3. نسخ البيانات المفكوكة إلى الـ buffer الخاص بالمكتبة
       if (decryptedData.isNotEmpty) {
         buffer.setRange(0, decryptedData.length, decryptedData);
         return decryptedData.length;
@@ -128,29 +127,16 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  Future<void> _saveDataToHive() async {
+  Future<void> _saveDrawingsToHive() async {
+    if (_pageDrawings.isEmpty) return;
     try {
-      if (_pageDrawings.isNotEmpty) {
-        final box = await StorageService.openBox('pdf_drawings_db');
-        for (var entry in _pageDrawings.entries) {
-          final page = entry.key;
-          final lines = entry.value;
-          if (lines.isNotEmpty) {
+      final box = await StorageService.openBox('pdf_drawings_db');
+      for (var entry in _pageDrawings.entries) {
+        final page = entry.key;
+        final lines = entry.value;
+        if (lines.isNotEmpty) {
             final serialized = lines.map((l) => l.toJson()).toList();
             await box.put('${widget.pdfId}_$page', serialized);
-          }
-        }
-      }
-
-      if (_pageTexts.isNotEmpty) {
-        final textBox = await StorageService.openBox('pdf_texts_db');
-        for (var entry in _pageTexts.entries) {
-          final page = entry.key;
-          final texts = entry.value;
-          if (texts.isNotEmpty) {
-            final serialized = texts.map((t) => t.toJson()).toList();
-            await textBox.put('${widget.pdfId}_$page', serialized);
-          }
         }
       }
     } catch (_) {}
@@ -175,25 +161,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  Future<List<TextAnnotation>> _getTextsForPage(int pageNumber) async {
-    if (_pageTexts.containsKey(pageNumber)) {
-      return _pageTexts[pageNumber]!;
-    }
-    try {
-      final box = await StorageService.openBox('pdf_texts_db');
-      final dynamic data = box.get('${widget.pdfId}_$pageNumber');
-      List<TextAnnotation> texts = [];
-      if (data != null) {
-        final List<dynamic> rawList = data;
-        texts = rawList.map((e) => TextAnnotation.fromJson(Map<String, dynamic>.from(e))).toList();
-      }
-      _pageTexts[pageNumber] = texts;
-      return texts;
-    } catch (_) {
-      return [];
-    }
-  }
-
   Future<void> _preparePdf() async {
     setState(() {
       _loading = true;
@@ -206,11 +173,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       final downloadsBox = await StorageService.openBox('downloads_box');
       final downloadItem = downloadsBox.get('pdf_${widget.pdfId}');
 
+
       if (downloadItem != null && downloadItem['path'] != null) {
         final file = File(downloadItem['path']);
         if (await file.exists()) {
           final totalSize = await file.length();
           
+          // حساب الحجم الأصلي (استبعاد الـ Nonce المضاف لكل جزء)
           int numChunks = (totalSize / FileCryptoService.ENCRYPTED_CHUNK_SIZE).ceil();
           int originalSize = totalSize - (numChunks * FileCryptoService.NONCE_LENGTH);
 
@@ -226,6 +195,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         }
       }
 
+      // التحميل المباشر (Online Stream)
       setState(() {
         _isOffline = false;
         _loadingMessage = "جار التحميل المباشر...";
@@ -251,133 +221,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // ✅ دالة إضافة ملاحظة جديدة (تم تعديل الألوان)
-  void _addTextAnnotation(BuildContext context, Rect pageRect, PdfPage page, Offset relativeTapPos) {
-    TextEditingController textController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.backgroundSecondary,
-        // ✅ استخدام AppColors.textPrimary لضمان الظهور في الوضعين
-        title: Text("إضافة ملاحظة", style: TextStyle(color: AppColors.textPrimary)),
-        content: TextField(
-          controller: textController,
-          // ✅ لون النص يتكيف مع الوضع
-          style: TextStyle(color: AppColors.textPrimary), 
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: "اكتب ملاحظتك هنا...",
-            hintStyle: const TextStyle(color: Colors.grey),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
-            onPressed: () => Navigator.pop(context),
-          ),
-          TextButton(
-            child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
-            onPressed: () {
-              if (textController.text.trim().isNotEmpty) {
-                setState(() {
-                  if (_pageTexts[page.pageNumber] == null) _pageTexts[page.pageNumber] = [];
-                  _pageTexts[page.pageNumber]!.add(TextAnnotation(
-                    text: textController.text,
-                    position: relativeTapPos,
-                    color: _selectedColor.value,
-                    fontSize: _textSize,
-                  ));
-                });
-                Navigator.pop(context);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ دالة عرض وتعديل الملاحظة (تم إصلاح الوضوح)
-  void _showNoteDialog(BuildContext context, TextAnnotation annotation, int pageNumber) {
-    TextEditingController textController = TextEditingController(text: annotation.text);
-    bool isEditing = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setStateDialog) {
-          return AlertDialog(
-            backgroundColor: AppColors.backgroundSecondary,
-            title: Row(
-              children: [
-                Icon(LucideIcons.messageCircle, color: Color(annotation.color)),
-                const SizedBox(width: 8),
-                // ✅ تعديل اللون ليكون ديناميكياً
-                Text("ملاحظة", style: TextStyle(color: AppColors.textPrimary)),
-              ],
-            ),
-            content: isEditing
-                ? TextField(
-                    controller: textController,
-                    style: TextStyle(color: AppColors.textPrimary), // ✅ تعديل
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      hintText: "اكتب ملاحظتك هنا...",
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                      focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    child: Text(
-                      annotation.text,
-                      // ✅ تعديل: لون النص ديناميكي وحجم خط مناسب
-                      style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
-                    ),
-                  ),
-            actions: [
-              TextButton(
-                child: const Text("حذف", style: TextStyle(color: Colors.red)),
-                onPressed: () {
-                  setState(() {
-                    _pageTexts[pageNumber]?.remove(annotation);
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              const Spacer(),
-              if (isEditing)
-                TextButton(
-                  child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
-                  onPressed: () {
-                    if (textController.text.trim().isNotEmpty) {
-                      setState(() {
-                        annotation.text = textController.text;
-                      });
-                      Navigator.pop(context);
-                    }
-                  },
-                )
-              else
-                TextButton(
-                  child: Text("تعديل", style: TextStyle(color: AppColors.accentYellow)),
-                  onPressed: () {
-                    setStateDialog(() => isEditing = true);
-                  },
-                ),
-              TextButton(
-                child: const Text("إغلاق", style: TextStyle(color: Colors.grey)),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) return _buildLoadingView();
@@ -390,11 +233,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
+          // ✅ عرض الـ PDF باستخدام الطريقة الصحيحة للمكتبة الحديثة
           _isOffline && _encryptedFile != null && _originalFileSize != null
             ? PdfViewer.custom(
-                fileSize: _originalFileSize!,
-                read: _customRead,
-                sourceName: _encryptedFile!.path,
+                fileSize: _originalFileSize!, // تمرير الحجم الأصلي
+                read: _customRead,            // تمرير دالة القراءة المباشرة
+                sourceName: _encryptedFile!.path, // اسم المصدر
                 controller: _pdfController,
                 params: _buildPdfParams(),
               )
@@ -405,8 +249,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 params: _buildPdfParams(),
               ),
 
+          // العلامة المائية (Watermark)
           _buildWatermark(),
 
+          // شريط أدوات الرسم (فقط في وضع الأوفلاين)
           if (_isDrawingMode && _isOffline)
             Positioned(bottom: 40, left: 20, right: 20, child: _buildToolbar()),
         ],
@@ -457,7 +303,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       leading: BackButton(
         color: AppColors.accentYellow,
         onPressed: () async {
-           if(_isOffline) await _saveDataToHive();
+           if(_isOffline) await _saveDrawingsToHive();
            if(context.mounted) Navigator.pop(context);
         }
       ),
@@ -562,9 +408,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
       backgroundColor: AppColors.backgroundPrimary,
-      textSelectionParams: const PdfTextSelectionParams(enabled: false),
+      textSelectionParams: const PdfTextSelectionParams(enabled: false), // منع النسخ
       scrollPhysics: const BouncingScrollPhysics(),
       
+      // ✅ تمت إضافة شاشة الانتظار أثناء تحميل الصفحات أونلاين
       loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
         return Center(
           child: Container(
@@ -581,7 +428,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       onDocumentChanged: (document) {
         if (mounted) setState(() => _totalPages = document?.pages.length ?? 0);
       },
-
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
         return [
@@ -594,73 +440,27 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 if (_isDrawingMode && _currentLine != null && _activePage == page.pageNumber) {
                   allLines.add(_currentLine!);
                 }
-                return GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onPanStart: (details) {
-                    if (_selectedTool == 3) {
-                       final renderBox = context.findRenderObject() as RenderBox;
-                       final localPos = renderBox.globalToLocal(details.globalPosition);
-                       final relativePoint = Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
-                       _addTextAnnotation(context, pageRect, page, relativePoint);
-                    } else {
-                       _startStroke(details, context, pageRect, page);
-                    }
-                  },
-                  onPanUpdate: (details) {
-                    if (_selectedTool != 3) _updateStroke(details, context, pageRect);
-                  },
-                  onPanEnd: (details) {
-                    if (_selectedTool != 3) _endStroke(page);
-                  },
-                  child: CustomPaint(
-                    painter: RelativeSketchPainter(lines: allLines, pageSize: pageRect.size),
+                return IgnorePointer(
+                  ignoring: !_isDrawingMode,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onPanStart: (details) => _startStroke(details, context, pageRect, page),
+                    onPanUpdate: (details) => _updateStroke(details, context, pageRect),
+                    onPanEnd: (details) => _endStroke(page),
+                    child: CustomPaint(
+                      painter: RelativeSketchPainter(lines: allLines, pageSize: pageRect.size),
+                    ),
                   ),
                 );
               },
             ),
           ),
-
-          FutureBuilder<List<TextAnnotation>>(
-            future: _getTextsForPage(page.pageNumber),
-            builder: (context, snapshot) {
-              final texts = _pageTexts[page.pageNumber] ?? snapshot.data ?? [];
-              if (texts.isEmpty) return const SizedBox();
-
-              return Stack(
-                children: texts.map((annotation) {
-                  return Positioned(
-                    left: annotation.position.dx * pageRect.width,
-                    top: annotation.position.dy * pageRect.height,
-                    child: GestureDetector(
-                      onTap: () => _showNoteDialog(context, annotation, page.pageNumber),
-                      // ✅ تحريك التعليق فقط عند تفعيل أداة النص
-                      onPanUpdate: _isDrawingMode && _selectedTool == 3 ? (details) {
-                        setState(() {
-                          double newDx = annotation.position.dx + (details.delta.dx / pageRect.width);
-                          double newDy = annotation.position.dy + (details.delta.dy / pageRect.height);
-                          annotation.position = Offset(newDx, newDy);
-                        });
-                      } : null,
-                      child: Container(
-                        padding: const EdgeInsets.all(8), 
-                        child: Icon(
-                          LucideIcons.messageCircle,
-                          color: Color(annotation.color),
-                          // ✅ تم تقليل معامل الضرب إلى 5 لجعل الحجم منطقياً
-                          size: annotation.fontSize * pageRect.width * 5, 
-                          shadows: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
         ];
       },
     );
   }
+
+  // --- منطق الرسم ---
 
   void _startStroke(DragStartDetails details, BuildContext context, Rect pageRect, PdfPage page) {
     if (!_isDrawingMode) return;
@@ -715,21 +515,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 _toolIcon(LucideIcons.highlighter, 1),
                 const SizedBox(width: 8),
                 _toolIcon(LucideIcons.eraser, 2),
-                const SizedBox(width: 8),
-                _toolIcon(LucideIcons.messageSquare, 3), 
-                
                 const SizedBox(width: 12),
                 IconButton(
                   icon: const Icon(LucideIcons.undo, color: Colors.white, size: 20),
                   onPressed: () {
-                      if (_selectedTool == 3) {
-                         if (_pageTexts[_activePage]?.isNotEmpty ?? false) {
-                           setState(() => _pageTexts[_activePage]!.removeLast());
-                         }
-                      } else {
-                         if (_pageDrawings[_activePage]?.isNotEmpty ?? false) {
-                           setState(() => _pageDrawings[_activePage]!.removeLast());
-                         }
+                      if (_pageDrawings[_activePage]?.isNotEmpty ?? false) {
+                        setState(() => _pageDrawings[_activePage]!.removeLast());
                       }
                   },
                 ),
@@ -738,7 +529,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 const SizedBox(width: 12),
                 if (_selectedTool != 2) ...[
                   _colorCircle(Colors.red), _colorCircle(Colors.blue), _colorCircle(Colors.green),
-                  _colorCircle(Colors.yellow), _colorCircle(Colors.white), _colorCircle(Colors.purple),
+                  _colorCircle(Colors.yellow), _colorCircle(Colors.white),
                 ],
               ],
             ),
@@ -751,23 +542,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Widget _sizeSlider() {
-    double currentVal;
-    if (_selectedTool == 3) currentVal = _textSize;
-    else if (_selectedTool == 2) currentVal = _eraserSize; 
-    else if (_selectedTool == 1) currentVal = _highlightSize; 
-    else currentVal = _penSize;
-
-    double maxVal = _selectedTool == 3 ? 0.08 : 0.08; 
-
     return Slider(
-      value: currentVal,
-      min: 0.001, max: maxVal, 
+      value: _selectedTool == 2 ? _eraserSize : (_selectedTool == 1 ? _highlightSize : _penSize),
+      min: 0.001, max: 0.08, 
       activeColor: _selectedTool == 2 ? Colors.white : _selectedColor,
       onChanged: (val) => setState(() {
-        if (_selectedTool == 3) _textSize = val;
-        else if (_selectedTool == 2) _eraserSize = val; 
-        else if (_selectedTool == 1) _highlightSize = val; 
-        else _penSize = val;
+        if (_selectedTool == 2) _eraserSize = val; else if (_selectedTool == 1) _highlightSize = val; else _penSize = val;
       }),
     );
   }
@@ -832,35 +612,4 @@ class RelativeSketchPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class TextAnnotation {
-  String text;
-  Offset position; 
-  int color;
-  double fontSize; 
-
-  TextAnnotation({
-    required this.text,
-    required this.position,
-    required this.color,
-    required this.fontSize,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'text': text,
-    'dx': position.dx,
-    'dy': position.dy,
-    'color': color,
-    'fontSize': fontSize,
-  };
-
-  factory TextAnnotation.fromJson(Map<String, dynamic> json) {
-    return TextAnnotation(
-      text: json['text'],
-      position: Offset(json['dx'], json['dy']),
-      color: json['color'],
-      fontSize: json['fontSize'],
-    );
-  }
 }
