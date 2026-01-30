@@ -345,7 +345,11 @@ class DownloadManager with WidgetsBindingObserver {
       }
 
       var downloadsBox = await StorageService.openBox('downloads_box');
-      await downloadsBox.put(lessonId, {
+      
+      // ✅ التعديل هنا: استخدام مفتاح فريد يعتمد على النوع لتجنب التضارب
+      String uniqueStorageKey = isPdf ? 'pdf_$lessonId' : 'vid_$lessonId';
+
+      await downloadsBox.put(uniqueStorageKey, { 
         'id': lessonId,
         'title': videoTitle,
         'path': videoSavePath,
