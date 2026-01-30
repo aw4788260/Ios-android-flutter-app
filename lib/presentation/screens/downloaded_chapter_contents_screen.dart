@@ -125,13 +125,13 @@ class _DownloadedChapterContentsScreenState extends State<DownloadedChapterConte
   }
 
   // --- تشغيل PDF أوفلاين ---
-  void _openOfflinePdf(String key, String title) {
+  void _openOfflinePdf(String id, String title) {
     try {
-      FirebaseCrashlytics.instance.log("📄 User requested offline PDF: $title");
+      FirebaseCrashlytics.instance.log("📄 User requested offline PDF: $title (ID: $id)");
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PdfViewerScreen(pdfId: key, title: title),
+          builder: (_) => PdfViewerScreen(pdfId: id, title: title),
         ),
       );
     } catch (e, stack) {
@@ -339,7 +339,9 @@ class _DownloadedChapterContentsScreenState extends State<DownloadedChapterConte
                // ✅ استدعاء الدالة الجديدة التي تقوم بالتحضير
                _prepareAndPlayOfflineVideo(item);
              } else {
-               _openOfflinePdf(key.toString(), item['title'] ?? 'Document');
+               // ✅ التعديل هنا: تمرير الـ ID الأصلي فقط بدلاً من المفتاح الكامل
+               // هذا لأن شاشة PdfViewerScreen تضيف البادئة 'pdf_' تلقائياً
+               _openOfflinePdf(item['id'].toString(), item['title'] ?? 'Document');
              }
           },
           child: Container(
