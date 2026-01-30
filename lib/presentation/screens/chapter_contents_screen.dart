@@ -840,13 +840,17 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                         return ValueListenableBuilder(
                           valueListenable: Hive.box('downloads_box').listenable(),
                           builder: (context, Box box, _) {
-                            bool isDownloaded = box.containsKey(videoId);
+                            // ✅ التعديل: الفحص باستخدام المفتاح الفريد للفيديو
+                            String storageKey = 'vid_$videoId'; 
+                            bool isDownloaded = box.containsKey(storageKey); 
+                            
                             // ✅ التحقق من أن الفيديو قيد التحميل حالياً
                             bool isDownloading = progresses.containsKey(videoId);
 
                             String? sizeStr;
                             if (isDownloaded) {
-                               final item = box.get(videoId);
+                               // ✅ التعديل: جلب البيانات بالمفتاح الصحيح
+                               final item = box.get(storageKey);
                                if (item != null) {
                                  int bytes = item['size'] ?? 0;
                                  sizeStr = "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
@@ -961,7 +965,10 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                         return ValueListenableBuilder(
                           valueListenable: Hive.box('downloads_box').listenable(),
                           builder: (context, Box box, _) {
-                            bool isDownloaded = box.containsKey(pdfId);
+                            // ✅ التعديل: الفحص باستخدام مفتاح الـ PDF
+                            String storageKey = 'pdf_$pdfId';
+                            bool isDownloaded = box.containsKey(storageKey);
+                            
                             bool isDownloading = progresses.containsKey(pdfId);
 
                             if (isDownloaded) return _buildStatusButton("SAVED", AppColors.success, LucideIcons.checkCircle);
