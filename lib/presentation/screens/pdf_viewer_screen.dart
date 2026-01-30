@@ -209,6 +209,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       await FileCryptoService.init();
 
       final downloadsBox = await StorageService.openBox('downloads_box');
+      
+      // ✅ استخدام المفتاح الجديد مع البادئة 'pdf_'
       final downloadItem = downloadsBox.get('pdf_${widget.pdfId}');
 
       if (downloadItem != null && downloadItem['path'] != null) {
@@ -268,9 +270,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           controller: textController,
           style: const TextStyle(color: Colors.white),
           maxLines: 3,
-          decoration: const InputDecoration(
+          // ✅ تم إزالة const لإصلاح الخطأ
+          decoration: InputDecoration(
             hintText: "اكتب ملاحظتك هنا...",
-            hintStyle: TextStyle(color: Colors.grey),
+            hintStyle: const TextStyle(color: Colors.grey),
             enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
           ),
           autofocus: true,
@@ -281,7 +284,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: const Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
+            // ✅ تم إزالة const لإصلاح الخطأ
+            child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
             onPressed: () {
               if (textController.text.trim().isNotEmpty) {
                 setState(() {
@@ -325,10 +329,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     controller: textController,
                     style: const TextStyle(color: Colors.white),
                     maxLines: 5,
-                    decoration: const InputDecoration(
+                    // ✅ تم إزالة const لإصلاح الخطأ
+                    decoration: InputDecoration(
                       hintText: "اكتب ملاحظتك هنا...",
-                      hintStyle: TextStyle(color: Colors.grey),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
                       focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
                     ),
                   )
@@ -351,7 +356,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               const Spacer(),
               if (isEditing)
                 TextButton(
-                  child: const Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
+                  // ✅ تم إزالة const لإصلاح الخطأ
+                  child: Text("حفظ", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
                   onPressed: () {
                     if (textController.text.trim().isNotEmpty) {
                       setState(() {
@@ -363,7 +369,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 )
               else
                 TextButton(
-                  child: const Text("تعديل", style: TextStyle(color: AppColors.accentYellow)),
+                  // ✅ تم إزالة const لإصلاح الخطأ
+                  child: Text("تعديل", style: TextStyle(color: AppColors.accentYellow)),
                   onPressed: () {
                     setStateDialog(() => isEditing = true);
                   },
@@ -424,8 +431,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // ✅ تم إزالة const لإصلاح الخطأ
             CircularProgressIndicator(color: AppColors.accentYellow),
             const SizedBox(height: 20),
+            // ✅ تم إزالة const لإصلاح الخطأ
             Text(_loadingMessage, style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
           ],
         ),
@@ -533,6 +542,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
+            // ✅ تم إزالة const لإصلاح الخطأ
             child: Text("فهرس الصفحات", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
           const Divider(color: Colors.white10),
@@ -583,11 +593,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         if (mounted) setState(() => _totalPages = document?.pages.length ?? 0);
       },
 
-      // ✅ بناء طبقات الرسم والنصوص
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
         return [
-          // الطبقة 1: الرسم الحر (Pen/Highlighter/Eraser)
           Positioned.fill(
             child: FutureBuilder<List<DrawingLine>>(
               future: _getDrawingsForPage(page.pageNumber),
@@ -597,11 +605,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 if (_isDrawingMode && _currentLine != null && _activePage == page.pageNumber) {
                   allLines.add(_currentLine!);
                 }
-                // التعامل مع اللمس: إضافة نص أو رسم
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onPanStart: (details) {
-                    // إذا كانت أداة النص، نضيف ملاحظة
                     if (_selectedTool == 3) {
                        final renderBox = context.findRenderObject() as RenderBox;
                        final localPos = renderBox.globalToLocal(details.globalPosition);
@@ -625,7 +631,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
           ),
 
-          // الطبقة 2: أيقونات الملاحظات (Comments)
           FutureBuilder<List<TextAnnotation>>(
             future: _getTextsForPage(page.pageNumber),
             builder: (context, snapshot) {
@@ -638,9 +643,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     left: annotation.position.dx * pageRect.width,
                     top: annotation.position.dy * pageRect.height,
                     child: GestureDetector(
-                      // فتح الملاحظة
                       onTap: () => _showNoteDialog(context, annotation, page.pageNumber),
-                      // سحب الملاحظة (فقط في وضع النص)
                       onPanUpdate: _isDrawingMode && _selectedTool == 3 ? (details) {
                         setState(() {
                           double newDx = annotation.position.dx + (details.delta.dx / pageRect.width);
@@ -653,7 +656,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         child: Icon(
                           LucideIcons.messageCircle,
                           color: Color(annotation.color),
-                          size: annotation.fontSize * pageRect.width * 20, // تحجيم الأيقونة حسب الزووم
+                          size: annotation.fontSize * pageRect.width * 20, 
                           shadows: const [BoxShadow(color: Colors.black45, blurRadius: 4)],
                         ),
                       ),
@@ -667,8 +670,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       },
     );
   }
-
-  // --- منطق الرسم ---
 
   void _startStroke(DragStartDetails details, BuildContext context, Rect pageRect, PdfPage page) {
     if (!_isDrawingMode) return;
@@ -706,8 +707,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // --- Toolbar ---
-
   Widget _buildToolbar() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -726,7 +725,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 const SizedBox(width: 8),
                 _toolIcon(LucideIcons.eraser, 2),
                 const SizedBox(width: 8),
-                // ✅ أيقونة التعليق (أداة رقم 3)
                 _toolIcon(LucideIcons.messageSquare, 3), 
                 
                 const SizedBox(width: 12),
@@ -734,12 +732,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   icon: const Icon(LucideIcons.undo, color: Colors.white, size: 20),
                   onPressed: () {
                       if (_selectedTool == 3) {
-                         // التراجع للنصوص
                          if (_pageTexts[_activePage]?.isNotEmpty ?? false) {
                            setState(() => _pageTexts[_activePage]!.removeLast());
                          }
                       } else {
-                         // التراجع للرسم
                          if (_pageDrawings[_activePage]?.isNotEmpty ?? false) {
                            setState(() => _pageDrawings[_activePage]!.removeLast());
                          }
@@ -764,7 +760,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Widget _sizeSlider() {
-    // تحديد القيمة الحالية بناءً على الأداة
     double currentVal;
     if (_selectedTool == 3) currentVal = _textSize;
     else if (_selectedTool == 2) currentVal = _eraserSize; 
@@ -805,7 +800,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 }
 
-// ✅ كلاس الرسم
 class RelativeSketchPainter extends CustomPainter {
   final List<DrawingLine> lines;
   final Size pageSize;
@@ -849,12 +843,11 @@ class RelativeSketchPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
-// ✅ كلاس نموذج الملاحظات النصية
 class TextAnnotation {
   String text;
-  Offset position; // إحداثيات نسبية (0.0 - 1.0)
+  Offset position; 
   int color;
-  double fontSize; // حجم نسبي
+  double fontSize; 
 
   TextAnnotation({
     required this.text,
