@@ -58,7 +58,7 @@ class _ProtectedVideoPlayerState extends State<ProtectedVideoPlayer> with Widget
       // 1. Platform-specific Screenshot/Screen Recording Protection
       if (Platform.isAndroid) {
         // Android: Use FlutterWindowManager (FLAG_SECURE)
-        await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+        // await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
         debugPrint('✅ Amr AI: Android screen protection enabled (FLAG_SECURE)');
       } else if (Platform.isIOS) {
         // iOS: Use screen_protector plugin

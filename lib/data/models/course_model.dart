@@ -88,6 +88,10 @@ class CourseModel {
   final String code;
   final double fullPrice;
   final String? description;
+  final double? rating;
+  final int? reviews;
+  final String? category;
+
   
   // ✅ الحقول الجديدة التي يحتاجها CourseCard
   final String? imageUrl; 
@@ -108,6 +112,9 @@ class CourseModel {
     this.subject = 'General', // ✅ قيمة افتراضية
     this.subjects = const [],
     this.exams = const [],
+    this.rating,
+    this.reviews,
+    this.category,
   });
 
   factory CourseModel.fromJson(Map<String, dynamic> json) {

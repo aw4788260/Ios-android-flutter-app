@@ -38,13 +38,13 @@ class ChapterAccordion extends StatelessWidget {
             ),
             child: Text(
               "${index + 1}`.padLeft(2, '0')",
-              style: const TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold),
+              style:  TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold),
             ),
           ),
           // عنوان الفصل
           title: Text(
             chapter.title,
-            style: const TextStyle(
+            style:  TextStyle(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -53,7 +53,7 @@ class ChapterAccordion extends StatelessWidget {
           // عدد الدروس
           subtitle: Text(
             chapter.subtitle,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style:  TextStyle(color: AppColors.textSecondary, fontSize: 12),
           ),
           // قائمة الدروس داخل الفصل
           children: chapter.lessons.map((lesson) {
@@ -66,15 +66,15 @@ class ChapterAccordion extends StatelessWidget {
                 contentPadding: const EdgeInsets.only(left: 64, right: 16),
                 title: Text(
                   lesson.title,
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  style:  TextStyle(color: AppColors.textPrimary, fontSize: 13),
                 ),
                 subtitle: Text(
                   lesson.duration,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  style:  TextStyle(color: AppColors.textSecondary, fontSize: 11),
                 ),
                 trailing: lesson.isFree
                     ? const Icon(LucideIcons.playCircle, color: AppColors.success, size: 20)
-                    : const Icon(LucideIcons.lock, color: AppColors.textSecondary, size: 16),
+                    :  Icon(LucideIcons.lock, color: AppColors.textSecondary, size: 16),
                 onTap: () {
                   if (lesson.isFree) {
                     // تشغيل الفيديو المجاني

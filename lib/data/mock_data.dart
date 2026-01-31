@@ -7,12 +7,11 @@ class User {
   final String username;
   final List<String> enrolledCourses;
 
-  User({
-    required this.id, 
-    required this.name, 
-    required this.username, 
-    required this.enrolledCourses
-  });
+  User(
+      {required this.id,
+      required this.name,
+      required this.username,
+      required this.enrolledCourses});
 }
 
 // --- 2. Teacher Model ---
@@ -23,13 +22,12 @@ class Teacher {
   final String avatar;
   final String bio;
 
-  Teacher({
-    required this.id, 
-    required this.name, 
-    required this.specialty, 
-    required this.avatar, 
-    required this.bio
-  });
+  Teacher(
+      {required this.id,
+      required this.name,
+      required this.specialty,
+      required this.avatar,
+      required this.bio});
 }
 
 // --- 3. Mock Teachers ---
@@ -39,14 +37,16 @@ final List<Teacher> mockTeachers = [
     name: 'Dr. Alex Rivera',
     specialty: 'UI/UX Design Master',
     avatar: 'https://i.pravatar.cc/150?u=t1',
-    bio: 'Award-winning designer with 10+ years of experience in mobile interfaces.',
+    bio:
+        'Award-winning designer with 10+ years of experience in mobile interfaces.',
   ),
   Teacher(
     id: 't2',
     name: 'Eng. Sarah Jenkins',
     specialty: 'Fullstack Architect',
     avatar: 'https://i.pravatar.cc/150?u=t2',
-    bio: 'Lead developer at top tech firm, passionate about React and scalable systems.',
+    bio:
+        'Lead developer at top tech firm, passionate about React and scalable systems.',
   ),
 ];
 
@@ -59,7 +59,12 @@ final ExamModel mockExam = ExamModel(
     Question(
       id: 'q1',
       text: 'What is the primary feature of Material You?',
-      options: ['Strict color palettes', 'Dynamic color extraction', 'No shadows', '3D elements'],
+      options: [
+        'Strict color palettes',
+        'Dynamic color extraction',
+        'No shadows',
+        '3D elements'
+      ],
       correctIndex: 1,
       imageUrl: 'https://picsum.photos/seed/m3_1/600/300',
     )
@@ -74,7 +79,8 @@ final List<CourseModel> mockCourses = [
     title: 'Modern UI Design with Material 3',
     rating: 4.8,
     reviews: 1240,
-    description: 'Master the latest design language by Google. Learn dynamic coloring and adaptive layouts.',
+    description:
+        'Master the latest design language by Google. Learn dynamic coloring and adaptive layouts.',
     fullPrice: 500,
     category: 'Design',
     exams: [mockExam],
@@ -88,7 +94,12 @@ final List<CourseModel> mockCourses = [
             id: 'ch1',
             title: 'Dynamic Coloring',
             lessons: [
-              Lesson(id: 'l1', title: 'Extraction Logic', type: LessonType.video, duration: '12:45', url: 'https://www.w3schools.com/html/mov_bbb.mp4'),
+              Lesson(
+                  id: 'l1',
+                  title: 'Extraction Logic',
+                  type: LessonType.video,
+                  duration: '12:45',
+                  url: 'https://www.w3schools.com/html/mov_bbb.mp4'),
             ],
           ),
         ],
@@ -102,12 +113,19 @@ final List<CourseModel> mockCourses = [
             id: 'ch2',
             title: 'Grid vs Flex',
             lessons: [
-              Lesson(id: 'l2', title: 'Responsive Grids', type: LessonType.video, duration: '15:20', url: 'https://www.w3schools.com/html/mov_bbb.mp4'),
+              Lesson(
+                  id: 'l2',
+                  title: 'Responsive Grids',
+                  type: LessonType.video,
+                  duration: '15:20',
+                  url: 'https://www.w3schools.com/html/mov_bbb.mp4'),
             ],
           ),
         ],
       ),
     ],
+    instructorName: '',
+    code: '',
   ),
   CourseModel(
     id: 'c2',
@@ -126,5 +144,7 @@ final List<CourseModel> mockCourses = [
         chapters: [],
       ),
     ],
+    instructorName: '',
+    code: '',
   ),
 ];
