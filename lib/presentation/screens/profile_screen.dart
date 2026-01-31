@@ -57,6 +57,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // 🔥 دالة حذف الحساب (الجديدة)
+  Future<void> _deleteAccount() async {
+    // 1. إظهار نافذة تحذير (تأكيد الحذف)
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.backgroundSecondary,
+        title: Text(
+          "Delete Account",
+          style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          "Are you sure you want to delete your account? This action cannot be undone and you will lose all your subscriptions.",
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text("Delete", style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // 2. بدء عملية الحذف
+    try {
+      // إظهار مؤشر تحميل
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      var authBox = await StorageService.openBox('auth_box');
+      final token = authBox.get('jwt_token');
+      final deviceId = authBox.get('device_id');
+
+      if (token != null && deviceId != null) {
+        // استدعاء API الحذف
+        await Dio().delete(
+          '$_baseUrl/api/student/delete-account',
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              'x-device-id': deviceId,
+              'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            },
+            validateStatus: (status) => status! < 500,
+          ),
+        );
+      }
+
+      // 3. تنظيف البيانات محلياً والخروج
+      await authBox.clear();
+      AppState().clear();
+
+      if (mounted) {
+        Navigator.pop(context); // إغلاق مؤشر التحميل
+        
+        // التوجيه لشاشة الدخول
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Account deleted successfully."),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // إغلاق مؤشر التحميل
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error deleting account: $e"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   // دالة تسجيل الخروج
   Future<void> _logout() async {
     try {
@@ -108,7 +201,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ✅ دالة لتغيير الثيم وإعادة تشغيل التطبيق
-  // ملاحظة: هذا الكود سيعمل الآن لأننا جعلنا toggleTheme تعيد Future في AppState
   void _toggleThemeAndRestart() async {
     await AppState().toggleTheme();
     
@@ -401,6 +493,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
+
+              // ========================================================
+              // 🔴 Danger Zone (حذف الحساب) - تمت الإضافة هنا
+              // ========================================================
+              if (!isGuest) ...[
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 12),
+                  child: Text(
+                    "DANGER ZONE",
+                    style: TextStyle(
+                      fontSize: 10, 
+                      fontWeight: FontWeight.bold, 
+                      color: AppColors.error, 
+                      letterSpacing: 2.0
+                    ),
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withOpacity(0.05), // لون خلفية خفيف للأحمر
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      _buildMenuItem(
+                        context,
+                        icon: LucideIcons.trash2,
+                        title: "Delete My Account",
+                        // أيقونة حمراء لتمييز الخطر
+                        trailing: Icon(LucideIcons.chevronRight, size: 18, color: AppColors.error),
+                        onTap: _deleteAccount, // استدعاء دالة الحذف
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ],
 
               // --- Logout Button ---
               GestureDetector(
