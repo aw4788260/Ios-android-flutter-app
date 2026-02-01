@@ -24,14 +24,10 @@ android {
 
     signingConfigs {
         create("release") {
-            // ✅ القراءة من متغيرات البيئة بأسماء مطابقة تماماً للأسرار في الصورة
-            // استخدام .trim() يحل مشكلة الرموز الخاصة والمسافات الخفية
-            keyAlias = System.getenv("KEY_ALIAS")?.trim() ?: ""
-            keyPassword = System.getenv("KEY_PASSWORD")?.trim() ?: ""
-            storePassword = System.getenv("STORE_PASSWORD")?.trim() ?: "" 
-            
-            // الملف يتم إنشاؤه بواسطة الأتمتة داخل مجلد app مباشرة
-            storeFile = file("upload-keystore.jks")
+            keyAlias = System.getenv("KEY_ALIAS")?.trim() ?: throw GradleException("KEY_ALIAS not set")
+            keyPassword = System.getenv("KEY_PASSWORD")?.trim() ?: throw GradleException("KEY_PASSWORD not set")
+            storePassword = System.getenv("STORE_PASSWORD")?.trim() ?: throw GradleException("STORE_PASSWORD not set")
+            storeFile = file("keystore/upload-keystore.jks")
         }
     }
 
@@ -45,7 +41,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-
+    
     compileOptions {
         // ✅ 1. تفعيل Core Library Desugaring (مطلوب لمكتبة الإشعارات لتعمل على إصدارات أندرويد القديمة)
         isCoreLibraryDesugaringEnabled = true

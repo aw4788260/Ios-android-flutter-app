@@ -63,6 +63,12 @@
 		<string>fetch</string>
 		<string>processing</string>
 	</array>
+
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+    	<string>com.medaad.edu.refresh</string>
+    	<string>com.medaad.edu.cleanup</string>
+	</array>
 	
 	<key>NSMicrophoneUsageDescription</key>
 	<string>نحتاج لإدارة جلسة الصوت لضمان حماية المحتوى ومنع التعارض مع تطبيقات التسجيل</string>

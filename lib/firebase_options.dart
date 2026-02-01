@@ -65,4 +65,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'berlin-app-fc5c0.firebasestorage.app',
     iosBundleId: 'com.medaad.edu',
   );
+
 }

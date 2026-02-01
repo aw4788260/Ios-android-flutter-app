@@ -15,12 +15,13 @@ class NotificationService {
 
   Future<void> init() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/launcher_icon');
 
     const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings();
 
-    const InitializationSettings initializationSettings = InitializationSettings(
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsDarwin,
     );
@@ -34,21 +35,22 @@ class NotificationService {
     );
 
     // 2. طلب الأذونات (أندرويد 13+)
-    final androidImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    
+    final androidImplementation =
+        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
     await androidImplementation?.requestNotificationsPermission();
 
     // 3. ✅ إنشاء قنوات الإشعارات يدوياً لتفادي RemoteServiceException
     if (androidImplementation != null) {
-      
       // القناة الأولى: للتحميل (صامتة للـ Foreground Service)
       await androidImplementation.createNotificationChannel(
         const AndroidNotificationChannel(
           'downloads_channel', // نفس الـ ID المستخدم في main.dart و showProgressNotification
           'Active Downloads',
           description: 'Shows progress of active downloads',
-          importance: Importance.low, // Low = يظهر بدون صوت (مناسب لشريط التقدم)
+          importance:
+              Importance.low, // Low = يظهر بدون صوت (مناسب لشريط التقدم)
           playSound: false,
           showBadge: false,
         ),
@@ -79,7 +81,8 @@ class NotificationService {
     try {
       await flutterLocalNotificationsPlugin.cancelAll();
     } catch (e, s) {
-      FirebaseCrashlytics.instance.recordError(e, s, reason: 'Failed to cancel all notifications');
+      FirebaseCrashlytics.instance
+          .recordError(e, s, reason: 'Failed to cancel all notifications');
     }
   }
 
@@ -91,14 +94,14 @@ class NotificationService {
     required int maxProgress,
   }) async {
     // استخدام القناة التي أنشأناها بالأعلى
-    const String channelId = 'downloads_channel'; 
-    
+    const String channelId = 'downloads_channel';
+
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      channelId, 
+      channelId,
       'Active Downloads',
       channelDescription: 'Shows progress of active downloads',
-      importance: Importance.low, 
+      importance: Importance.low,
       priority: Priority.low,
       showProgress: true,
       maxProgress: maxProgress,

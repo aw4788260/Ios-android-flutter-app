@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:Medaad/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -26,10 +27,18 @@ void main() async {
   runZonedGuarded<Future<void>>(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // ✅ تهيئة Hive
-    await Hive.initFlutter();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-    // ✅ فتح الصناديق الأساسية
+    FlutterError.onError =
+        FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+    await NotificationService().init();
+    await initializeService();
+
+    // Hive
+    await Hive.initFlutter();
     await Hive.openBox('auth_box');
     await Hive.openBox('settings_box');
     await Hive.openBox('downloads_box');
@@ -43,21 +52,25 @@ void main() async {
       avAudioSessionCategory: AVAudioSessionCategory.playback,
       avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.none,
       avAudioSessionMode: AVAudioSessionMode.defaultMode,
-      avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
-      avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+      avAudioSessionRouteSharingPolicy:
+          AVAudioSessionRouteSharingPolicy.defaultPolicy,
+      avAudioSessionSetActiveOptions:
+          AVAudioSessionSetActiveOptions.none,
       androidAudioAttributes: AndroidAudioAttributes(
         contentType: AndroidAudioContentType.movie,
         flags: AndroidAudioFlags.none,
         usage: AndroidAudioUsage.media,
       ),
-      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+      androidAudioFocusGainType:
+          AndroidAudioFocusGainType.gain,
       androidWillPauseWhenDucked: true,
     ));
 
-    await NotificationService().init();
-    await initializeService();
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
 
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -67,17 +80,12 @@ void main() async {
 
     await _enableSecureMode();
 
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
-    }
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-
-    // ✅ تشغيل مدير الحماية المحدث
+    // Security
     SecurityManager.instance.initListeners();
     // Start periodic check
     SecurityManager.instance.startPeriodicCheck();
 
-    // ✅ تهيئة الثيم
+    // Theme
     await AppState().initTheme();
 
     runApp(
@@ -85,12 +93,13 @@ void main() async {
         child: EduVantageApp(),
       ),
     );
-    
-  }, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+  }, (error, stack) async {
+    if (Firebase.apps.isNotEmpty) {
+      await FirebaseCrashlytics.instance
+          .recordError(error, stack, fatal: true);
+    }
   });
 }
-
 // =========================================================
 // 🛡️ كلاس إدارة الحماية (Security Manager) - النسخة المحدثة
 // =========================================================
