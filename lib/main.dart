@@ -31,11 +31,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    FlutterError.onError =
-        FirebaseCrashlytics.instance.recordFlutterFatalError;
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
     await NotificationService().init();
-    await initializeService();
+    // await initializeService();
 
     // Hive
     await Hive.initFlutter();
@@ -54,15 +53,13 @@ void main() async {
       avAudioSessionMode: AVAudioSessionMode.defaultMode,
       avAudioSessionRouteSharingPolicy:
           AVAudioSessionRouteSharingPolicy.defaultPolicy,
-      avAudioSessionSetActiveOptions:
-          AVAudioSessionSetActiveOptions.none,
+      avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
       androidAudioAttributes: AndroidAudioAttributes(
         contentType: AndroidAudioContentType.movie,
         flags: AndroidAudioFlags.none,
         usage: AndroidAudioUsage.media,
       ),
-      androidAudioFocusGainType:
-          AndroidAudioFocusGainType.gain,
+      androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
       androidWillPauseWhenDucked: true,
     ));
 
@@ -95,11 +92,11 @@ void main() async {
     );
   }, (error, stack) async {
     if (Firebase.apps.isNotEmpty) {
-      await FirebaseCrashlytics.instance
-          .recordError(error, stack, fatal: true);
+      await FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     }
   });
 }
+
 // =========================================================
 // 🛡️ كلاس إدارة الحماية (Security Manager) - النسخة المحدثة
 // =========================================================
@@ -141,18 +138,17 @@ class SecurityManager {
     try {
       bool isJailBroken = await SafeDevice.isJailBroken;
       bool isDevMode = await SafeDevice.isDevelopmentModeEnable;
-      
+
       // ✅ تحديد السبب بدقة
       if (isJailBroken) {
         _triggerBreach("الجهاز مكسور الحماية (Root)");
         return false;
       }
-      
+
       if (isDevMode) {
         _triggerBreach("خيارات المطور مفعلة (Developer Options)");
         return false;
       }
-
     } catch (e) {
       debugPrint("Security Check Error: $e");
     }
@@ -168,37 +164,43 @@ class SecurityManager {
 
   // ✅ دالة تفعيل الإنذار تستقبل السبب وتخزنه للعرض
   void _triggerBreach(String reason) {
-    // فقط قم بتحديث السبب إذا لم يكن هناك سبب مسجل مسبقاً (لتجنب الكتابة فوق السبب الأول)
-    if (securityBreachReason.value == null) {
-      debugPrint("🚨 SECURITY BREACH: $reason");
-      securityBreachReason.value = reason; // تخزين السبب ليعرض في الشاشة
-      
-      // ✅ محاولة إيقاف الصوت فوراً عبر إعادة تفعيل الحظر
-      _audioProtection.blockAudioCapture();
-    }
+    if (securityBreachReason.value != null) return;
+
+    debugPrint("🚨 SECURITY BREACH: $reason");
+
+    // تأكد أن التحديث يتم على الـ UI Thread
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      securityBreachReason.value = reason;
+    });
+
+    // أوقف الصوت فورًا
+    _audioProtection.blockAudioCapture();
+
+    // (اختياري) اهتزاز تحذيري
+    HapticFeedback.heavyImpact();
   }
 }
 
-Future<void> initializeService() async {
-  final service = FlutterBackgroundService();
+// Future<void> initializeService() async {
+// final service = FlutterBackgroundService();
 
-  await service.configure(
-    androidConfiguration: AndroidConfiguration(
-      onStart: onStart,
-      autoStart: false,
-      isForegroundMode: true,
-      notificationChannelId: 'downloads_channel',
-      initialNotificationTitle: 'مــــداد',
-      initialNotificationContent: 'Initializing downloads...',
-      foregroundServiceNotificationId: 888,
-    ),
-    iosConfiguration: IosConfiguration(
-      autoStart: false,
-      onForeground: onStart,
-      onBackground: onIosBackground,
-    ),
-  );
-}
+//   await service.configure(
+//     androidConfiguration: AndroidConfiguration(
+//       onStart: onStart,
+//       autoStart: false,
+//       isForegroundMode: true,
+//       notificationChannelId: 'downloads_channel',
+//       initialNotificationTitle: 'مــــداد',
+//       initialNotificationContent: 'Initializing downloads...',
+//       foregroundServiceNotificationId: 888,
+//     ),
+//     iosConfiguration: IosConfiguration(
+//       autoStart: false,
+//       onForeground: onStart,
+//       onBackground: onIosBackground,
+//     ),
+//   );
+// }
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
@@ -238,7 +240,8 @@ bool onIosBackground(ServiceInstance service) {
 
 Future<void> _enableSecureMode() async {
   try {
-    await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
+    await FlutterWindowManagerPlus.addFlags(
+        FlutterWindowManagerPlus.FLAG_SECURE);
   } catch (e) {
     debugPrint("Security Mode Error: $e");
   }
@@ -251,8 +254,8 @@ class EduVantageApp extends StatefulWidget {
   State<EduVantageApp> createState() => _EduVantageAppState();
 }
 
-class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserver {
-  
+class _EduVantageAppState extends State<EduVantageApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -276,6 +279,7 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    const MethodChannel _settingsChannel = MethodChannel("app.settings");
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: AppState().themeNotifier,
       builder: (context, currentMode, child) {
@@ -284,20 +288,24 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
           debugShowCheckedModeBanner: false,
           title: 'مــــداد',
           theme: AppTheme.darkTheme.copyWith(
-            brightness: currentMode == ThemeMode.dark ? Brightness.dark : Brightness.light,
+            brightness: currentMode == ThemeMode.dark
+                ? Brightness.dark
+                : Brightness.light,
           ),
           themeMode: currentMode,
-          
+
           // ✅ هنا نطبق "الشاشة الحمراء" كطبقة فوق كل التطبيق (Global Overlay)
           builder: (context, child) {
             return Stack(
               textDirection: TextDirection.ltr,
               children: [
                 if (child != null) child, // التطبيق الطبيعي
-                
+
                 // ✅ التعديل: الاستماع لمتغير النص (String?) بدلاً من البوليان
+                //???????!/
                 ValueListenableBuilder<String?>(
-                  valueListenable: SecurityManager.instance.securityBreachReason,
+                  valueListenable:
+                      SecurityManager.instance.securityBreachReason,
                   builder: (context, breachReason, _) {
                     // إذا كان السبب null (لا يوجد اختراق)، نخفي الطبقة
                     if (breachReason == null) return const SizedBox.shrink();
@@ -312,7 +320,8 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(LucideIcons.shieldAlert, color: Colors.white, size: 80),
+                            const Icon(LucideIcons.shieldAlert,
+                                color: Colors.white, size: 80),
                             const SizedBox(height: 24),
                             const Text(
                               "SECURITY ALERT",
@@ -325,43 +334,52 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
                               ),
                             ),
                             const SizedBox(height: 16),
-                            
+
                             // ✅ عرض سبب المشكلة الفعلي القادم من SecurityManager
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 32.0),
                               child: Text(
                                 breachReason, // هنا سيظهر النص المحدد (مثلاً: خيارات المطور مفعلة)
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: Colors.white, 
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  decoration: TextDecoration.none
-                                ),
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.none),
                               ),
                             ),
                             const SizedBox(height: 32),
-                            
+
                             // ⚠️ صندوق التهديد بالحظر
                             Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 32),
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 32),
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.3),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.yellow, width: 2),
+                                border:
+                                    Border.all(color: Colors.yellow, width: 2),
                               ),
                               child: const Column(
                                 children: [
                                   Text(
                                     "⚠️ تنويه",
-                                    style: TextStyle(color: Colors.yellow, fontSize: 20, fontWeight: FontWeight.bold, decoration: TextDecoration.none),
+                                    style: TextStyle(
+                                        color: Colors.yellow,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.none),
                                   ),
                                   SizedBox(height: 8),
                                   Text(
                                     "يرجى إغلاق التطبيقات المخالفة أو إيقاف خيارات المطور لضمان عمل التطبيق بأمان.",
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.white, fontSize: 14, decoration: TextDecoration.none),
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        decoration: TextDecoration.none),
                                     textDirection: TextDirection.rtl,
                                   ),
                                 ],
@@ -369,15 +387,62 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
                             ),
 
                             const SizedBox(height: 40),
-                            ElevatedButton(
-                              onPressed: () => exit(0), // إغلاق التطبيق فوراً
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.red.shade900,
-                                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                              ),
-                              child: const Text("إغلاق التطبيق / EXIT", style: TextStyle(fontWeight: FontWeight.bold)),
-                            )
+                            // ElevatedButton(
+                            //   onPressed: () => exit(0), // إغلاق التطبيق فوراً
+                            //   style: ElevatedButton.styleFrom(
+                            //     backgroundColor: Colors.white,
+                            //     foregroundColor: Colors.red.shade900,
+                            //     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            //   ),
+                            //   child: const Text("إغلاق التطبيق / EXIT", style: TextStyle(fontWeight: FontWeight.bold)),
+                            // )
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    // إعادة المحاولة بعد أن المستخدم يصلح المشكلة
+                                    SecurityManager.instance
+                                        .securityBreachReason.value = null;
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.red.shade900,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 32, vertical: 12),
+                                  ),
+                                  child: const Text(
+                                    "إعادة المحاولة",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+
+                                // زر اختياري لفتح الإعدادات
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await _settingsChannel
+                                          .invokeMethod("openSettings");
+                                    } catch (e) {
+                                      debugPrint("Failed to open settings: $e");
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 32, vertical: 12),
+                                  ),
+                                  child: const Text(
+                                    "فتح الإعدادات",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),

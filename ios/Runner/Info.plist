@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Medaad</string>
+	<string>مـــداد</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -51,34 +51,10 @@
 	
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>نحتاج للوصول إلى معرض الصور لاختيار صور الإيصالات</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>نحتاج للوصول لحفظ الشهادات والملفات في معرض الصور</string>
 	
-	<key>NSDocumentsFolderUsageDescription</key>
-	<string>نحتاج للوصول إلى الملفات لحفظ المحتوى التعليمي للمشاهدة بدون إنترنت</string>
-	
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>fetch</string>
-		<string>processing</string>
-	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>نرسل لك إشعارات لتحديثك بحالة الطلبات والتنبيهات المهمة</string>
 
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-    	<string>com.medaad.edu.refresh</string>
-    	<string>com.medaad.edu.cleanup</string>
-	</array>
-	
-	<key>NSMicrophoneUsageDescription</key>
-	<string>نحتاج لإدارة جلسة الصوت لضمان حماية المحتوى ومنع التعارض مع تطبيقات التسجيل</string>
-	
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
-	
 	<key>UIFileSharingEnabled</key>
 	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
