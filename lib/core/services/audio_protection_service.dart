@@ -18,36 +18,27 @@ class AudioProtectionService {
 
   /// بدء المراقبة المستمرة
   Future<void> startMonitoring() async {
-    // استقبال إشارات من Native
+    // 🛑 تم التعديل: لن نفعل شيئاً هنا
+    print('⚠️ AudioProtectionService: Monitoring is temporarily DISABLED.');
+    
+    // لن نقوم بتشغيل Timer ولن نستمع للقناة
+    /*
     platform.setMethodCallHandler((call) async {
       if (call.method == 'onRecordingDetected') {
         _handleRecordingDetected();
       }
     });
 
-    // فحص دوري إضافي من جانب Flutter
     _monitoringTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       await checkRecordingStatus();
     });
+    */
   }
 
   /// فحص حالة التسجيل
   Future<bool> checkRecordingStatus() async {
-    try {
-      final bool isRecording = await platform.invokeMethod('checkRecording') ?? false;
-      
-      if (isRecording && !_isRecording) {
-        _handleRecordingDetected();
-      } else if (!isRecording && _isRecording) {
-        _isRecording = false;
-        _recordingStateController.add(false);
-      }
-      
-      return isRecording;
-    } catch (e) {
-      print('⚠️ خطأ في فحص التسجيل: $e');
-      return false;
-    }
+    // 🛑 تم التعديل: يرجع دائماً false
+    return false;
   }
 
   /// معالجة اكتشاف التسجيل
@@ -58,13 +49,8 @@ class AudioProtectionService {
 
   /// حظر التقاط الصوت (Android 10+)
   Future<bool> blockAudioCapture() async {
-    try {
-      final bool result = await platform.invokeMethod('blockAudioCapture') ?? false;
-      return result;
-    } catch (e) {
-      print('⚠️ خطأ في حظر الصوت: $e');
-      return false;
-    }
+    // 🛑 تم التعديل: يرجع true (نجاح وهمي)
+    return true;
   }
 
   /// إيقاف المراقبة
