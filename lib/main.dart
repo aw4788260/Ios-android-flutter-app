@@ -65,17 +65,18 @@ void main() async {
       DeviceOrientation.landscapeRight,
     ]);
 
-    await _enableSecureMode();
+    // 🛑 تم الايقاف: تفعيل الوضع الآمن (منع لقطات الشاشة)
+    // await _enableSecureMode();
 
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp();
     }
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-    // ✅ تشغيل مدير الحماية المحدث
-    SecurityManager.instance.initListeners();
+    // 🛑 تم الايقاف: تشغيل مدير الحماية المحدث
+    // SecurityManager.instance.initListeners();
     // Start periodic check
-    SecurityManager.instance.startPeriodicCheck();
+    // SecurityManager.instance.startPeriodicCheck();
 
     // ✅ تهيئة الثيم
     await AppState().initTheme();
@@ -106,6 +107,8 @@ class SecurityManager {
   final AudioProtectionService _audioProtection = AudioProtectionService();
 
   void initListeners() {
+    // 🛑 تم الايقاف: لن يتم تشغيل أي استماع للحماية
+    /*
     // 1. تشغيل المراقبة من خدمتك الخاصة (AudioProtectionService)
     _audioProtection.startMonitoring();
 
@@ -122,10 +125,15 @@ class SecurityManager {
     }, (isCapturing) {
       if (isCapturing) _triggerBreach("تم اكتشاف تصوير للشاشة!");
     });
+    */
   }
 
   // فحص الأمان للروت وخيارات المطور
   Future<bool> checkSecurity() async {
+    // 🛑 تم الايقاف: دائماً نرجع true (الجهاز آمن)
+    return true;
+
+    /*
     // إذا كان هناك سبب مسجل بالفعل، نعتبر الجهاز مخترقاً ولا نعيد الفحص
     if (securityBreachReason.value != null) return false;
 
@@ -148,17 +156,23 @@ class SecurityManager {
       debugPrint("Security Check Error: $e");
     }
     return true;
+    */
   }
 
   // Start periodic check for jailbreak/dev mode
   void startPeriodicCheck() {
+    // 🛑 تم الايقاف: لا يوجد فحص دوري
+    /*
     Timer.periodic(const Duration(seconds: 2), (timer) async {
       await checkSecurity();
     });
+    */
   }
 
   // ✅ دالة تفعيل الإنذار تستقبل السبب وتخزنه للعرض
   void _triggerBreach(String reason) {
+    // 🛑 تم الايقاف: لن يتم تفعيل الحظر أبداً
+    /*
     // فقط قم بتحديث السبب إذا لم يكن هناك سبب مسجل مسبقاً (لتجنب الكتابة فوق السبب الأول)
     if (securityBreachReason.value == null) {
       debugPrint("🚨 SECURITY BREACH: $reason");
@@ -167,6 +181,7 @@ class SecurityManager {
       // ✅ محاولة إيقاف الصوت فوراً عبر إعادة تفعيل الحظر
       _audioProtection.blockAudioCapture();
     }
+    */
   }
 }
 
@@ -229,7 +244,8 @@ bool onIosBackground(ServiceInstance service) {
 
 Future<void> _enableSecureMode() async {
   try {
-    await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
+    // 🛑 تم الايقاف: السماح بتصوير الشاشة
+    // await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
   } catch (e) {
     debugPrint("Security Mode Error: $e");
   }
@@ -259,9 +275,9 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // إعادة تفعيل الحظر عند العودة للتطبيق
-      AudioProtectionService().blockAudioCapture();
-      SecurityManager.instance.checkSecurity();
+      // 🛑 تم الايقاف: عدم إعادة تفعيل الحماية عند العودة
+      // AudioProtectionService().blockAudioCapture();
+      // SecurityManager.instance.checkSecurity();
     }
   }
 
@@ -287,13 +303,14 @@ class _EduVantageAppState extends State<EduVantageApp> with WidgetsBindingObserv
                 if (child != null) child, // التطبيق الطبيعي
                 
                 // ✅ التعديل: الاستماع لمتغير النص (String?) بدلاً من البوليان
+                // بما أننا عطلنا التحديث، ستظل هذه القيمة null ولن تظهر الشاشة الحمراء أبداً
                 ValueListenableBuilder<String?>(
                   valueListenable: SecurityManager.instance.securityBreachReason,
                   builder: (context, breachReason, _) {
                     // إذا كان السبب null (لا يوجد اختراق)، نخفي الطبقة
                     if (breachReason == null) return const SizedBox.shrink();
 
-                    // 🛑 إذا وجد نص، نظهر الشاشة الحمراء مع السبب المحدد
+                    // 🛑 لن يتم الوصول لهذا الكود لأننا عطلنا التريجر
                     return Material(
                       type: MaterialType.transparency,
                       child: Container(
