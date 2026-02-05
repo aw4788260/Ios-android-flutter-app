@@ -24,72 +24,65 @@ class MainActivity: FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ✅ 1. منع تسجيل الفيديو وأخذ لقطات الشاشة (FLAG_SECURE)
-        // وضعه في onCreate يضمن تنفيذه فوراً عند بناء النافذة
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // 🛑 تم الايقاف: منع تسجيل الفيديو وأخذ لقطات الشاشة (FLAG_SECURE)
+        // window.setFlags(
+        //     WindowManager.LayoutParams.FLAG_SECURE,
+        //     WindowManager.LayoutParams.FLAG_SECURE
+        // )
 
-        // ✅ 2. منع تسجيل الصوت الداخلي (Internal Audio) - Android 10+
+        // 🛑 تم الايقاف: منع تسجيل الصوت الداخلي
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                // الرقم 3 يعني ALLOW_CAPTURE_BY_NONE
-                audioManager?.allowedCapturePolicy = 3 
+                // audioManager?.allowedCapturePolicy = 3 // تم التعليق
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        // ✅ 3. بدء حلقة المراقبة المستمرة للتطبيقات الخارجية
-        startRecordingMonitoring()
+        // 🛑 تم الايقاف: بدء حلقة المراقبة المستمرة للتطبيقات الخارجية
+        // startRecordingMonitoring()
     }
 
-    // ✅ هذه الدالة ضرورية جداً لكي يعمل كود Dart (AudioProtectionService)
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "checkRecording" -> {
-                    // Flutter يسأل: هل هناك تسجيل الآن؟
-                    val isRecording = checkIfRecording()
-                    result.success(isRecording)
+                    // 🛑 تعديل: دائماً نرجع false (لا يوجد تسجيل)
+                    result.success(false) 
                 }
                 "getAudioMode" -> {
                     val mode = audioManager?.mode ?: -1
                     result.success(mode)
                 }
                 "blockAudioCapture" -> {
-                    // طلب إعادة تطبيق الحظر من Flutter
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        audioManager?.allowedCapturePolicy = 3
-                        result.success(true)
-                    } else {
-                        result.success(false)
-                    }
+                    // 🛑 تعديل: نرجع true وكأننا نفذنا الأمر بنجاح ولكن بدون تنفيذ فعلي
+                    result.success(true)
                 }
                 else -> result.notImplemented()
             }
         }
     }
 
-    // ✅ دالة فحص التسجيل النشط (تستخدمها حلقة المراقبة وكود Flutter)
+    // ✅ دالة فحص التسجيل النشط
     private fun checkIfRecording(): Boolean {
+        // 🛑 تعديل: تم إيقاف الفحص وإرجاع false دائماً
+        return false;
+        
+        /* // الكود القديم (تم تعليقه)
         try {
             if (audioManager == null) {
                 audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             }
             
-            // 1. فحص وضع الصوت (مثل المكالمات)
             val audioMode = audioManager?.mode
             if (audioMode == AudioManager.MODE_IN_COMMUNICATION || 
                 audioMode == AudioManager.MODE_IN_CALL) {
                 return true
             }
 
-            // 2. فحص تطبيقات التسجيل النشطة (Android 7.0+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val activeRecordings = audioManager?.activeRecordingConfigurations
                 if (!activeRecordings.isNullOrEmpty()) {
@@ -100,20 +93,21 @@ class MainActivity: FlutterActivity() {
             e.printStackTrace()
         }
         return false
+        */
     }
 
     // ✅ تشغيل مراقبة مستمرة في الخلفية كل 2 ثانية
     private fun startRecordingMonitoring() {
+        // 🛑 الدالة موجودة ولكن لن يتم استدعاؤها لأننا علقنا الاستدعاء في onCreate
         handler = Handler(Looper.getMainLooper())
         recordingCheckRunnable = object : Runnable {
             override fun run() {
                 if (checkIfRecording()) {
-                    // إرسال تنبيه فوري إلى Flutter لإيقاف الفيديو
                     flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
                         MethodChannel(messenger, CHANNEL).invokeMethod("onRecordingDetected", true)
                     }
                 }
-                handler?.postDelayed(this, 2000) // تكرار الفحص كل 2 ثانية
+                handler?.postDelayed(this, 2000)
             }
         }
         handler?.post(recordingCheckRunnable!!)
@@ -121,24 +115,21 @@ class MainActivity: FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
-        // إعادة تطبيق حظر الصوت عند العودة للتطبيق
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            audioManager?.allowedCapturePolicy = 3
-        }
+        // 🛑 تم الايقاف: إعادة تطبيق حظر الصوت عند العودة للتطبيق
+        // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        //     audioManager?.allowedCapturePolicy = 3
+        // }
     }
 
     override fun onDestroy() {
-        // إيقاف حلقة المراقبة لتجنب تسريب الذاكرة
         if (handler != null && recordingCheckRunnable != null) {
             handler?.removeCallbacks(recordingCheckRunnable!!)
         }
 
-        // حذف الإشعارات عند الإغلاق
         try {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancelAll()
         } catch (e: Exception) {
-            // تجاهل الخطأ
         }
         
         super.onDestroy()
