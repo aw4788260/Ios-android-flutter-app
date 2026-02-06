@@ -52,17 +52,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   bool _isError = false;
   String _errorMessage = "";
   bool _isInitialized = false;
-   
+    
   bool _isVideoLoading = true;
   bool _isOfflineMode = false;
-   
+    
   bool _isWeakDevice = false;
 
   int _stabilizingCountdown = 0;
   Timer? _countdownTimer;
-   
+    
   bool _isDisposing = false;
-   
+    
   Timer? _watermarkTimer;
   Alignment _watermarkAlignment = Alignment.topRight;
   String _watermarkText = "";
@@ -79,12 +79,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeProtection(); // ✅ تفعيل الحماية أولاً
+    // 🛑 تم الايقاف: عدم تفعيل الحماية عند البدء
+    // _initializeProtection(); 
     _initializePlayerScreen();
   }
 
   // ✅ 1. دالة تفعيل الحماية والاستماع للتسجيل
   Future<void> _initializeProtection() async {
+    // 🛑 تم الايقاف بالكامل
+    /*
     try {
       // منع لقطات الشاشة وتسجيل الفيديو (يظهر شاشة سوداء)
       await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
@@ -106,10 +109,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
     } catch (e) {
       FirebaseCrashlytics.instance.recordError(e, null, reason: 'Protection Init Error');
     }
+    */
   }
 
   // ✅ 2. دالة التعامل الصارم مع اكتشاف التسجيل (كتم الصوت + إيقاف)
   void _handleRecordingDetected() {
+    // 🛑 تم الايقاف: لن نفعل شيئاً حتى لو تم استدعاء الدالة
+    return;
+
+    /*
     if (!mounted) return;
     
     setState(() => _isRecordingDetected = true);
@@ -119,6 +127,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
     _player.pause();
     
     FirebaseCrashlytics.instance.log("🚨 Security: Screen Recording Detected! Player Muted & Paused.");
+    */
   }
 
   // ✅ 3. مراقبة حالة التطبيق عند الخروج والعودة
@@ -127,9 +136,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
     if (state == AppLifecycleState.paused) {
       _player.pause();
     } else if (state == AppLifecycleState.resumed) {
-      _protectionService.blockAudioCapture();
+      // 🛑 تم الايقاف: عدم إعادة تفعيل الحظر
+      // _protectionService.blockAudioCapture();
+      
       // إعادة التحقق: إذا كان هناك تسجيل، تأكد من كتم الصوت مجدداً
       if (_isRecordingDetected) {
+         // لن يتم الدخول هنا أبداً لأن _isRecordingDetected دائما false
          _player.setVolume(0.0);
          _player.pause();
       }
@@ -170,7 +182,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
           vo: 'gpu',
         ),
       );
-       
+        
       if (forceSoftwareDecoding) {
         await (_player.platform as dynamic).setProperty('hwdec', 'no');
         await (_player.platform as dynamic).setProperty('vd-lavc-threads', '4');
@@ -199,12 +211,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
           if (mounted) {
             setState(() => _isVideoLoading = false);
             
-            // 🛑 حارس الأمان: لا تشغل إذا تم اكتشاف تسجيل
+            // 🛑 تم الايقاف: إزالة حارس الأمان
+            /*
             if (_isRecordingDetected) {
               _player.setVolume(0.0);
               _player.pause();
               return;
             }
+            */
 
             if (_isOfflineMode) {
                _startCountdown();
@@ -245,17 +259,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
 
   Future<void> _playVideo(String url, {Duration? startAt}) async {
     if (_isDisposing) return;
-     
+      
     setState(() {
       _isVideoLoading = true;
       _stabilizingCountdown = 0;
     });
     _countdownTimer?.cancel();
-     
+      
     try {
       String playUrl = url;
       String? audioUrl;
-       
+        
       _isOfflineMode = false;
 
       if (url.contains('|')) {
@@ -292,9 +306,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
             audioUrl = widget.preReadyAudioUrl;
          }
       }
-       
+        
       await _player.stop();
-       
+        
       final bool isYoutubeSource = playUrl.contains('googlevideo.com');
       final headers = isYoutubeSource ? _youtubeHeaders : _serverHeaders;    
 
@@ -303,11 +317,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
         play: false 
       );
 
-      // ✅ 5. حارس أمان إضافي عند فتح الميديا
+      // 🛑 تم الايقاف: إزالة حارس الأمان الإضافي
+      /*
       if (_isRecordingDetected) {
          await _player.setVolume(0.0);
          return; 
       }
+      */
 
       if (audioUrl != null) {
         int delayMs = _isWeakDevice ? 2500 : 500;
@@ -322,7 +338,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
           } catch (_) {}
         }
       }
-       
+        
       if (startAt != null && startAt != Duration.zero) {
          await _player.seek(startAt);
       }
@@ -344,8 +360,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   }
 
   Future<void> _seekRelative(Duration amount) async {
-    // منع التنقل إذا كان هناك تسجيل
-    if (_isRecordingDetected) return;
+    // 🛑 تم الايقاف: السماح بالتنقل دائماً
+    // if (_isRecordingDetected) return;
 
     _accumulatedSeekAmount += amount;
     if (_seekDebounceTimer?.isActive ?? false) _seekDebounceTimer!.cancel();
@@ -379,7 +395,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   }
 
   void _showSettingsSheet() {
-    if (!mounted || _isRecordingDetected) return;
+    // 🛑 تم الايقاف: السماح بفتح الإعدادات دائماً
+    if (!mounted /* || _isRecordingDetected */) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1E1E1E),
@@ -466,25 +483,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   void _startCountdown() {
     setState(() => _stabilizingCountdown = _isWeakDevice ? 6 : 10);
     _countdownTimer?.cancel();
-     
+      
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_isDisposing) {
         timer.cancel();
         return;
       }
-       
+        
       if (_stabilizingCountdown <= 1) {
         timer.cancel();
         if (mounted) {
           setState(() => _stabilizingCountdown = 0);
           
           // ✅ 6. حارس الأمان للعد التنازلي
+          // 🛑 تم الايقاف: التشغيل دائماً
+          /*
           if (!_isRecordingDetected) {
              _player.play();
           } else {
              _player.setVolume(0.0);
              _player.pause();
           }
+          */
+          _player.play(); // Play always
         }
       } else {
         if (mounted) setState(() => _stabilizingCountdown--);
@@ -557,7 +578,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
 
   Future<void> _safeExit() async {
     if (_isDisposing) return;
-     
+      
     if (mounted) setState(() => _isDisposing = true);
 
     try {
@@ -579,7 +600,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _recordingSubscription?.cancel();
-    _protectionService.stopMonitoring();
+    // 🛑 تم الايقاف
+    // _protectionService.stopMonitoring();
 
     if (!_isDisposing) _safeExit();
     super.dispose();
@@ -588,7 +610,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.of(context).viewPadding;
-     
+      
     final controlsTheme = MaterialVideoControlsThemeData(
       displaySeekBar: false,
       padding: EdgeInsets.only(
@@ -724,6 +746,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
               ),
 
             // ✅ 7. شاشة التحذير الحمراء مع التهديد
+            // 🛑 تم الايقاف: لن يتم عرضها أبداً لأن _isRecordingDetected دائماً false
             if (_isRecordingDetected)
               Container(
                 color: Colors.red.shade900,
