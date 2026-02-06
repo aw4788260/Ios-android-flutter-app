@@ -36,7 +36,7 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
   final AudioProtectionService _protectionService = AudioProtectionService();
   StreamSubscription? _recordingSubscription;
   bool _isRecordingDetected = false;
-   
+    
   // متغيرات العلامة المائية
   Timer? _watermarkTimer;
   Alignment _watermarkAlignment = Alignment.topRight;
@@ -58,7 +58,8 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     WakelockPlus.enable();
 
     // ✅ 3. تفعيل الحماية الأمنية
-    _initializeProtection();
+    // 🛑 تم الايقاف: عدم تفعيل الحماية عند البدء
+    // _initializeProtection();
 
     // ✅ 4. جلب رقم الهاتف وبدء التحريك
     _getUserId();
@@ -86,6 +87,8 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
 
   // ✅ دالة تفعيل الحماية
   Future<void> _initializeProtection() async {
+    // 🛑 تم الايقاف بالكامل
+    /*
     try {
       // منع Screenshot & Screen Recording
       // ✅ تم التصحيح هنا: استخدام FlutterWindowManagerPlus بدلاً من FlutterWindowManager
@@ -106,10 +109,15 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     } catch (e) {
       FirebaseCrashlytics.instance.recordError(e, null, reason: 'Protection Init Error');
     }
+    */
   }
 
   // ✅ التعامل مع اكتشاف التسجيل (تم التعديل لإيقاف الصوت)
   void _handleRecordingDetected() {
+    // 🛑 تم الايقاف: لن يتم تنفيذ أي حظر
+    return;
+
+    /*
     if (!mounted) return;
     
     // حتى إذا تم الكشف مسبقاً، نتأكد من تطبيق الإيقاف مرة أخرى
@@ -120,6 +128,7 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     _controller.pause(); // إيقاف الفيديو
     
     FirebaseCrashlytics.instance.log("🚨 Security: Screen Recording Detected on YouTube Player! Muted & Paused.");
+    */
   }
 
   // ✅ إعادة تفعيل الحماية عند العودة للتطبيق
@@ -128,10 +137,12 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     if (state == AppLifecycleState.paused) {
       _controller.pause();
     } else if (state == AppLifecycleState.resumed) {
-      _protectionService.blockAudioCapture();
+      // 🛑 تم الايقاف: عدم إعادة تفعيل الحظر
+      // _protectionService.blockAudioCapture();
       
       // إذا كان هناك تسجيل، نعيد تطبيق الحظر (كتم وإيقاف)
       if (_isRecordingDetected) {
+         // لن يتم الدخول هنا أبداً لأن _isRecordingDetected دائماً false
          _controller.mute();
          _controller.pause();
       }
@@ -144,10 +155,13 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     }
     
     // ✅ حارس إضافي: إذا كان الفيديو يعمل وهناك تسجيل، أوقفه
+    // 🛑 تم الايقاف
+    /*
     if (_isRecordingDetected && _controller.value.isPlaying) {
        _controller.pause();
        _controller.mute();
     }
+    */
   }
 
   void _getUserId() {
@@ -196,7 +210,8 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
   void dispose() {
     WidgetsBinding.instance.removeObserver(this); // ✅ إزالة المراقب
     _recordingSubscription?.cancel();
-    _protectionService.stopMonitoring();
+    // 🛑 تم الايقاف
+    // _protectionService.stopMonitoring();
     WakelockPlus.disable(); // ✅ إيقاف Wakelock
     
     _watermarkTimer?.cancel();
@@ -298,6 +313,7 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
           ),
 
           // 4. ✅ شاشة التحذير الحمراء عند اكتشاف التسجيل (فوق كل شيء)
+          // 🛑 تم الايقاف: لن تظهر أبداً لأن _isRecordingDetected دائماً false
           if (_isRecordingDetected)
             Container(
               color: Colors.red.shade900,
