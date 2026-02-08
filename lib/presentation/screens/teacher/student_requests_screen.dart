@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../core/constants/app_colors.dart'; 
+import '../../../core/constants/app_colors.dart';
 import '../../../core/services/teacher_service.dart';
-import '../../../core/services/storage_service.dart'; 
+import '../../../core/services/storage_service.dart';
 import '../../../core/constants/api_constants.dart';
 
 class StudentRequestsScreen extends StatefulWidget {
@@ -20,10 +20,11 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
   // بيانات المصادقة للصور
   String? _token;
   String? _deviceId;
-  final String _appSecret = const String.fromEnvironment('APP_SECRET');
+  final String _appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
 
   final String _baseUrl = ApiConstants.baseUrl;
-  String get _receiptProxyUrl => "$_baseUrl/api/admin/file-proxy?type=receipts&filename=";
+  String get _receiptProxyUrl =>
+      "$_baseUrl/api/admin/file-proxy?type=receipts&filename=";
 
   @override
   void initState() {
@@ -52,13 +53,14 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
 
       // 3. الآن فقط نقوم بجلب الطلبات من السيرفر
       await _loadRequestsData();
-
     } catch (e) {
       debugPrint("Error in initial load: $e");
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ في التحميل: $e"), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text("حدث خطأ في التحميل: $e"),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -84,8 +86,8 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
 
   /// إعادة تحميل القائمة (مثلاً بعد القبول/الرفض)
   Future<void> _refreshRequests() async {
-      setState(() => _isLoading = true);
-      await _loadRequestsData();
+    setState(() => _isLoading = true);
+    await _loadRequestsData();
   }
 
   Future<void> _handleDecision(String requestId, bool approve) async {
@@ -98,7 +100,9 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
           String reason = "";
           return AlertDialog(
             backgroundColor: AppColors.backgroundSecondary,
-            title: Text("سبب الرفض", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            title: Text("سبب الرفض",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
             content: TextField(
               onChanged: (val) => reason = val,
               // ✅ تصحيح لون النص ليكون مرئياً في الوضعين
@@ -106,7 +110,8 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
               decoration: InputDecoration(
                 hintText: "اكتب سبب الرفض هنا...",
                 hintStyle: TextStyle(color: AppColors.textSecondary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
                 fillColor: AppColors.backgroundPrimary,
               ),
@@ -114,16 +119,18 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx), 
-                child: Text("إلغاء", style: TextStyle(color: AppColors.textSecondary))
-              ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text("إلغاء",
+                      style: TextStyle(color: AppColors.textSecondary))),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, reason),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.error,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text("تأكيد الرفض", style: TextStyle(color: Colors.white)),
+                child: const Text("تأكيد الرفض",
+                    style: TextStyle(color: Colors.white)),
               ),
             ],
           );
@@ -135,32 +142,39 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
 
     try {
       ScaffoldMessenger.of(context).showSnackBar(
-         const SnackBar(content: Text("جاري تنفيذ العملية..."), duration: Duration(seconds: 1)),
+        const SnackBar(
+            content: Text("جاري تنفيذ العملية..."),
+            duration: Duration(seconds: 1)),
       );
 
-      await _teacherService.handleRequest(requestId, approve, reason: rejectionReason);
-      
+      await _teacherService.handleRequest(requestId, approve,
+          reason: rejectionReason);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                Icon(approve ? Icons.check_circle : Icons.cancel, color: Colors.white),
+                Icon(approve ? Icons.check_circle : Icons.cancel,
+                    color: Colors.white),
                 const SizedBox(width: 8),
                 Text(approve ? "تم قبول الطالب بنجاح" : "تم رفض الطلب"),
               ],
             ),
             backgroundColor: approve ? AppColors.success : AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
       _refreshRequests();
     } catch (e) {
-       if (mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشلت العملية: $e"), backgroundColor: AppColors.error),
+          SnackBar(
+              content: Text("فشلت العملية: $e"),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -169,10 +183,12 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
   void _showFullImage(String url) {
     // نتأكد للمرة الأخيرة أن البيانات موجودة
     if (_deviceId == null || _token == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text("خطأ: بيانات المصادقة غير جاهزة"), backgroundColor: AppColors.error),
-       );
-       return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: const Text("خطأ: بيانات المصادقة غير جاهزة"),
+            backgroundColor: AppColors.error),
+      );
+      return;
     }
 
     showDialog(
@@ -194,18 +210,23 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                   // ✅ الهيدرز الضرورية لعرض الصورة
                   httpHeaders: {
                     'Authorization': 'Bearer $_token',
-                    'x-device-id': _deviceId!, // علامة التعجب لأننا تأكدنا أنه ليس null
+                    'x-device-id':
+                        _deviceId!, // علامة التعجب لأننا تأكدنا أنه ليس null
                     'x-app-secret': _appSecret,
                   },
-                  placeholder: (context, url) => Center(child: CircularProgressIndicator(color: AppColors.accentYellow)),
+                  placeholder: (context, url) => Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.accentYellow)),
                   errorWidget: (context, url, error) => Container(
                     color: AppColors.backgroundSecondary,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                          Icon(Icons.broken_image_rounded, color: AppColors.error, size: 50),
-                          const SizedBox(height: 8),
-                          Text("تعذر تحميل الصورة - تأكد من الاتصال", style: TextStyle(color: AppColors.textSecondary)),
+                        Icon(Icons.broken_image_rounded,
+                            color: AppColors.error, size: 50),
+                        const SizedBox(height: 8),
+                        Text("تعذر تحميل الصورة - تأكد من الاتصال",
+                            style: TextStyle(color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -233,29 +254,37 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
       appBar: AppBar(
-        title: Text("طلبات الاشتراك المعلقة", style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text("طلبات الاشتراك المعلقة",
+            style: TextStyle(
+                color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
         backgroundColor: AppColors.backgroundSecondary,
         elevation: 0,
         iconTheme: IconThemeData(color: AppColors.accentYellow),
         centerTitle: true,
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
+          ? Center(
+              child: CircularProgressIndicator(color: AppColors.accentYellow))
           : _requests.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.inbox_rounded, size: 80, color: AppColors.textSecondary.withOpacity(0.3)),
+                      Icon(Icons.inbox_rounded,
+                          size: 80,
+                          color: AppColors.textSecondary.withOpacity(0.3)),
                       const SizedBox(height: 16),
-                      Text("لا توجد طلبات معلقة حالياً", style: TextStyle(color: AppColors.textSecondary, fontSize: 18)),
+                      Text("لا توجد طلبات معلقة حالياً",
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 18)),
                     ],
                   ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
                   itemCount: _requests.length,
-                  itemBuilder: (context, index) => _buildRequestCard(_requests[index]),
+                  itemBuilder: (context, index) =>
+                      _buildRequestCard(_requests[index]),
                 ),
     );
   }
@@ -278,7 +307,9 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
         color: AppColors.backgroundSecondary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -297,7 +328,8 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                     height: 90,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                      border: Border.all(
+                          color: AppColors.textSecondary.withOpacity(0.1)),
                       color: AppColors.backgroundPrimary,
                     ),
                     child: ClipRRect(
@@ -311,10 +343,16 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                                 'x-app-secret': _appSecret,
                               },
                               fit: BoxFit.cover,
-                              placeholder: (c, u) => Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentYellow)),
-                              errorWidget: (c, u, e) => Icon(Icons.broken_image_rounded, color: AppColors.textSecondary),
+                              placeholder: (c, u) => Center(
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.accentYellow)),
+                              errorWidget: (c, u, e) => Icon(
+                                  Icons.broken_image_rounded,
+                                  color: AppColors.textSecondary),
                             )
-                          : Icon(Icons.receipt_long_rounded, color: AppColors.textSecondary, size: 35),
+                          : Icon(Icons.receipt_long_rounded,
+                              color: AppColors.textSecondary, size: 35),
                     ),
                   ),
                 ),
@@ -326,35 +364,48 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                           Expanded(
-                             child: Text(
-                               req['user_name'] ?? "اسم غير معروف",
-                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
-                               overflow: TextOverflow.ellipsis,
-                             ),
-                           ),
-                           Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                             decoration: BoxDecoration(color: AppColors.backgroundPrimary, borderRadius: BorderRadius.circular(8)),
-                             child: Text(dateStr, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                           )
+                          Expanded(
+                            child: Text(
+                              req['user_name'] ?? "اسم غير معروف",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: AppColors.textPrimary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: AppColors.backgroundPrimary,
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Text(dateStr,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary)),
+                          )
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _buildInfoRow(Icons.phone_android_rounded, req['phone'] ?? '---'),
+                      _buildInfoRow(
+                          Icons.phone_android_rounded, req['phone'] ?? '---'),
                       const SizedBox(height: 4),
-                      _buildInfoRow(Icons.alternate_email_rounded, req['user_username'] ?? '---'),
+                      _buildInfoRow(Icons.alternate_email_rounded,
+                          req['user_username'] ?? '---'),
                     ],
                   ),
                 ),
               ],
             ),
-            
-            Divider(height: 24, color: AppColors.textSecondary.withOpacity(0.1)),
+
+            Divider(
+                height: 24, color: AppColors.textSecondary.withOpacity(0.1)),
 
             // ================== التفاصيل والسعر والملاحظة ==================
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start, // محاذاة للأعلى لضمان تناسق العمودين
+              crossAxisAlignment: CrossAxisAlignment
+                  .start, // محاذاة للأعلى لضمان تناسق العمودين
               children: [
                 Expanded(
                   flex: 3,
@@ -365,29 +416,37 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.backgroundPrimary.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.accentBlue.withOpacity(0.3))
-                        ),
+                            color: AppColors.backgroundPrimary.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: AppColors.accentBlue.withOpacity(0.3))),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.shopping_cart_outlined, size: 16, color: AppColors.accentBlue),
+                                Icon(Icons.shopping_cart_outlined,
+                                    size: 16, color: AppColors.accentBlue),
                                 const SizedBox(width: 6),
-                                Text("المحتوى المطلوب:", style: TextStyle(color: AppColors.accentBlue, fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text("المحتوى المطلوب:",
+                                    style: TextStyle(
+                                        color: AppColors.accentBlue,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold)),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
                               req['course_title'] ?? 'غير محدد',
-                              style: TextStyle(color: AppColors.textPrimary, fontSize: 13, height: 1.3),
+                              style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13,
+                                  height: 1.3),
                             ),
                           ],
                         ),
                       ),
-                      
+
                       // ✅ عرض الملاحظة هنا بشكل منفصل وبتصميم مميز
                       if (hasNote) ...[
                         const SizedBox(height: 8),
@@ -395,24 +454,35 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.1), // خلفية شفافة صفراء
+                            color: Colors.amber
+                                .withOpacity(0.1), // خلفية شفافة صفراء
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.amber.withOpacity(0.3)), // حدود صفراء خفيفة
+                            border: Border.all(
+                                color: Colors.amber
+                                    .withOpacity(0.3)), // حدود صفراء خفيفة
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Row(
                                 children: [
-                                  Icon(Icons.edit_note_rounded, size: 16, color: Colors.amber),
+                                  Icon(Icons.edit_note_rounded,
+                                      size: 16, color: Colors.amber),
                                   SizedBox(width: 6),
-                                  Text("ملاحظة الطالب:", style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text("ملاحظة الطالب:",
+                                      style: TextStyle(
+                                          color: Colors.amber,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
                                 ],
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 userNote,
-                                style: TextStyle(color: AppColors.textPrimary, fontSize: 13, height: 1.3),
+                                style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    height: 1.3),
                               ),
                             ],
                           ),
@@ -422,33 +492,40 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                
+
                 // صندوق السعر
                 Expanded(
                   flex: 2,
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      color: AppColors.backgroundPrimary.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(12),
-                       border: Border.all(color: AppColors.success.withOpacity(0.3))
-                    ),
+                        color: AppColors.backgroundPrimary.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.success.withOpacity(0.3))),
                     child: Column(
                       children: [
-                        Text("الإجمالي", style: TextStyle(color: AppColors.success, fontSize: 11)),
+                        Text("الإجمالي",
+                            style: TextStyle(
+                                color: AppColors.success, fontSize: 11)),
                         const SizedBox(height: 4),
-                        Text(
-                          "${req['total_price'] ?? 0}", 
-                          style: TextStyle(color: AppColors.success, fontWeight: FontWeight.bold, fontSize: 18)
-                        ),
-                        Text("EGP", style: TextStyle(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold)),
+                        Text("${req['total_price'] ?? 0}",
+                            style: TextStyle(
+                                color: AppColors.success,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18)),
+                        Text("EGP",
+                            style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 20),
 
             // ================== الأزرار ==================
@@ -456,30 +533,38 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _handleDecision(req['id'].toString(), false),
+                    onPressed: () =>
+                        _handleDecision(req['id'].toString(), false),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.error,
-                      side: BorderSide(color: AppColors.error.withOpacity(0.5), width: 1.5),
+                      side: BorderSide(
+                          color: AppColors.error.withOpacity(0.5), width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     icon: const Icon(Icons.close_rounded, size: 20),
-                    label: const Text("رفض الطلب", style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text("رفض الطلب",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _handleDecision(req['id'].toString(), true),
+                    onPressed: () =>
+                        _handleDecision(req['id'].toString(), true),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                     icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
-                    label: const Text("قبول وتفعيل", style: TextStyle(fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.check_circle_outline_rounded,
+                        size: 20),
+                    label: const Text("قبول وتفعيل",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -497,7 +582,10 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
         const SizedBox(width: 8),
         Text(
           text,
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+          style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500),
         ),
       ],
     );

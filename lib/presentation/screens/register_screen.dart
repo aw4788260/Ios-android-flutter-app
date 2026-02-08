@@ -38,7 +38,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.initState();
     FirebaseCrashlytics.instance.log("Entered Register Screen");
     // تحديث الواجهة عند تغيير التركيز
-    for (var node in [_nameFocus, _phoneFocus, _userFocus, _passFocus, _confirmPassFocus]) {
+    for (var node in [
+      _nameFocus,
+      _phoneFocus,
+      _userFocus,
+      _passFocus,
+      _confirmPassFocus
+    ]) {
       node.addListener(() => setState(() {}));
     }
   }
@@ -68,20 +74,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final confirmPassword = _confirmPasswordController.text;
 
     // Validation
-    if (name.isEmpty || phone.isEmpty || username.isEmpty || password.isEmpty) {
+    if (name.isEmpty || username.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = "All fields are required");
       return;
     }
 
     final usernameRegex = RegExp(r'^[a-zA-Z0-9]+$');
     if (!usernameRegex.hasMatch(username)) {
-      setState(() => _errorMessage = "Username must be English letters & numbers only");
+      setState(() =>
+          _errorMessage = "Username must be English letters & numbers only");
       return;
     }
 
     final phoneRegex = RegExp(r'^01[0-9]{9}$');
-    if (!phoneRegex.hasMatch(phone)) {
-      setState(() => _errorMessage = "Invalid phone number (must be 11 digits starting with 01)");
+    if (phone.isNotEmpty && !phoneRegex.hasMatch(phone)) {
+      setState(() =>
+          _errorMessage = "Invalid phone number (11 digits starting with 01)");
       return;
     }
 
@@ -104,14 +112,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         data: {
           'firstName': name,
           'username': username,
-          'phone': phone,
+          'phone': phone.isEmpty ? null : phone,
           'password': password,
         },
         options: Options(
           headers: {
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
-          validateStatus: (status) => status! < 500
+          validateStatus: (status) => status! < 500,
         ),
       );
 
@@ -121,7 +129,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text("Account created successfully. Please login."),
+              content:
+                  const Text("Account created successfully. Please login."),
               backgroundColor: AppColors.success,
             ),
           );
@@ -131,7 +140,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
         }
       } else {
-        setState(() => _errorMessage = data['message'] ?? "Registration failed");
+        setState(
+            () => _errorMessage = data['message'] ?? "Registration failed");
       }
     } catch (e, stack) {
       FirebaseCrashlytics.instance.recordError(e, stack);
@@ -152,7 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              
+
               // Back Button
               GestureDetector(
                 onTap: () => Navigator.pop(context),
@@ -162,9 +172,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSecondary,
                     borderRadius: BorderRadius.circular(50),
-                    border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                    border: Border.all(
+                        color: AppColors.textSecondary.withOpacity(0.1)),
                   ),
-                  child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                  child: Icon(LucideIcons.arrowLeft,
+                      color: AppColors.accentYellow, size: 20),
                 ),
               ),
 
@@ -172,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Text(
                 "CREATE ACCOUNT",
                 style: TextStyle(
-                  fontSize: 24, 
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                   letterSpacing: -0.5,
@@ -202,12 +214,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(LucideIcons.alertCircle, color: AppColors.error, size: 16),
+                      Icon(LucideIcons.alertCircle,
+                          color: AppColors.error, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: AppColors.error, fontSize: 12),
+                          style:
+                              TextStyle(color: AppColors.error, fontSize: 12),
                         ),
                       ),
                     ],
@@ -264,7 +278,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 controller: _confirmPasswordController,
                 focusNode: _confirmPassFocus,
                 hint: "••••••",
-                icon: LucideIcons.lock, 
+                icon: LucideIcons.lock,
                 isPassword: true,
               ),
               const SizedBox(height: 32),
@@ -283,23 +297,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     elevation: 10,
                   ),
-                  child: _isLoading 
-                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundPrimary))
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            "CREATE ACCOUNT",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              letterSpacing: 1.0,
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.backgroundPrimary))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              "CREATE ACCOUNT",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                                letterSpacing: 1.0,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 12),
-                          Icon(LucideIcons.arrowRight, size: 18),
-                        ],
-                      ),
+                            SizedBox(width: 12),
+                            Icon(LucideIcons.arrowRight, size: 18),
+                          ],
+                        ),
                 ),
               ),
 
@@ -312,13 +331,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     Text(
                       "Already have an account? ",
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 12),
                     ),
                     GestureDetector(
                       onTap: () {
-                         Navigator.pushReplacement(
+                        Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => const LoginScreen()),
                         );
                       },
                       child: Text(
@@ -373,8 +394,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         color: AppColors.backgroundSecondary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: focusNode.hasFocus 
-              ? AppColors.accentYellow.withOpacity(0.5) 
+          color: focusNode.hasFocus
+              ? AppColors.accentYellow.withOpacity(0.5)
               : AppColors.textSecondary.withOpacity(0.1),
         ),
       ),
@@ -391,7 +412,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
           prefixIcon: Icon(
             icon,
             size: 18,

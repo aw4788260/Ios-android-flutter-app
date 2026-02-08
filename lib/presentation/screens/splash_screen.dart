@@ -25,10 +25,11 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
-    
+
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
 
@@ -45,7 +46,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
-     
+
     _bounceAnimation = Tween<double>(begin: 0.0, end: 15.0).animate(
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
@@ -68,18 +69,18 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     try {
       final tempDir = await getTemporaryDirectory();
       final dir = Directory(tempDir.path);
-      
+
       if (await dir.exists()) {
         final List<FileSystemEntity> entities = dir.listSync();
         for (final entity in entities) {
           if (entity is File) {
             // حذف ملفات PDF المفكوكة وملفات التحميل المؤقتة
             final filename = entity.uri.pathSegments.last;
-            if (filename.startsWith('view_') || 
-                filename.startsWith('temp_') || 
+            if (filename.startsWith('view_') ||
+                filename.startsWith('temp_') ||
                 filename.startsWith('downloading_')) {
-              try { 
-                await entity.delete(); 
+              try {
+                await entity.delete();
                 debugPrint("🧹 Deleted temp file: $filename");
               } catch (_) {}
             }
@@ -94,65 +95,84 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   // نافذة الموافقة على الشروط والسياسات
   Future<bool> _showTermsDialog(Box box) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          backgroundColor: AppColors.backgroundSecondary,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            "Welcome / مرحباً بك",
-            style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "يرجى الموافقة على الشروط والأحكام وسياسة الخصوصية للمتابعة.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: AppColors.backgroundSecondary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                "Welcome / مرحباً بك",
+                style: TextStyle(
+                    color: AppColors.accentYellow, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "يرجى الموافقة على الشروط والأحكام وسياسة الخصوصية للمتابعة.",
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Please accept our Terms & Privacy Policy to continue.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    ListTile(
+                      dense: true,
+                      leading: Icon(LucideIcons.fileText,
+                          color: AppColors.accentOrange, size: 20),
+                      title: Text("Terms & Conditions",
+                          style: TextStyle(color: AppColors.textPrimary)),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const TermsConditionsScreen())),
+                    ),
+                    ListTile(
+                      dense: true,
+                      leading: Icon(LucideIcons.shield,
+                          color: AppColors.accentOrange, size: 20),
+                      title: Text("Privacy Policy",
+                          style: TextStyle(color: AppColors.textPrimary)),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const PrivacyPolicyScreen())),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  "Please accept our Terms & Privacy Policy to continue.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              actions: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.error)),
+                  child:
+                      Text("DECLINE", style: TextStyle(color: AppColors.error)),
                 ),
-                const SizedBox(height: 16),
-                 
-                ListTile(
-                  dense: true,
-                  leading: Icon(LucideIcons.fileText, color: AppColors.accentOrange, size: 20),
-                  title: Text("Terms & Conditions", style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TermsConditionsScreen())),
-                ),
-                ListTile(
-                  dense: true,
-                  leading: Icon(LucideIcons.shield, color: AppColors.accentOrange, size: 20),
-                  title: Text("Privacy Policy", style: TextStyle(color: AppColors.textPrimary)),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen())),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success),
+                  child: const Text("ACCEPT",
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
-          actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context, false),
-              style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.error)),
-              child: Text("DECLINE", style: TextStyle(color: AppColors.error)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-              child: const Text("ACCEPT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   Future<void> _initializeApp() async {
@@ -163,10 +183,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       await Hive.initFlutter();
       var box = await StorageService.openBox('auth_box');
       await StorageService.openBox('downloads_box');
-      
+
       bool termsAccepted = box.get('terms_accepted', defaultValue: false);
       if (!termsAccepted) {
-        await Future.delayed(const Duration(seconds: 1)); 
+        await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
           // ✅ 2. التحقق الأمني قبل عرض الشروط
           if (!await SecurityManager.instance.checkSecurity()) return;
@@ -185,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       String? userId = box.get('user_id');
       String? deviceId = box.get('device_id');
 
-      await Future.delayed(const Duration(seconds: 1)); 
+      await Future.delayed(const Duration(seconds: 1));
 
       if (isGuest) {
         deviceId ??= 'guest_device_${DateTime.now().millisecondsSinceEpoch}';
@@ -195,20 +215,19 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
       if (userId == null || deviceId == null) {
         if (mounted) {
-            // ✅ 3. التحقق الأمني قبل الانتقال لتسجيل الدخول
-            if (!await SecurityManager.instance.checkSecurity()) return;
+          // ✅ 3. التحقق الأمني قبل الانتقال لتسجيل الدخول
+          if (!await SecurityManager.instance.checkSecurity()) return;
 
-            // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
-            );
+          // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
         }
         return;
       }
 
       await _initAsUser(userId, deviceId, box);
-
     } catch (e, stack) {
       FirebaseCrashlytics.instance.recordError(e, stack);
       if (mounted) {
@@ -232,7 +251,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           headers: {
             'x-user-id': '0',
             'x-device-id': deviceId,
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -268,7 +287,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             'x-device-id': deviceId,
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -280,30 +299,32 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
         // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ
-await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data));
+        await StorageService.saveFullAppInitData(
+            Map<String, dynamic>.from(response.data));
 
         // ✅ 3. تخزين بيانات الوصول السريع (العلامة المائية ومعلومات التواصل)
-        if (response.data['user'] != null && response.data['user']['phone'] != null) {
+        if (response.data['user'] != null &&
+            response.data['user']['phone'] != null) {
           await StorageService.saveUserPhone(response.data['user']['phone']);
         }
         if (response.data['contactInfo'] != null) {
-           await StorageService.saveContactInfo(
-             whatsapp: response.data['contactInfo']['whatsapp'] ?? '',
-             telegram: response.data['contactInfo']['telegram'] ?? '',
-           );
+          await StorageService.saveContactInfo(
+            whatsapp: response.data['contactInfo']['whatsapp'] ?? '',
+            telegram: response.data['contactInfo']['telegram'] ?? '',
+          );
         }
 
         // ✅ 4. حفظ بيانات الجلسة الأساسية
         if (response.data['user'] != null) {
-           final userData = response.data['user'];
-           
-           if (userData['role'] != null) {
-             await box.put('role', userData['role']);
-           }
-           
-           if (userData['profile_image'] != null) {
-             await box.put('profile_image', userData['profile_image']);
-           }
+          final userData = response.data['user'];
+
+          if (userData['role'] != null) {
+            await box.put('role', userData['role']);
+          }
+
+          if (userData['profile_image'] != null) {
+            await box.put('profile_image', userData['profile_image']);
+          }
         }
 
         bool isLoggedIn = response.data['isLoggedIn'] ?? false;
@@ -311,8 +332,8 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
         // إذا قال السيرفر أن المستخدم غير مسجل
         if (!isLoggedIn) {
           await box.clear(); // حذف البيانات القديمة
-          await box.put('terms_accepted', true); 
-          
+          await box.put('terms_accepted', true);
+
           if (mounted) {
             if (!await SecurityManager.instance.checkSecurity()) return;
             Navigator.of(context).pushAndRemoveUntil(
@@ -333,41 +354,42 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
       } else {
         throw Exception("Server Error: ${response.statusCode}");
       }
-
     } catch (serverError) {
       FirebaseCrashlytics.instance.log("Splash Offline Mode: $serverError");
-      
+
       // ✅ 5. محاولة الدخول بوضع الأوفلاين باستخدام البيانات المخزنة الكاملة
       bool offlineSuccess = await AppState().loadOfflineData();
-      
+
       if (offlineSuccess) {
-         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
-               content: const Text("No Internet. Entering Offline Mode."),
-               backgroundColor: AppColors.accentOrange,
-               duration: const Duration(seconds: 3),
-             ),
-           );
-           
-           if (!await SecurityManager.instance.checkSecurity()) return;
-           Navigator.of(context).pushAndRemoveUntil(
-             MaterialPageRoute(builder: (_) => const MainWrapper()),
-             (route) => false,
-           );
-         }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("No Internet. Entering Offline Mode."),
+              backgroundColor: AppColors.accentOrange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          if (!await SecurityManager.instance.checkSecurity()) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainWrapper()),
+            (route) => false,
+          );
+        }
       } else {
-         if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text("Offline Mode (Limited Access)"), backgroundColor: Colors.grey),
-           );
-           
-           if (!await SecurityManager.instance.checkSecurity()) return;
-           Navigator.of(context).pushAndRemoveUntil(
-             MaterialPageRoute(builder: (_) => const MainWrapper()),
-             (route) => false,
-           );
-         }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text("Offline Mode (Limited Access)"),
+                backgroundColor: Colors.grey),
+          );
+
+          if (!await SecurityManager.instance.checkSecurity()) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainWrapper()),
+            (route) => false,
+          );
+        }
       }
     }
   }
@@ -384,7 +406,8 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
     final size = MediaQuery.of(context).size;
     final isLandscape = size.width > size.height;
     final isTablet = size.shortestSide > 600;
-    final logoWidth = size.width * (isLandscape ? 0.25 : (isTablet ? 0.4 : 0.6));
+    final logoWidth =
+        size.width * (isLandscape ? 0.25 : (isTablet ? 0.4 : 0.6));
 
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
@@ -394,7 +417,6 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(flex: 3),
-
               AnimatedBuilder(
                 animation: _bounceAnimation,
                 builder: (context, child) {
@@ -409,9 +431,7 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
                   fit: BoxFit.contain,
                 ),
               ),
-              
               const SizedBox(height: 20),
-
               Text(
                 "EMPOWERING YOUR GROWTH",
                 style: TextStyle(
@@ -421,9 +441,7 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
                   letterSpacing: 4.0,
                 ),
               ),
-
               const Spacer(flex: 2),
-
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -446,7 +464,8 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
                               borderRadius: BorderRadius.circular(2),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.accentYellow.withOpacity(0.6),
+                                  color:
+                                      AppColors.accentYellow.withOpacity(0.6),
                                   blurRadius: 12,
                                 )
                               ],
@@ -457,7 +476,6 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
                   Text(
                     "LOADING SYSTEM",
                     style: TextStyle(
@@ -469,7 +487,6 @@ await StorageService.saveFullAppInitData(Map<String, dynamic>.from(response.data
                   ),
                 ],
               ),
-
               const Spacer(flex: 1),
             ],
           ),

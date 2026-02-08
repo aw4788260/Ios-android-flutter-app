@@ -30,16 +30,16 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
       // ✅ جلب التوكن وبصمة الجهاز بدلاً من user_id
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
-      
+
       final res = await Dio().get(
         '$_baseUrl/api/student/my-requests',
         options: Options(headers: {
           'Authorization': 'Bearer $token', // ✅ الهيدر الجديد
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
-      
+
       if (mounted) {
         setState(() {
           _requests = res.data;
@@ -70,9 +70,11 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.05)),
                       ),
-                      child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                      child: Icon(LucideIcons.arrowLeft,
+                          color: AppColors.accentYellow, size: 20),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -107,18 +109,24 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
             // --- List ---
             Expanded(
               child: _loading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
+                  ? Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.accentYellow))
                   : _requests.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(LucideIcons.inbox, size: 48, color: AppColors.textSecondary.withOpacity(0.2)),
+                              Icon(LucideIcons.inbox,
+                                  size: 48,
+                                  color:
+                                      AppColors.textSecondary.withOpacity(0.2)),
                               const SizedBox(height: 16),
                               Text(
                                 "NO REQUESTS FOUND",
                                 style: TextStyle(
-                                  color: AppColors.textSecondary.withOpacity(0.5),
+                                  color:
+                                      AppColors.textSecondary.withOpacity(0.5),
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.5,
@@ -163,7 +171,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     // ✅ استخراج الملاحظة
     final String? userNote = req['user_note'];
     final bool hasNote = userNote != null && userNote.trim().isNotEmpty;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
@@ -184,32 +192,41 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                   color: AppColors.backgroundPrimary,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  "#${req['id']}", 
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold)
-                ),
+                child: Text("#${req['id']}",
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold)),
               ),
               Row(
                 children: [
                   Icon(statusIcon, color: statusColor, size: 14),
                   const SizedBox(width: 6),
-                  Text(
-                    status.toUpperCase(), 
-                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0)
-                  ),
+                  Text(status.toUpperCase(),
+                      style: TextStyle(
+                          color: statusColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
-            req['course_title'] ?? 'Unknown Item', 
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+            req['course_title'] ?? 'Unknown Item',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            "${req['total_price']} EGP", 
-            style: TextStyle(color: AppColors.accentYellow, fontSize: 14, fontWeight: FontWeight.bold),
+            "${req['total_price']} EGP",
+            style: TextStyle(
+                color: AppColors.accentYellow,
+                fontSize: 14,
+                fontWeight: FontWeight.bold),
           ),
 
           // ✅ عرض الملاحظة هنا
@@ -228,23 +245,30 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                 children: [
                   Row(
                     children: const [
-                        Icon(LucideIcons.fileText, size: 12, color: Colors.amber),
-                        SizedBox(width: 4),
-                        Text(
+                      Icon(LucideIcons.fileText, size: 12, color: Colors.amber),
+                      SizedBox(width: 4),
+                      Text(
                         "YOUR NOTE",
-                        style: TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                        style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     userNote,
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        height: 1.4),
                   ),
                 ],
               ),
             ),
-          
+
           if (status == 'rejected' && req['rejection_reason'] != null)
             Container(
               margin: const EdgeInsets.only(top: 12),
@@ -256,7 +280,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                 border: Border.all(color: AppColors.error.withOpacity(0.2)),
               ),
               child: Text(
-                "Reason: ${req['rejection_reason']}", 
+                "Reason: ${req['rejection_reason']}",
                 style: TextStyle(color: AppColors.error, fontSize: 11),
               ),
             ),

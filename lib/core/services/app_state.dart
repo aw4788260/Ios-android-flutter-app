@@ -16,10 +16,10 @@ class AppState {
   // البيانات المخزنة
   List<CourseModel> allCourses = []; // للمتجر والشاشة الرئيسية
   Map<String, dynamic>? userData;
-  
+
   List<String> myCourseIds = [];
   List<String> mySubjectIds = [];
-  
+
   // ✅ القائمة الجاهزة للعرض في صفحة "مكتبتي"
   List<Map<String, dynamic>> myLibrary = [];
 
@@ -47,10 +47,10 @@ class AppState {
   // ✅ 4. دالة التبديل بين الوضعين (عند ضغط الزر)
   Future<void> toggleTheme() async {
     bool currentIsDark = themeNotifier.value == ThemeMode.dark;
-    
+
     // عكس القيمة الحالية
     themeNotifier.value = currentIsDark ? ThemeMode.light : ThemeMode.dark;
-    
+
     // حفظ التفضيل الجديد في التخزين المحلي
     var box = await StorageService.openBox('settings_box');
     await box.put('is_dark_mode', !currentIsDark);
@@ -59,7 +59,7 @@ class AppState {
   // ============================================================
   // 🟢 Getters مساعدة للتحقق من الصلاحيات بسرعة
   // ============================================================
-  
+
   // هل المستخدم معلم؟
   bool get isTeacher => userData?['role'] == 'teacher';
 
@@ -124,29 +124,30 @@ class AppState {
       // 2. استقبال كورسات المتجر (متاحة للجميع: مسجلين وضيوف)
       if (castedData['courses'] != null) {
         allCourses = (castedData['courses'] as List)
-            .map((e) => CourseModel.fromJson(_makeSafeMap(e))) // ✅ استخدام التحويل الآمن هنا
+            .map((e) => CourseModel.fromJson(
+                _makeSafeMap(e))) // ✅ استخدام التحويل الآمن هنا
             .toList();
       } else {
         allCourses = [];
       }
-      
+
       // 3. بيانات المستخدم (إذا وجد في الرد، فهو ليس ضيفاً)
       if (castedData['user'] != null) {
         userData = _makeSafeMap(castedData['user']);
-        isGuest = false; 
+        isGuest = false;
       }
 
       // 4. أرقام الاشتراكات (فقط إذا لم يكن ضيفاً)
       if (!isGuest && castedData['myAccess'] != null) {
         final access = _makeSafeMap(castedData['myAccess']);
 
-        myCourseIds = (access['courses'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ?? [];
+        myCourseIds =
+            (access['courses'] as List?)?.map((e) => e.toString()).toList() ??
+                [];
 
-        mySubjectIds = (access['subjects'] as List?)
-                ?.map((e) => e.toString())
-                .toList() ?? [];
+        mySubjectIds =
+            (access['subjects'] as List?)?.map((e) => e.toString()).toList() ??
+                [];
       } else {
         myCourseIds = [];
         mySubjectIds = [];
@@ -163,9 +164,9 @@ class AppState {
       }
 
       if (kDebugMode) {
-        print("✅ Data Updated: Courses: ${allCourses.length}, Library: ${myLibrary.length}");
+        print(
+            "✅ Data Updated: Courses: ${allCourses.length}, Library: ${myLibrary.length}");
       }
-
     } catch (e, stack) {
       if (kDebugMode) print("❌ Error parsing init data: $e\n$stack");
     }
@@ -184,25 +185,25 @@ class AppState {
 
         // تحديث التطبيق بالبيانات المخبأة
         updateFromInitData(cachedData);
-        
+
         // ⚠️ استرجاع نوع المستخدم وصورته من auth_box لضمان التزامن
         var authBox = await StorageService.openBox('auth_box');
         if (userData != null) {
-           if (authBox.containsKey('role')) {
-             userData!['role'] = authBox.get('role');
-           }
-           if (authBox.containsKey('profile_image')) {
-             userData!['profile_image'] = authBox.get('profile_image');
-           }
-           // ✅ استرجاع رقم الهاتف من التخزين السريع إذا لم يكن موجوداً
-           if (userData!['phone'] == null) {
-             userData!['phone'] = await StorageService.getUserPhone();
-           }
+          if (authBox.containsKey('role')) {
+            userData!['role'] = authBox.get('role');
+          }
+          if (authBox.containsKey('profile_image')) {
+            userData!['profile_image'] = authBox.get('profile_image');
+          }
+          // ✅ استرجاع رقم الهاتف من التخزين السريع إذا لم يكن موجوداً
+          if (userData!['phone'] == null) {
+            userData!['phone'] = await StorageService.getUserPhone();
+          }
         }
-        
+
         // إذا نجحنا في تحميل الكورسات أو المكتبة، نعتبر العملية ناجحة
         if (allCourses.isNotEmpty || myLibrary.isNotEmpty) {
-          return true; 
+          return true;
         }
       } else {
         if (kDebugMode) print("⚠️ No offline data found in storage.");
@@ -220,34 +221,36 @@ class AppState {
       var box = await StorageService.openBox('auth_box');
       String? token = box.get('jwt_token');
       // ✅ 1. جلب معرف الجهاز
-      String? deviceId = box.get('device_id'); 
-      
+      String? deviceId = box.get('device_id');
+
       // التأكد من وجود التوكن قبل الطلب (للمستخدم المسجل فقط)
       if (token == null || isGuest) return;
 
       // ✅ التعديل هنا: إضافة timestamp لمنع الكاش وإجبار السيرفر على جلب بيانات جديدة
       final response = await Dio().get(
-        '${ApiConstants.apiUrl}/public/get-app-init-data', 
+        '${ApiConstants.apiUrl}/public/get-app-init-data',
         queryParameters: {
           't': DateTime.now().millisecondsSinceEpoch, // 👈 هذا السطر يمنع الكاش
         },
         options: Options(headers: {
           'Authorization': 'Bearer $token',
-          'x-device-id': deviceId, // ✅ 2. إرسال معرف الجهاز (بدونه يعتبرك السيرفر ضيفاً)
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-device-id':
+              deviceId, // ✅ 2. إرسال معرف الجهاز (بدونه يعتبرك السيرفر ضيفاً)
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
       if (response.statusCode == 200) {
         final data = response.data;
-        
+
         // 1. تحديث الذاكرة الحية (RAM)
-        updateFromInitData(data); 
-        
+        updateFromInitData(data);
+
         // 2. ✅ حفظ كامل الرد في الذاكرة الدائمة (للأوفلاين)
         // نقوم بتحويل البيانات إلى Map<String, dynamic> قبل الحفظ للتأكد
-        await StorageService.saveFullAppInitData(Map<String, dynamic>.from(data));
-        
+        await StorageService.saveFullAppInitData(
+            Map<String, dynamic>.from(data));
+
         // 3. ✅ حفظ رقم الهاتف للعلامة المائية (وصول سريع)
         if (data['user'] != null && data['user']['phone'] != null) {
           await StorageService.saveUserPhone(data['user']['phone']);
@@ -255,19 +258,19 @@ class AppState {
 
         // 4. ✅ حفظ معلومات التواصل (وصول سريع)
         if (data['contactInfo'] != null) {
-           await StorageService.saveContactInfo(
-             whatsapp: data['contactInfo']['whatsapp'] ?? '',
-             telegram: data['contactInfo']['telegram'] ?? '',
-           );
+          await StorageService.saveContactInfo(
+            whatsapp: data['contactInfo']['whatsapp'] ?? '',
+            telegram: data['contactInfo']['telegram'] ?? '',
+          );
         }
-        
+
         if (kDebugMode) print("✅ App Init Reloaded & Full Data Persisted!");
       }
     } catch (e) {
       if (kDebugMode) print("❌ App Init Reload Error: $e");
     }
   }
-  
+
   // دالة لمسح البيانات عند الخروج
   void clear() {
     userData = null;

@@ -61,24 +61,24 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       _buildSection(
                         "1. جمع البيانات والأذونات",
                         "1. Data Collection & Permissions",
-                        "نقوم بجمع 'معرف الجهاز' (Device ID) لربط حسابك بجهاز واحد فقط لضمان الأمان. كما نستخدم خدمة الإشعارات (Notifications) لعرض حالة تحميل الدروس في الخلفية لضمان استمرار التحميل عند الخروج من التطبيق.",
-                        "We collect your 'Device ID' to link your account to a single device for security. We also use Notifications to display download progress in the background, ensuring downloads continue even when the app is minimized."
+                        "نقوم بجمع معرّف فريد يتم إنشاؤه داخل التطبيق للمساعدة في تأمين حسابك وربطه بجهاز واحد فقط. يتم استخدام هذا المعرّف لأغراض الأمان ووظائف التطبيق فقط، ولا يتم استخدامه للتتبع أو الإعلانات.\n\nنستخدم الإشعارات لإعلامك بحالة تحميل الدروس والتحديثات المهمة، لضمان استمرار التحميل وبقائك على اطلاع حتى عند تشغيل التطبيق في الخلفية.",
+                        "We collect a unique app-generated identifier to help secure your account and associate it with a single device. This identifier is used solely for security and functionality purposes and is not used for tracking or advertising.\n\nWe use Notifications to inform you about lesson download status and important updates, ensuring downloads can continue and you stay informed even when the app is in the background."
                       ),
                       Divider(color: AppColors.textSecondary.withOpacity(0.1), height: 40),
                       
                       _buildSection(
-                        "2. متطلبات الأمان للجهاز",
+                        "2. متطلبات أمان الجهاز",
                         "2. Device Security Requirements",
-                        "لضمان حماية المحتوى، لا يمكن استخدام التطبيق على الأجهزة التي تم كسر حمايتها (Root/Jailbreak) أو الأجهزة التي تم تفعيل 'خيارات المطور' (Developer Options) بها. سيقوم التطبيق بالتحقق من ذلك وإيقاف العمل تلقائياً.",
-                        "To ensure content protection, the app cannot be used on Rooted/Jailbroken devices or devices with 'Developer Options' enabled. The app will automatically verify this and stop working if detected."
+                        "لحماية المحتوى والخدمات، قد لا تعمل بعض الميزات بشكل صحيح على الأجهزة التي تم تعديل نظامها (مثل الأجهزة التي تم عمل Root أو Jailbreak لها) أو التي تم تفعيل بعض الإعدادات على مستوى النظام. لا يمكننا ضمان أمان أو استقرار التطبيق في هذه الحالات.",
+                        "To help protect our content and services, some features may not function properly on devices that have been modified (such as rooted or jailbroken devices) or where certain system-level settings are enabled. We cannot guarantee the security or stability of the app in these environments."
                       ),
                       Divider(color: AppColors.textSecondary.withOpacity(0.1), height: 40),
 
                       _buildSection(
                         "3. حماية المحتوى",
                         "3. Content Protection",
-                        "جميع المواد التعليمية مشفرة ومحمية. أي محاولة لتسجيل الشاشة أو استخدام برامج خارجية ستؤدي إلى حظر الحساب فوراً.",
-                        "All educational materials are encrypted and protected. Any attempt to screen record or use third-party software will result in immediate account suspension."
+                        "جميع الفيديوهات والمواد التعليمية مخصصة للاستخدام الشخصي غير التجاري فقط. نطبق إجراءات تقنية وتنظيمية مناسبة للمساعدة في حماية المحتوى من الوصول أو النسخ أو إعادة التوزيع غير المصرح بها، مع الحفاظ على تجربة تعلم سلسة للمستخدمين.",
+                        "All educational videos and materials are provided for personal, non-commercial use only. We apply reasonable technical and organizational measures to help protect our content from unauthorized access, copying, or redistribution, while ensuring a smooth learning experience for our users."
                       ),
                     ],
                   ),

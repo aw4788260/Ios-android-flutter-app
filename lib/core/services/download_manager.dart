@@ -22,7 +22,7 @@ class DownloadManager with WidgetsBindingObserver {
   DownloadManager._internal() {
     // ✅ 1. مراقبة حالة التطبيق لإلغاء التحميل عند الخروج
     WidgetsBinding.instance.addObserver(this);
-    
+
     // ✅ 2. تنظيف أي إشعارات عالقة من المرة السابقة عند فتح التطبيق
     NotificationService().cancelAll();
   }
@@ -43,14 +43,15 @@ class DownloadManager with WidgetsBindingObserver {
   ));
 
   static final Set<String> _activeDownloads = {};
-  
+
   // خريطة لتخزين عناوين الدروس الجاري تحميلها لعرضها في الواجهة
-  final Map<String, String> activeTitles = {}; 
+  final Map<String, String> activeTitles = {};
 
   // خريطة لتخزين توكن الإلغاء لكل درس
-  static final Map<String, CancelToken> _cancelTokens = {}; 
-  
-  static final ValueNotifier<Map<String, double>> downloadingProgress = ValueNotifier({});
+  static final Map<String, CancelToken> _cancelTokens = {};
+
+  static final ValueNotifier<Map<String, double>> downloadingProgress =
+      ValueNotifier({});
   final String _baseUrl = ApiConstants.baseUrl;
   Timer? _keepAliveTimer;
 
@@ -66,13 +67,13 @@ class DownloadManager with WidgetsBindingObserver {
       final regex = RegExp(r'(?:dur%3D|dur=)(\d+(\.\d+)?)');
       final match = regex.firstMatch(url);
       if (match != null) {
-        final secondsString = match.group(1); 
+        final secondsString = match.group(1);
         if (secondsString != null) {
           return _formatDuration(double.parse(secondsString).toInt());
         }
       }
     } catch (e) {}
-    return ""; 
+    return "";
   }
 
   String _formatDuration(int totalSeconds) {
@@ -80,7 +81,7 @@ class DownloadManager with WidgetsBindingObserver {
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final seconds = totalSeconds % 60;
-    return hours > 0 
+    return hours > 0
         ? "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}"
         : "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
   }
@@ -106,42 +107,43 @@ class DownloadManager with WidgetsBindingObserver {
       }
       _cancelTokens.remove(lessonId);
     }
-    
+
     _activeDownloads.remove(lessonId);
     activeTitles.remove(lessonId);
-    
+
     var prog = Map<String, double>.from(downloadingProgress.value);
     prog.remove(lessonId);
     downloadingProgress.value = prog;
 
     // ✅ حذف الإشعار فوراً
     await NotificationService().cancelNotification(lessonId.hashCode);
-    
+
     if (_activeDownloads.isEmpty) {
       _stopBackgroundService();
     }
-    
+
     debugPrint("🛑 Download Cancelled: $lessonId");
   }
-  
+
   void _startBackgroundService() async {
     final service = FlutterBackgroundService();
     if (!await service.isRunning()) await service.startService();
-    
+
     _keepAliveTimer?.cancel();
     _keepAliveTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_activeDownloads.isEmpty) {
-         _stopBackgroundService(); 
-         return;
+        _stopBackgroundService();
+        return;
       }
       service.invoke('keepAlive');
-      
+
       try {
         NotificationService().showProgressNotification(
-          id: 888, 
+          id: 888,
           title: "مــــداد Service",
           body: "Downloading ${_activeDownloads.length} file(s)...",
-          progress: 0, maxProgress: 0, 
+          progress: 0,
+          maxProgress: 0,
         );
       } catch (e) {}
     });
@@ -149,11 +151,13 @@ class DownloadManager with WidgetsBindingObserver {
 
   void _stopBackgroundService() async {
     _keepAliveTimer?.cancel();
-    try { await NotificationService().cancelNotification(888); } catch (e) {}
+    try {
+      await NotificationService().cancelNotification(888);
+    } catch (e) {}
 
     final service = FlutterBackgroundService();
     if (await service.isRunning()) {
-       service.invoke('stopService');
+      service.invoke('stopService');
     }
   }
 
@@ -174,16 +178,17 @@ class DownloadManager with WidgetsBindingObserver {
     required Function(String) onError,
     bool isPdf = false,
     String quality = "SD",
-    String duration = "", 
+    String duration = "",
   }) async {
     final CancelToken cancelToken = CancelToken();
     _cancelTokens[lessonId] = cancelToken;
-    activeTitles[lessonId] = videoTitle; 
+    activeTitles[lessonId] = videoTitle;
 
-    FirebaseCrashlytics.instance.log("⬇️ Download Started: $videoTitle (PDF: $isPdf)");
+    FirebaseCrashlytics.instance
+        .log("⬇️ Download Started: $videoTitle (PDF: $isPdf)");
     _activeDownloads.add(lessonId);
     _startBackgroundService();
-    
+
     var currentProgress = Map<String, double>.from(downloadingProgress.value);
     currentProgress[lessonId] = 0.0;
     downloadingProgress.value = currentProgress;
@@ -195,17 +200,19 @@ class DownloadManager with WidgetsBindingObserver {
       id: notificationId,
       title: "Downloading: $videoTitle",
       body: "Starting...",
-      progress: 0, maxProgress: 100,
+      progress: 0,
+      maxProgress: 100,
     );
 
     try {
       await EncryptionHelper.init();
       var box = await StorageService.openBox('auth_box');
-      
+
       // ✅ استخراج التوكن والبصمة
       final deviceId = box.get('device_id');
       final token = box.get('jwt_token');
-      const String appSecret = String.fromEnvironment('APP_SECRET');
+      const String appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
+      //String.fromEnvironment('APP_SECRET');
 
       // ✅ بناء الهيدرز الموحدة
       final Map<String, dynamic> requestHeaders = {
@@ -222,21 +229,24 @@ class DownloadManager with WidgetsBindingObserver {
 
       if (finalVideoUrl == null) {
         if (isPdf) {
-           finalVideoUrl = '$_baseUrl/api/secure/get-pdf?pdfId=$lessonId';
+          finalVideoUrl = '$_baseUrl/api/secure/get-pdf?pdfId=$lessonId';
         } else {
-           final res = await _dio.get(
+          final res = await _dio.get(
             '$_baseUrl/api/secure/get-video-id',
             queryParameters: {'lessonId': lessonId},
-            options: Options(headers: requestHeaders), // ✅ استخدام الهيدرز الجديدة
+            options:
+                Options(headers: requestHeaders), // ✅ استخدام الهيدرز الجديدة
             cancelToken: cancelToken,
           );
           if (res.statusCode == 200 && res.data['url'] != null) {
-             finalVideoUrl = res.data['url'];
+            finalVideoUrl = res.data['url'];
           }
         }
       }
-      
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
       if (finalVideoUrl == null) throw Exception("Link not found");
 
       if (!isPdf && (duration.isEmpty || duration == "--:--")) {
@@ -246,16 +256,21 @@ class DownloadManager with WidgetsBindingObserver {
 
       // Paths
       final appDir = await getApplicationDocumentsDirectory();
-      final safeCourse = courseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-      final safeSubject = subjectName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-      final safeChapter = chapterName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-      
-      final dir = Directory('${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter');
+      final safeCourse =
+          courseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+      final safeSubject =
+          subjectName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+      final safeChapter =
+          chapterName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+
+      final dir = Directory(
+          '${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter');
       if (!await dir.exists()) await dir.create(recursive: true);
 
-      final String videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
+      final String videoFileName =
+          isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
       final String videoSavePath = '${dir.path}/$videoFileName';
-      
+
       String? audioSavePath;
       if (finalAudioUrl != null) {
         audioSavePath = '${dir.path}/aud_${lessonId}_hq.enc';
@@ -265,28 +280,27 @@ class DownloadManager with WidgetsBindingObserver {
       if (isPdf) {
         // ✅ تحميل PDF وتشفيره بنظام الأجزاء لتمكين فك التشفير عند الطلب
         await _downloadAndEncryptPdfNew(
-          url: finalVideoUrl,
-          savePath: videoSavePath,
-          headers: requestHeaders, // ✅ تمرير الهيدرز
-          cancelToken: cancelToken,
-          onProgress: (p) {
-             if (cancelToken.isCancelled) return;
-             var prog = Map<String, double>.from(downloadingProgress.value);
-             prog[lessonId] = p;
-             downloadingProgress.value = prog; 
-             onProgress(p);
-             
-             int percent = (p * 100).toInt();
-             if (percent % 5 == 0) {
-               notifService.showProgressNotification(
-                 id: notificationId, 
-                 title: "Downloading PDF...",
-                 body: "$percent%",
-                 progress: percent, maxProgress: 100
-               );
-             }
-          }
-        );
+            url: finalVideoUrl,
+            savePath: videoSavePath,
+            headers: requestHeaders, // ✅ تمرير الهيدرز
+            cancelToken: cancelToken,
+            onProgress: (p) {
+              if (cancelToken.isCancelled) return;
+              var prog = Map<String, double>.from(downloadingProgress.value);
+              prog[lessonId] = p;
+              downloadingProgress.value = prog;
+              onProgress(p);
+
+              int percent = (p * 100).toInt();
+              if (percent % 5 == 0) {
+                notifService.showProgressNotification(
+                    id: notificationId,
+                    title: "Downloading PDF...",
+                    body: "$percent%",
+                    progress: percent,
+                    maxProgress: 100);
+              }
+            });
       } else {
         // 🎥 تحميل فيديو (AES)
         double vidProg = 0.0;
@@ -294,50 +308,57 @@ class DownloadManager with WidgetsBindingObserver {
 
         void updateAggregatedProgress() {
           if (cancelToken.isCancelled) return;
-          double total = (finalAudioUrl != null) 
+          double total = (finalAudioUrl != null)
               ? (vidProg * 0.80) + (audProg * 0.20)
               : vidProg;
-              
+
           var prog = Map<String, double>.from(downloadingProgress.value);
           prog[lessonId] = total;
-          downloadingProgress.value = prog; 
+          downloadingProgress.value = prog;
           onProgress(total);
 
           int percent = (total * 100).toInt();
-          if (percent % 2 == 0) { 
+          if (percent % 2 == 0) {
             notifService.showProgressNotification(
-              id: notificationId, 
+              id: notificationId,
               title: "Downloading: $videoTitle",
               body: "$percent%",
-              progress: percent, maxProgress: 100,
+              progress: percent,
+              maxProgress: 100,
             );
           }
         }
 
         final List<Future> tasks = [];
-        
+
         tasks.add(_downloadFileSmartly(
-          url: finalVideoUrl,
-          savePath: videoSavePath,
-          headers: requestHeaders, // ✅ تمرير الهيدرز
-          cancelToken: cancelToken,
-          onProgress: (p) { vidProg = p; updateAggregatedProgress(); }
-        ));
+            url: finalVideoUrl,
+            savePath: videoSavePath,
+            headers: requestHeaders, // ✅ تمرير الهيدرز
+            cancelToken: cancelToken,
+            onProgress: (p) {
+              vidProg = p;
+              updateAggregatedProgress();
+            }));
 
         if (finalAudioUrl != null && audioSavePath != null) {
           tasks.add(_downloadFileSmartly(
-            url: finalAudioUrl,
-            savePath: audioSavePath,
-            headers: requestHeaders, // ✅ تمرير الهيدرز
-            cancelToken: cancelToken,
-            onProgress: (p) { audProg = p; updateAggregatedProgress(); }
-          ));
+              url: finalAudioUrl,
+              savePath: audioSavePath,
+              headers: requestHeaders, // ✅ تمرير الهيدرز
+              cancelToken: cancelToken,
+              onProgress: (p) {
+                audProg = p;
+                updateAggregatedProgress();
+              }));
         }
 
         await Future.wait(tasks);
       }
 
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
 
       int totalSizeBytes = await File(videoSavePath).length();
       if (audioSavePath != null && await File(audioSavePath).exists()) {
@@ -345,11 +366,11 @@ class DownloadManager with WidgetsBindingObserver {
       }
 
       var downloadsBox = await StorageService.openBox('downloads_box');
-      
+
       // ✅ التعديل هنا: استخدام مفتاح فريد يعتمد على النوع لتجنب التضارب
       String uniqueStorageKey = isPdf ? 'pdf_$lessonId' : 'vid_$lessonId';
 
-      await downloadsBox.put(uniqueStorageKey, { 
+      await downloadsBox.put(uniqueStorageKey, {
         'id': lessonId,
         'title': videoTitle,
         'path': videoSavePath,
@@ -365,7 +386,7 @@ class DownloadManager with WidgetsBindingObserver {
       });
 
       await notifService.cancelNotification(notificationId);
-      
+
       await notifService.showCompletionNotification(
         id: DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
         title: videoTitle,
@@ -374,15 +395,16 @@ class DownloadManager with WidgetsBindingObserver {
 
       FirebaseCrashlytics.instance.log("✅ Download Success: $videoTitle");
       onComplete();
-
     } catch (e, stack) {
       // ✅ حذف الإشعار في حالة الخطأ أو الإلغاء
       await notifService.cancelNotification(notificationId);
-      
-      bool isCancelled = (e is DioException && e.type == DioExceptionType.cancel);
-      
+
+      bool isCancelled =
+          (e is DioException && e.type == DioExceptionType.cancel);
+
       if (!isCancelled) {
-        FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Download Failed');
+        FirebaseCrashlytics.instance
+            .recordError(e, stack, reason: 'Download Failed');
         await notifService.showCompletionNotification(
           id: DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
           title: videoTitle,
@@ -390,40 +412,43 @@ class DownloadManager with WidgetsBindingObserver {
         );
         onError("Download failed. Please check internet.");
       }
-      
+
       // Cleanup partial files
       try {
         final appDir = await getApplicationDocumentsDirectory();
-        final safeCourse = courseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-        final safeSubject = subjectName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-        final safeChapter = chapterName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
-        final dirPath = '${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter';
-        
-        final videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
+        final safeCourse =
+            courseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+        final safeSubject =
+            subjectName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+        final safeChapter =
+            chapterName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
+        final dirPath =
+            '${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter';
+
+        final videoFileName =
+            isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
         final audioFileName = 'aud_${lessonId}_hq.enc';
-        
+
         final videoFile = File('$dirPath/$videoFileName');
         if (await videoFile.exists()) await videoFile.delete();
-        
+
         final audioFile = File('$dirPath/$audioFileName');
         if (await audioFile.exists()) await audioFile.delete();
-        
       } catch (cleanupError) {
         print("Cleanup Error: $cleanupError");
       }
-
     } finally {
       // Final Cleanup
       _activeDownloads.remove(lessonId);
-      _cancelTokens.remove(lessonId); 
-      activeTitles.remove(lessonId); 
-      
+      _cancelTokens.remove(lessonId);
+      activeTitles.remove(lessonId);
+
       var prog = Map<String, double>.from(downloadingProgress.value);
       prog.remove(lessonId);
       downloadingProgress.value = prog;
-      
+
       if (_activeDownloads.isEmpty) {
-         _stopBackgroundService();
+        _stopBackgroundService();
       }
     }
   }
@@ -439,9 +464,11 @@ class DownloadManager with WidgetsBindingObserver {
     required CancelToken cancelToken,
   }) async {
     final tempDir = await getTemporaryDirectory();
-    final tempPath = '${tempDir.path}/downloading_${DateTime.now().millisecondsSinceEpoch}.tmp';
-    
+    final tempPath =
+        '${tempDir.path}/downloading_${DateTime.now().millisecondsSinceEpoch}.tmp';
+
     try {
+      print("Downloading from: $url");
       // 1. تحميل الملف الخام (سريع)
       await _dio.download(
         url,
@@ -453,7 +480,9 @@ class DownloadManager with WidgetsBindingObserver {
         },
       );
 
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
 
       // 2. التعديل الجوهري: التشفير بنظام الأجزاء (encryptFileChunked) بدلاً من التشفير المستمر
       // هذا يسمح بفك التشفير عند الطلب لاحقاً دون تحميل الملف كاملاً في الذاكرة
@@ -462,7 +491,6 @@ class DownloadManager with WidgetsBindingObserver {
       // 3. حذف الملف الخام
       final tempFile = File(tempPath);
       if (await tempFile.exists()) await tempFile.delete();
-
     } catch (e) {
       try {
         final f = File(tempPath);
@@ -488,11 +516,11 @@ class DownloadManager with WidgetsBindingObserver {
       final sink = await saveFile.open(mode: FileMode.write);
       List<int> buffer = [];
       try {
-         await _downloadHls(url, sink, buffer, onProgress, cancelToken);
-         if (buffer.isNotEmpty) {
-           final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
-           await sink.writeFrom(enc);
-         }
+        await _downloadHls(url, sink, buffer, onProgress, cancelToken);
+        if (buffer.isNotEmpty) {
+          final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
+          await sink.writeFrom(enc);
+        }
       } finally {
         await sink.close();
       }
@@ -501,11 +529,13 @@ class DownloadManager with WidgetsBindingObserver {
 
     int totalBytes = 0;
     try {
-      final headRes = await _dio.head(url, options: Options(headers: headers), cancelToken: cancelToken);
-      totalBytes = int.parse(headRes.headers.value(Headers.contentLengthHeader) ?? '0');
+      final headRes = await _dio.head(url,
+          options: Options(headers: headers), cancelToken: cancelToken);
+      totalBytes =
+          int.parse(headRes.headers.value(Headers.contentLengthHeader) ?? '0');
     } catch (_) {}
 
-    const int chunkSize = 1 * 1024 * 1024; 
+    const int chunkSize = 1 * 1024 * 1024;
     int downloadedBytes = 0;
     final saveFile = File(savePath);
     final sink = await saveFile.open(mode: FileMode.write);
@@ -513,28 +543,39 @@ class DownloadManager with WidgetsBindingObserver {
 
     try {
       if (totalBytes <= 0) {
-         await _downloadStreamBasic(url, sink, buffer, onProgress, headers, cancelToken);
-         if (buffer.isNotEmpty) {
-           final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
-           await sink.writeFrom(enc);
-         }
-         return;
+        await _downloadStreamBasic(
+            url, sink, buffer, onProgress, headers, cancelToken);
+        if (buffer.isNotEmpty) {
+          final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
+          await sink.writeFrom(enc);
+        }
+        return;
       }
 
       while (downloadedBytes < totalBytes) {
-        if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+        if (cancelToken.isCancelled)
+          throw DioException(
+              requestOptions: RequestOptions(), type: DioExceptionType.cancel);
 
         int start = downloadedBytes;
         int end = min(start + chunkSize - 1, totalBytes - 1);
-        
+
         bool chunkSuccess = false;
-        int retries = 5; 
+        int retries = 5;
 
         while (retries > 0 && !chunkSuccess) {
-          if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+          if (cancelToken.isCancelled)
+            throw DioException(
+                requestOptions: RequestOptions(),
+                type: DioExceptionType.cancel);
           try {
             await _downloadChunkAndEncrypt(
-              url: url, start: start, end: end, headers: headers, sink: sink, buffer: buffer,
+              url: url,
+              start: start,
+              end: end,
+              headers: headers,
+              sink: sink,
+              buffer: buffer,
               cancelToken: cancelToken,
             );
             chunkSuccess = true;
@@ -544,7 +585,7 @@ class DownloadManager with WidgetsBindingObserver {
             if (e is DioException && e.type == DioExceptionType.cancel) throw e;
             retries--;
             if (retries == 0) throw Exception("Failed chunk");
-            await Future.delayed(const Duration(seconds: 2)); 
+            await Future.delayed(const Duration(seconds: 2));
           }
         }
       }
@@ -554,15 +595,19 @@ class DownloadManager with WidgetsBindingObserver {
         await sink.writeFrom(enc);
         buffer.clear();
       }
-
     } finally {
       await sink.close();
     }
   }
 
   Future<void> _downloadChunkAndEncrypt({
-    required String url, required int start, required int end, required Map<String, dynamic> headers,
-    required RandomAccessFile sink, required List<int> buffer, required CancelToken cancelToken,
+    required String url,
+    required int start,
+    required int end,
+    required Map<String, dynamic> headers,
+    required RandomAccessFile sink,
+    required List<int> buffer,
+    required CancelToken cancelToken,
   }) async {
     final response = await _dio.get(
       url,
@@ -575,29 +620,44 @@ class DownloadManager with WidgetsBindingObserver {
 
     Stream<Uint8List> stream = response.data.stream;
     await for (final chunk in stream) {
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
       buffer.addAll(chunk);
       while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
         final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
         buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-        final encrypted = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
+        final encrypted =
+            EncryptionHelper.encryptBlock(Uint8List.fromList(block));
         await sink.writeFrom(encrypted);
       }
     }
   }
 
-  Future<void> _downloadStreamBasic(String url, RandomAccessFile sink, List<int> buffer, Function(double) onProgress, Map<String, dynamic> headers, CancelToken cancelToken) async {
-    final response = await _dio.get(url, options: Options(responseType: ResponseType.stream, headers: headers), cancelToken: cancelToken);
-    int total = int.parse(response.headers.value(Headers.contentLengthHeader) ?? '-1');
+  Future<void> _downloadStreamBasic(
+      String url,
+      RandomAccessFile sink,
+      List<int> buffer,
+      Function(double) onProgress,
+      Map<String, dynamic> headers,
+      CancelToken cancelToken) async {
+    final response = await _dio.get(url,
+        options: Options(responseType: ResponseType.stream, headers: headers),
+        cancelToken: cancelToken);
+    int total =
+        int.parse(response.headers.value(Headers.contentLengthHeader) ?? '-1');
     int received = 0;
     Stream<Uint8List> stream = response.data.stream;
     await for (final chunk in stream) {
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
       buffer.addAll(chunk);
       while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
         final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
         buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-        final encrypted = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
+        final encrypted =
+            EncryptionHelper.encryptBlock(Uint8List.fromList(block));
         await sink.writeFrom(encrypted);
       }
       received += chunk.length;
@@ -605,48 +665,63 @@ class DownloadManager with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _downloadHls(String m3u8Url, RandomAccessFile sink, List<int> buffer, Function(double) onProgress, CancelToken cancelToken) async {
-      final response = await _dio.get(m3u8Url, cancelToken: cancelToken);
-      final content = response.data.toString();
-      final baseUrl = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
-      List<String> tsUrls = [];
-      for (var line in content.split('\n')) {
-        line = line.trim();
-        if (line.isNotEmpty && !line.startsWith('#')) tsUrls.add(line.startsWith('http') ? line : baseUrl + line);
-      }
-      if (tsUrls.isEmpty) throw Exception("No TS segments");
-      
-      int total = tsUrls.length;
-      int done = 0;
-      int batchSize = 8; 
+  Future<void> _downloadHls(
+      String m3u8Url,
+      RandomAccessFile sink,
+      List<int> buffer,
+      Function(double) onProgress,
+      CancelToken cancelToken) async {
+    final response = await _dio.get(m3u8Url, cancelToken: cancelToken);
+    final content = response.data.toString();
+    final baseUrl = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
+    List<String> tsUrls = [];
+    for (var line in content.split('\n')) {
+      line = line.trim();
+      if (line.isNotEmpty && !line.startsWith('#'))
+        tsUrls.add(line.startsWith('http') ? line : baseUrl + line);
+    }
+    if (tsUrls.isEmpty) throw Exception("No TS segments");
 
-      for (int i = 0; i < total; i += batchSize) {
-        if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
-        
-        int end = min(i + batchSize, total);
-        List<String> batchUrls = tsUrls.sublist(i, end);
-        List<Future<List<int>?>> futures = batchUrls.map((url) async {
-          try {
-            final rs = await _dio.get<List<int>>(url, options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(seconds: 15)), cancelToken: cancelToken);
-            return rs.data;
-          } catch (e) { return null; }
-        }).toList();
+    int total = tsUrls.length;
+    int done = 0;
+    int batchSize = 8;
 
-        List<List<int>?> results = await Future.wait(futures);
-        
-        for (var data in results) {
-          if (data != null) {
-            buffer.addAll(data); 
-            while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
-              final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
-              buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-              final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
-              await sink.writeFrom(enc);
-            }
-          }
-          done++;
-          onProgress(done / total);
+    for (int i = 0; i < total; i += batchSize) {
+      if (cancelToken.isCancelled)
+        throw DioException(
+            requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+
+      int end = min(i + batchSize, total);
+      List<String> batchUrls = tsUrls.sublist(i, end);
+      List<Future<List<int>?>> futures = batchUrls.map((url) async {
+        try {
+          final rs = await _dio.get<List<int>>(url,
+              options: Options(
+                  responseType: ResponseType.bytes,
+                  receiveTimeout: const Duration(seconds: 15)),
+              cancelToken: cancelToken);
+          return rs.data;
+        } catch (e) {
+          return null;
         }
+      }).toList();
+
+      List<List<int>?> results = await Future.wait(futures);
+
+      for (var data in results) {
+        if (data != null) {
+          buffer.addAll(data);
+          while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
+            final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
+            buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
+            final enc =
+                EncryptionHelper.encryptBlock(Uint8List.fromList(block));
+            await sink.writeFrom(enc);
+          }
+        }
+        done++;
+        onProgress(done / total);
       }
+    }
   }
 }

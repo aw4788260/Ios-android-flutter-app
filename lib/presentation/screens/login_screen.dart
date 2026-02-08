@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // نستخدم هذا المتحكم لاسم المستخدم أو رقم الهاتف
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
-   
+
   final FocusNode _userFocus = FocusNode();
   final FocusNode _passFocus = FocusNode();
 
@@ -59,7 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
       if (Platform.isAndroid) {
         const androidIdPlugin = AndroidId();
         final String? androidId = await androidIdPlugin.getId();
-        deviceId = androidId ?? 'unknown_android_${DateTime.now().millisecondsSinceEpoch}';
+        deviceId = androidId ??
+            'unknown_android_${DateTime.now().millisecondsSinceEpoch}';
       } else if (Platform.isIOS) {
         final deviceInfo = DeviceInfoPlugin();
         final iosInfo = await deviceInfo.iosInfo;
@@ -69,9 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       final random = Random();
-      deviceId = 'fallback_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(1000)}';
+      deviceId =
+          'fallback_${DateTime.now().millisecondsSinceEpoch}_${random.nextInt(1000)}';
     }
-    
+
     await box.put('device_id', deviceId);
     return deviceId;
   }
@@ -81,7 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text.trim();
 
     if (identifier.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = "Please enter username/phone and password");
+      setState(
+          () => _errorMessage = "Please enter username/phone and password");
       return;
     }
 
@@ -105,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
         },
         options: Options(
           headers: {
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
           validateStatus: (status) => status! < 500,
         ),
@@ -115,39 +118,40 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200 && data['success'] == true) {
         final userMap = data['user'];
-        
+
         // حفظ البيانات الأساسية
         await box.put('user_id', userMap['id'].toString());
         await box.put('username', userMap['username']);
         await box.put('first_name', userMap['firstName']);
         await box.put('phone', userMap['phone'] ?? ''); // حفظ الهاتف إن وجد
-        
+
         // ✅ [هام جداً] حفظ نوع المستخدم (معلم/طالب)
-        await box.put('role', userMap['role']); 
+        await box.put('role', userMap['role']);
 
         // ✅ [تمت الإضافة] حفظ رابط صورة البروفايل إذا وجد (للمعلمين)
         if (userMap['profileImage'] != null) {
-           await box.put('profile_image', userMap['profileImage']);
+          await box.put('profile_image', userMap['profileImage']);
         } else {
-           // حذف القيمة القديمة إذا لم تكن موجودة الآن
-           await box.delete('profile_image');
+          // حذف القيمة القديمة إذا لم تكن موجودة الآن
+          await box.delete('profile_image');
         }
 
         // ✅ حفظ التوكن القادم من السيرفر
         if (data['token'] != null) {
           await box.put('jwt_token', data['token']);
         }
-        
+
         // مسح علامة الضيف
         await box.delete('is_guest');
         AppState().isGuest = false;
-        
+
         // تحديث حالة التطبيق بالبيانات الجديدة
         AppState().updateUserData({
-            ...userMap,
-            'profile_image': userMap['profileImage'] // التأكد من تمرير الصورة للذاكرة
+          ...userMap,
+          'profile_image':
+              userMap['profileImage'] // التأكد من تمرير الصورة للذاكرة
         });
-        
+
         // جلب البيانات الأولية (مع تمرير التوكن ضمناً عبر الهيدرز المعدلة)
         await _fetchInitData(deviceId);
 
@@ -171,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
   // معالجة الدخول كضيف
   Future<void> _handleGuestLogin() async {
     setState(() => _isLoading = true);
-    
+
     try {
       var box = await StorageService.openBox('auth_box');
       final deviceId = await _getAndSaveDeviceId(box);
@@ -181,14 +185,14 @@ class _LoginScreenState extends State<LoginScreen> {
         '$_baseUrl/api/public/get-app-init-data',
         options: Options(headers: {
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
       }
-      
+
       await box.put('is_guest', true);
       AppState().isGuest = true;
 
@@ -198,18 +202,17 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const MainWrapper()),
         );
       }
-
     } catch (e) {
       // في حالة الفشل (أوفلاين)، ندخل كضيف فارغ
       var box = await StorageService.openBox('auth_box');
       await box.put('is_guest', true);
       AppState().isGuest = true;
-      
+
       if (mounted) {
-         Navigator.pushReplacement(
-           context,
-           MaterialPageRoute(builder: (context) => const MainWrapper()),
-         );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainWrapper()),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -227,10 +230,10 @@ class _LoginScreenState extends State<LoginScreen> {
         options: Options(headers: {
           if (token != null) 'Authorization': 'Bearer $token', // ✅ إرسال التوكن
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
-      
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
       }
@@ -260,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               Center(
                 child: Text(
                   "LOGIN",
@@ -336,23 +339,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   elevation: 10,
                   shadowColor: AppColors.accentYellow.withOpacity(0.2),
                 ),
-                child: _isLoading 
-                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundPrimary))
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Text(
-                          "SIGN IN",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            letterSpacing: 1.0,
+                child: _isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppColors.backgroundPrimary))
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text(
+                            "SIGN IN",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 1.0,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 12),
-                        Icon(LucideIcons.arrowRight, size: 18),
-                      ],
-                    ),
+                          SizedBox(width: 12),
+                          Icon(LucideIcons.arrowRight, size: 18),
+                        ],
+                      ),
               ),
 
               const SizedBox(height: 24),
@@ -388,13 +395,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text(
                     "New student? ",
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    style:
+                        TextStyle(color: AppColors.textSecondary, fontSize: 12),
                   ),
                   GestureDetector(
                     onTap: () {
-                        Navigator.push(
+                      Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const RegisterScreen()),
                       );
                     },
                     child: Text(
@@ -444,8 +453,8 @@ class _LoginScreenState extends State<LoginScreen> {
         color: AppColors.backgroundSecondary,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: focusNode.hasFocus 
-              ? AppColors.accentYellow.withOpacity(0.5) 
+          color: focusNode.hasFocus
+              ? AppColors.accentYellow.withOpacity(0.5)
               : Colors.white.withOpacity(0.05),
         ),
       ),
@@ -461,11 +470,14 @@ class _LoginScreenState extends State<LoginScreen> {
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
           prefixIcon: Icon(
             icon,
             size: 18,
-            color: (controller.text.isNotEmpty || focusNode.hasFocus) ? AppColors.accentYellow : AppColors.textSecondary,
+            color: (controller.text.isNotEmpty || focusNode.hasFocus)
+                ? AppColors.accentYellow
+                : AppColors.textSecondary,
           ),
         ),
       ),

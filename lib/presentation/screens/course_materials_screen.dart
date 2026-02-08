@@ -39,9 +39,10 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
   void initState() {
     super.initState();
     _checkUserRole();
-    
+
     // 1. استخدام البيانات الممررة (إذا وجدت) لتسريع الفتح
-    if (widget.preLoadedSubjects != null && widget.preLoadedSubjects!.isNotEmpty) {
+    if (widget.preLoadedSubjects != null &&
+        widget.preLoadedSubjects!.isNotEmpty) {
       _ownedSubjects = widget.preLoadedSubjects!;
       _loading = false;
     } else {
@@ -73,14 +74,14 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
         options: Options(headers: {
           if (token != null) 'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
       if (mounted) {
         final data = res.data;
         final allSubjects = data['subjects'] as List;
-        
+
         bool ownsCourse = AppState().ownsCourse(widget.courseId);
 
         setState(() {
@@ -103,7 +104,7 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
 
     // --- Responsive Logic ---
     final double screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = 2; 
+    int crossAxisCount = 2;
 
     if (screenWidth > 900) {
       crossAxisCount = 4;
@@ -142,14 +143,19 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                               decoration: BoxDecoration(
                                 color: AppColors.backgroundSecondary,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withOpacity(0.05)),
-                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.05)),
+                                boxShadow: const [
+                                  BoxShadow(
+                                      color: Colors.black12, blurRadius: 4)
+                                ],
                               ),
-                              child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                              child: Icon(LucideIcons.arrowLeft,
+                                  color: AppColors.accentYellow, size: 20),
                             ),
                           ),
                           const SizedBox(width: 16),
-                          
+
                           // ✅ Expanded للنصوص لتأخذ المساحة المتبقية فقط
                           Expanded(
                             child: Column(
@@ -197,14 +203,15 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                             MaterialPageRoute(
                               builder: (_) => ManageContentScreen(
                                 contentType: ContentType.subject,
-                                parentId: widget.courseId, // تمرير ID الكورس كأب للمادة
+                                parentId: widget
+                                    .courseId, // تمرير ID الكورس كأب للمادة
                               ),
                             ),
                           ).then((value) {
                             // ✅ إعادة طلب البيانات عند نجاح الإضافة
-                            if(value == true) {
+                            if (value == true) {
                               setState(() => _loading = true);
-                              _fetchSubjects(); 
+                              _fetchSubjects();
                             }
                           });
                         },
@@ -213,9 +220,11 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.accentYellow.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(50),
-                            border: Border.all(color: AppColors.accentYellow.withOpacity(0.5)),
+                            border: Border.all(
+                                color: AppColors.accentYellow.withOpacity(0.5)),
                           ),
-                          child: Icon(LucideIcons.plus, color: AppColors.accentYellow, size: 22),
+                          child: Icon(LucideIcons.plus,
+                              color: AppColors.accentYellow, size: 22),
                         ),
                       ),
                     ],
@@ -226,20 +235,26 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
               // --- Content Area ---
               Expanded(
                 child: _loading
-                    ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.accentYellow))
                     : _ownedSubjects.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(LucideIcons.layers, size: 40, color: AppColors.textSecondary.withOpacity(0.5)),
+                                Icon(LucideIcons.layers,
+                                    size: 40,
+                                    color: AppColors.textSecondary
+                                        .withOpacity(0.5)),
                                 const SizedBox(height: 16),
                                 Text(
                                   "NO SUBJECTS FOUND",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textSecondary.withOpacity(0.5),
+                                    color: AppColors.textSecondary
+                                        .withOpacity(0.5),
                                     letterSpacing: 2.0,
                                   ),
                                 )
@@ -248,7 +263,8 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                           )
                         : GridView.builder(
                             padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: crossAxisCount,
                               crossAxisSpacing: 16,
                               mainAxisSpacing: 16,
@@ -257,16 +273,15 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                             itemCount: _ownedSubjects.length,
                             itemBuilder: (context, index) {
                               final subject = _ownedSubjects[index];
-                              
+
                               return GestureDetector(
                                 onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SubjectMaterialsScreen(
-                                        subjectId: subject['id'].toString(), 
-                                        subjectTitle: subject['title']
-                                      ),
+                                          subjectId: subject['id'].toString(),
+                                          subjectTitle: subject['title']),
                                     ),
                                   );
                                 },
@@ -275,26 +290,39 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                                   decoration: BoxDecoration(
                                     color: AppColors.backgroundSecondary,
                                     borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+                                    border: Border.all(
+                                        color: Colors.white.withOpacity(0.1)),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                          color: Colors.black26, blurRadius: 8)
+                                    ],
                                   ),
                                   child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // أيقونة التشغيل العلوية
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Container(
-                                            width: 8, height: 8,
+                                            width: 8,
+                                            height: 8,
                                             decoration: const BoxDecoration(
                                               color: AppColors.accentOrange,
                                               shape: BoxShape.circle,
-                                              boxShadow: [BoxShadow(color: AppColors.accentOrange, blurRadius: 4)],
+                                              boxShadow: [
+                                                BoxShadow(
+                                                    color:
+                                                        AppColors.accentOrange,
+                                                    blurRadius: 4)
+                                              ],
                                             ),
                                           ),
-                                          
+
                                           // 🟢 أيقونة التعديل (للمعلم) أو أيقونة التشغيل (للطالب)
                                           if (_isTeacher)
                                             GestureDetector(
@@ -303,30 +331,40 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (_) => ManageContentScreen(
-                                                      contentType: ContentType.subject,
+                                                    builder: (_) =>
+                                                        ManageContentScreen(
+                                                      contentType:
+                                                          ContentType.subject,
                                                       initialData: subject,
                                                       parentId: widget.courseId,
                                                     ),
                                                   ),
                                                 ).then((val) {
                                                   // ✅ إعادة طلب البيانات عند نجاح التعديل
-                                                  if(val == true) {
-                                                    setState(() => _loading = true);
+                                                  if (val == true) {
+                                                    setState(
+                                                        () => _loading = true);
                                                     _fetchSubjects();
                                                   }
                                                 });
                                               },
-                                              child: Icon(LucideIcons.edit2, size: 20, color: AppColors.accentYellow),
+                                              child: Icon(LucideIcons.edit2,
+                                                  size: 20,
+                                                  color:
+                                                      AppColors.accentYellow),
                                             )
                                           else
-                                            Icon(LucideIcons.playCircle, size: 20, color: AppColors.accentOrange),
+                                            Icon(LucideIcons.playCircle,
+                                                size: 20,
+                                                color: AppColors.accentOrange),
                                         ],
                                       ),
 
                                       // اسم المادة
                                       Text(
-                                        subject['title'].toString().toUpperCase(),
+                                        subject['title']
+                                            .toString()
+                                            .toUpperCase(),
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -340,41 +378,57 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
 
                                       // اسم المدرس والسهم
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  displayInstructor.toUpperCase(),
+                                                  displayInstructor
+                                                      .toUpperCase(),
                                                   style: TextStyle(
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.bold,
-                                                    color: AppColors.textSecondary.withOpacity(0.7),
+                                                    color: AppColors
+                                                        .textSecondary
+                                                        .withOpacity(0.7),
                                                     letterSpacing: 1.5,
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                                 const SizedBox(height: 6),
                                                 Container(
-                                                  height: 2, width: 24,
+                                                  height: 2,
+                                                  width: 24,
                                                   decoration: BoxDecoration(
-                                                    color: AppColors.accentOrange.withOpacity(0.2),
-                                                    borderRadius: BorderRadius.circular(1),
+                                                    color: AppColors
+                                                        .accentOrange
+                                                        .withOpacity(0.2),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            1),
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
                                           Container(
-                                            width: 24, height: 24,
+                                            width: 24,
+                                            height: 24,
                                             decoration: BoxDecoration(
-                                              color: AppColors.backgroundPrimary,
+                                              color:
+                                                  AppColors.backgroundPrimary,
                                               shape: BoxShape.circle,
                                             ),
-                                            child: Icon(LucideIcons.chevronRight, size: 14, color: AppColors.accentOrange),
+                                            child: Icon(
+                                                LucideIcons.chevronRight,
+                                                size: 14,
+                                                color: AppColors.accentOrange),
                                           ),
                                         ],
                                       ),

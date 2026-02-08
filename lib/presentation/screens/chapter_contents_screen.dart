@@ -20,7 +20,7 @@ class ChapterContentsScreen extends StatefulWidget {
   final String subjectId;
 
   const ChapterContentsScreen({
-    super.key, 
+    super.key,
     required this.chapter,
     required this.courseTitle,
     required this.subjectTitle,
@@ -53,7 +53,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       setState(() {
         _isTeacher = role == 'teacher';
       });
-      
+
       // ✅ إذا كان معلماً، نحدث البيانات فوراً للتأكد من المزامنة
       if (_isTeacher) {
         _refreshChapterData();
@@ -76,7 +76,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -93,7 +93,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         });
       }
     } catch (e) {
-      FirebaseCrashlytics.instance.recordError(e, StackTrace.current, reason: 'Refresh Chapter Failed');
+      FirebaseCrashlytics.instance
+          .recordError(e, StackTrace.current, reason: 'Refresh Chapter Failed');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -103,7 +104,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   void _handleReturnData(dynamic result) {
     // إذا كانت النتيجة true، نعيد طلب البيانات من السيرفر
     if (result == true) {
-       _refreshChapterData();
+      _refreshChapterData();
     }
   }
 
@@ -163,35 +164,30 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
               _buildOptionTile(
-                icon: LucideIcons.rocket, 
+                icon: LucideIcons.rocket,
                 title: "First Player",
-                subtitle: "High Performance", 
+                subtitle: "High Performance",
                 onTap: () {
                   Navigator.pop(context);
-                  _fetchAndPlayWithExplode(video); 
+                  _fetchAndPlayWithExplode(video);
                 },
               ),
-
               const SizedBox(height: 16),
-
               _buildOptionTile(
                 icon: LucideIcons.youtube,
                 title: "Second Player",
-                subtitle: "Standard Player", 
+                subtitle: "Standard Player",
                 onTap: () {
                   Navigator.pop(context);
                   _fetchAndPlayVideo(video, useYoutube: true);
                 },
               ),
-              
               const SizedBox(height: 16),
-
               _buildOptionTile(
                 icon: LucideIcons.playCircle,
                 title: "Third Player",
-                subtitle: "Backup Player", 
+                subtitle: "Backup Player",
                 onTap: () {
                   Navigator.pop(context);
                   _fetchAndPlayVideo(video, useYoutube: false);
@@ -204,25 +200,27 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     );
   }
 
-  Future<void> _fetchAndPlayVideo(Map<String, dynamic> video, {required bool useYoutube}) async {
+  Future<void> _fetchAndPlayVideo(Map<String, dynamic> video,
+      {required bool useYoutube}) async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Center(child: CircularProgressIndicator(color: AppColors.accentYellow)),
+      builder: (_) => Center(
+          child: CircularProgressIndicator(color: AppColors.accentYellow)),
     );
 
     try {
       var box = await StorageService.openBox('auth_box');
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
-      
+
       final res = await Dio().get(
         '$_baseUrl/api/secure/get-video-id',
         queryParameters: {'lessonId': video['id'].toString()},
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -238,11 +236,13 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => YoutubePlayerScreen(videoId: youtubeId, title: videoTitle),
+                builder: (_) =>
+                    YoutubePlayerScreen(videoId: youtubeId, title: videoTitle),
               ),
             );
           } else {
-            FirebaseCrashlytics.instance.log("YouTube ID missing for lesson: ${video['id']}");
+            FirebaseCrashlytics.instance
+                .log("YouTube ID missing for lesson: ${video['id']}");
             _showErrorSnackBar("Not a YouTube video or ID missing.");
           }
         } else {
@@ -262,11 +262,13 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => VideoPlayerScreen(streams: qualities, title: videoTitle),
+                builder: (_) =>
+                    VideoPlayerScreen(streams: qualities, title: videoTitle),
               ),
             );
           } else {
-            FirebaseCrashlytics.instance.log("No streamable URLs found for lesson: ${video['id']}");
+            FirebaseCrashlytics.instance
+                .log("No streamable URLs found for lesson: ${video['id']}");
             _showErrorSnackBar("No playable stream found.");
           }
         }
@@ -275,31 +277,34 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       }
     } catch (e, stack) {
       if (mounted) Navigator.pop(context);
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Play Video Exception');
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Play Video Exception');
       _showErrorSnackBar("Connection Error: Please check internet");
     }
   }
 
   Future<void> _fetchAndPlayWithExplode(Map<String, dynamic> video) async {
-    FirebaseCrashlytics.instance.log("🚀 Starting Direct Play (Explode) for: ${video['title']}");
+    FirebaseCrashlytics.instance
+        .log("🚀 Starting Direct Play (Explode) for: ${video['title']}");
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Center(child: CircularProgressIndicator(color: AppColors.accentYellow)),
+      builder: (_) => Center(
+          child: CircularProgressIndicator(color: AppColors.accentYellow)),
     );
 
     try {
       var box = await StorageService.openBox('auth_box');
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
-      
+
       final res = await Dio().get(
-        '$_baseUrl/api/secure/get-stream-proxy', 
+        '$_baseUrl/api/secure/get-stream-proxy',
         queryParameters: {'lessonId': video['id'].toString()},
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -316,16 +321,15 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
           String? bestAudioUrl;
           try {
             final audioObj = rawQualities.firstWhere(
-              (q) => q['type'] == 'audio_only', 
-              orElse: () => null
-            );
+                (q) => q['type'] == 'audio_only',
+                orElse: () => null);
             bestAudioUrl = audioObj?['url'];
           } catch (_) {}
 
           for (var item in rawQualities) {
             String url = item['url'];
-            String qualityKey = "${item['quality']}p"; 
-            String type = item['type']; 
+            String qualityKey = "${item['quality']}p";
+            String type = item['type'];
 
             if (type == 'audio_only') continue;
 
@@ -337,7 +341,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
           }
 
           if (processedQualities.isNotEmpty) {
-            FirebaseCrashlytics.instance.log("✅ Streams processed. Launching player.");
+            FirebaseCrashlytics.instance
+                .log("✅ Streams processed. Launching player.");
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -348,7 +353,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
               ),
             );
           } else {
-            FirebaseCrashlytics.instance.log("⚠️ No valid video qualities processed.");
+            FirebaseCrashlytics.instance
+                .log("⚠️ No valid video qualities processed.");
             _showErrorSnackBar("No playable streams found.");
           }
         } else {
@@ -360,7 +366,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       }
     } catch (e, stack) {
       if (mounted) Navigator.pop(context);
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: "Direct Stream Error");
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: "Direct Stream Error");
       _showErrorSnackBar("Connection Error or Timeout.");
     }
   }
@@ -369,26 +376,29 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   // 2. منطق التحميل (Download Logic)
   // ===========================================================================
 
-  Future<void> _prepareVideoDownload(String videoId, String videoTitle, String duration) async {
-    FirebaseCrashlytics.instance.log("⬇️ Fetching download info for: $videoTitle");
+  Future<void> _prepareVideoDownload(
+      String videoId, String videoTitle, String duration) async {
+    FirebaseCrashlytics.instance
+        .log("⬇️ Fetching download info for: $videoTitle");
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Center(child: CircularProgressIndicator(color: AppColors.accentYellow)),
+      builder: (_) => Center(
+          child: CircularProgressIndicator(color: AppColors.accentYellow)),
     );
 
     try {
       var box = await StorageService.openBox('auth_box');
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
-      
+
       final res = await Dio().get(
-        '$_baseUrl/api/secure/get-stream-proxy', 
+        '$_baseUrl/api/secure/get-stream-proxy',
         queryParameters: {'lessonId': videoId},
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -399,12 +409,13 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         List<dynamic> rawQualities = data['availableQualities'] ?? [];
 
         if (rawQualities.isNotEmpty) {
-           
           String? bestAudioUrl;
           int audioSize = 0; // ✅ متغير لتخزين حجم الصوت
 
           try {
-            final audioObj = rawQualities.firstWhere((q) => q['type'] == 'audio_only', orElse: () => null);
+            final audioObj = rawQualities.firstWhere(
+                (q) => q['type'] == 'audio_only',
+                orElse: () => null);
             if (audioObj != null) {
               bestAudioUrl = audioObj['url'];
               // ✅ حساب حجم الصوت (يضاف لحجم الفيديو لاحقاً)
@@ -412,20 +423,17 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             }
           } catch (_) {}
 
-          var videoOptions = rawQualities.where((q) => q['type'] != 'audio_only').toList();
+          var videoOptions =
+              rawQualities.where((q) => q['type'] != 'audio_only').toList();
 
           if (videoOptions.isNotEmpty) {
-             _showQualitySelectionDialog(
-               videoId, 
-               videoTitle, 
-               videoOptions, 
-               duration, 
-               bestAudioUrl,
-               audioSize // ✅ تمرير حجم الصوت
-             );
+            _showQualitySelectionDialog(videoId, videoTitle, videoOptions,
+                duration, bestAudioUrl, audioSize // ✅ تمرير حجم الصوت
+                );
           } else {
-             FirebaseCrashlytics.instance.log("⚠️ No video-only streams found for download.");
-             _showErrorSnackBar("No compatible video streams found.");
+            FirebaseCrashlytics.instance
+                .log("⚠️ No video-only streams found for download.");
+            _showErrorSnackBar("No compatible video streams found.");
           }
         } else {
           _showErrorSnackBar("No download links available");
@@ -435,12 +443,19 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       }
     } catch (e, stack) {
       if (mounted) Navigator.pop(context);
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Prepare Download Failed');
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Prepare Download Failed');
       _showErrorSnackBar("Failed to fetch download info");
     }
   }
 
-  void _showQualitySelectionDialog(String videoId, String title, List<dynamic> qualities, String duration, String? audioUrl, int audioSize) {
+  void _showQualitySelectionDialog(
+      String videoId,
+      String title,
+      List<dynamic> qualities,
+      String duration,
+      String? audioUrl,
+      int audioSize) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white, // ✅ خلفية بيضاء للوضع النهاري
@@ -467,7 +482,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              
               Flexible(
                 child: SingleChildScrollView(
                   child: Column(
@@ -479,23 +493,30 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                       String sizeText = _formatBytes(totalSize, 1);
 
                       return ListTile(
-                        leading: const Icon(LucideIcons.download, color: Colors.black), // ✅ أيقونة سوداء
+                        leading: const Icon(LucideIcons.download,
+                            color: Colors.black), // ✅ أيقونة سوداء
                         title: Text(
-                          "${q['quality']}p", 
-                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold), // ✅ نص أسود
+                          "${q['quality']}p",
+                          style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold), // ✅ نص أسود
                         ),
                         // ✅ عرض الحجم أسفل الجودة
                         subtitle: Text(
                           sizeText,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 12),
                         ),
-                        trailing: const Icon(LucideIcons.chevronRight, color: Colors.black54, size: 16), // ✅ سهم رمادي
+                        trailing: const Icon(LucideIcons.chevronRight,
+                            color: Colors.black54, size: 16), // ✅ سهم رمادي
                         onTap: () {
                           Navigator.pop(context);
-                           
-                          String? targetAudio = (q['type'] == 'video_only') ? audioUrl : null;
 
-                          _startVideoDownload(videoId, title, q['url'], targetAudio, "${q['quality']}p", duration);
+                          String? targetAudio =
+                              (q['type'] == 'video_only') ? audioUrl : null;
+
+                          _startVideoDownload(videoId, title, q['url'],
+                              targetAudio, "${q['quality']}p", duration);
                         },
                       );
                     }).toList(),
@@ -509,10 +530,13 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     );
   }
 
-  void _startVideoDownload(String videoId, String videoTitle, String? downloadUrl, String? audioUrl, String quality, String duration) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Download Started...")));
-    FirebaseCrashlytics.instance.log("⬇️ Starting download: $videoTitle ($quality)");
-     
+  void _startVideoDownload(String videoId, String videoTitle,
+      String? downloadUrl, String? audioUrl, String quality, String duration) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Download Started...")));
+    FirebaseCrashlytics.instance
+        .log("⬇️ Starting download: $videoTitle ($quality)");
+
     DownloadManager().startDownload(
       lessonId: videoId,
       videoTitle: videoTitle,
@@ -521,36 +545,49 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       chapterName: _currentChapter['title'] ?? "Chapter",
       downloadUrl: downloadUrl,
       audioUrl: audioUrl,
-      quality: quality,   
-      duration: duration, 
+      quality: quality,
+      duration: duration,
       onProgress: (p) {},
       onComplete: () {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Download Completed!"), backgroundColor: AppColors.success));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text("Download Completed!"),
+              backgroundColor: AppColors.success));
       },
       onError: (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Download Failed"), backgroundColor: AppColors.error));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text("Download Failed"),
+              backgroundColor: AppColors.error));
       },
     );
   }
 
   void _startPdfDownload(String pdfId, String pdfTitle) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("PDF Download Started...")));
-      FirebaseCrashlytics.instance.log("⬇️ Starting PDF download: $pdfTitle");
-      
-      DownloadManager().startDownload(
-      lessonId: pdfId, 
-      videoTitle: pdfTitle, 
-      courseName: widget.courseTitle, 
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("PDF Download Started...")));
+    FirebaseCrashlytics.instance.log("⬇️ Starting PDF download: $pdfTitle");
+
+    DownloadManager().startDownload(
+      lessonId: pdfId,
+      videoTitle: pdfTitle,
+      courseName: widget.courseTitle,
       subjectName: widget.subjectTitle,
       chapterName: _currentChapter['title'] ?? "Chapter",
       isPdf: true,
-      quality: "PDF", 
+      quality: "PDF",
       onProgress: (p) {},
       onComplete: () {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("PDF Download Completed!"), backgroundColor: AppColors.success));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text("PDF Download Completed!"),
+              backgroundColor: AppColors.success));
       },
       onError: (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Download Failed"), backgroundColor: AppColors.error));
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text("Download Failed"),
+              backgroundColor: AppColors.error));
       },
     );
   }
@@ -561,8 +598,10 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final videos = (_currentChapter['videos'] as List? ?? []).cast<Map<String, dynamic>>();
-    final pdfs = (_currentChapter['pdfs'] as List? ?? []).cast<Map<String, dynamic>>();
+    final videos =
+        (_currentChapter['videos'] as List? ?? []).cast<Map<String, dynamic>>();
+    final pdfs =
+        (_currentChapter['pdfs'] as List? ?? []).cast<Map<String, dynamic>>();
 
     // ✅ تغليف Scaffold بـ WillPopScope لإرجاع الشابتر المحدث عند العودة للشاشة السابقة
     return WillPopScope(
@@ -600,24 +639,35 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                                     decoration: BoxDecoration(
                                       color: AppColors.backgroundSecondary,
                                       borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
-                                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                      border: Border.all(
+                                          color: AppColors.textSecondary
+                                              .withOpacity(0.1)),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                            color: Colors.black12,
+                                            blurRadius: 4)
+                                      ],
                                     ),
-                                    child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                                    child: Icon(LucideIcons.arrowLeft,
+                                        color: AppColors.accentYellow,
+                                        size: 20),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                
+
                                 // ✅ Expanded للنص ليأخذ المساحة المتبقية فقط
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // ✅ جعل العنوان الرئيسي قابلاً للسحب (Scrollable) لمنع الخطأ
                                       SingleChildScrollView(
                                         scrollDirection: Axis.horizontal,
                                         child: Text(
-                                          _currentChapter['title'].toString().toUpperCase(),
+                                          _currentChapter['title']
+                                              .toString()
+                                              .toUpperCase(),
                                           style: TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
@@ -635,7 +685,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                                         style: TextStyle(
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
-                                          color: AppColors.accentYellow.withOpacity(0.8),
+                                          color: AppColors.accentYellow
+                                              .withOpacity(0.8),
                                           letterSpacing: 1.0,
                                         ),
                                         maxLines: 1,
@@ -653,44 +704,55 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                             const SizedBox(width: 10), // مسافة أمان
                             GestureDetector(
                               onTap: () {
-                                ContentType type = activeTab == 'videos' ? ContentType.video : ContentType.pdf;
+                                ContentType type = activeTab == 'videos'
+                                    ? ContentType.video
+                                    : ContentType.pdf;
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => ManageContentScreen(
                                       contentType: type,
-                                      parentId: _currentChapter['id'].toString(), // ID الشابتر
+                                      parentId: _currentChapter['id']
+                                          .toString(), // ID الشابتر
                                     ),
                                   ),
-                                ).then((val) => _handleReturnData(val)); // ✅ تحديث فوري
+                                ).then((val) =>
+                                    _handleReturnData(val)); // ✅ تحديث فوري
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppColors.accentYellow.withOpacity(0.1),
+                                  color:
+                                      AppColors.accentYellow.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(50),
-                                  border: Border.all(color: AppColors.accentYellow.withOpacity(0.5)),
+                                  border: Border.all(
+                                      color: AppColors.accentYellow
+                                          .withOpacity(0.5)),
                                 ),
                                 child: Icon(
-                                  activeTab == 'videos' ? LucideIcons.video : LucideIcons.filePlus, 
-                                  color: AppColors.accentYellow, size: 22
-                                ),
+                                    activeTab == 'videos'
+                                        ? LucideIcons.video
+                                        : LucideIcons.filePlus,
+                                    color: AppColors.accentYellow,
+                                    size: 22),
                               ),
                             ),
                           ],
                         ],
                       ),
                     ),
-                    
+
                     // Tabs
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24.0, vertical: 8.0),
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: AppColors.backgroundSecondary,
                           borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                          border: Border.all(
+                              color: AppColors.textSecondary.withOpacity(0.1)),
                         ),
                         child: Row(
                           children: [
@@ -706,11 +768,13 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
 
               // Content List
               Expanded(
-                child: _isLoading 
-                  ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
-                  : activeTab == 'videos'
-                    ? _buildVideosList(videos)
-                    : _buildPdfsList(pdfs),
+                child: _isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                            color: AppColors.accentYellow))
+                    : activeTab == 'videos'
+                        ? _buildVideosList(videos)
+                        : _buildPdfsList(pdfs),
               ),
             ],
           ),
@@ -730,7 +794,9 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
           decoration: BoxDecoration(
             color: isActive ? AppColors.backgroundPrimary : Colors.transparent,
             borderRadius: BorderRadius.circular(50),
-            boxShadow: isActive ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+            boxShadow: isActive
+                ? [const BoxShadow(color: Colors.black12, blurRadius: 4)]
+                : [],
           ),
           child: Text(
             title.toUpperCase(),
@@ -738,7 +804,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isActive ? AppColors.accentYellow : AppColors.textSecondary,
+              color:
+                  isActive ? AppColors.accentYellow : AppColors.textSecondary,
               letterSpacing: 1.5,
             ),
           ),
@@ -748,16 +815,17 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   }
 
   Widget _buildVideosList(List<Map<String, dynamic>> videos) {
-    if (videos.isEmpty) return _buildEmptyState(LucideIcons.monitorPlay, "No video lessons");
-    
+    if (videos.isEmpty)
+      return _buildEmptyState(LucideIcons.monitorPlay, "No video lessons");
+
     return ListView.builder(
       padding: const EdgeInsets.all(24),
       itemCount: videos.length,
       itemBuilder: (context, index) {
         final video = videos[index];
         final String videoId = video['id'].toString();
-        final String duration = video['duration'] ?? "--:--"; 
-        
+        final String duration = video['duration'] ?? "--:--";
+
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -773,13 +841,17 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.backgroundPrimary,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 2)
+                        ],
                       ),
-                      child: Icon(LucideIcons.play, color: AppColors.accentOrange, size: 18),
+                      child: Icon(LucideIcons.play,
+                          color: AppColors.accentOrange, size: 18),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -788,24 +860,33 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                         children: [
                           Text(
                             video['title'].toString().toUpperCase(),
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "VIDEO", 
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textSecondary.withOpacity(0.7)),
+                            "VIDEO",
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    AppColors.textSecondary.withOpacity(0.7)),
                           ),
                         ],
                       ),
                     ),
-                    
+
                     // 🟢 زر التعديل (للمعلم فقط)
                     if (_isTeacher)
                       IconButton(
-                        icon: Icon(LucideIcons.edit2, size: 18, color: AppColors.accentYellow),
+                        icon: Icon(LucideIcons.edit2,
+                            size: 18, color: AppColors.accentYellow),
                         onPressed: () {
-                           Navigator.push(
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => ManageContentScreen(
@@ -814,61 +895,73 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                                 parentId: _currentChapter['id'].toString(),
                               ),
                             ),
-                          ).then((val) => _handleReturnData(val)); // ✅ تحديث فوري
+                          ).then(
+                              (val) => _handleReturnData(val)); // ✅ تحديث فوري
                         },
                       ),
                   ],
                 ),
               ),
-              Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+              Divider(
+                  height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
               Row(
                 children: [
                   Expanded(
                     child: _buildActionButton(
-                      "Watch Now", 
-                      AppColors.accentYellow, 
-                      () => _showPlayerSelectionDialog(video), 
+                      "Watch Now",
+                      AppColors.accentYellow,
+                      () => _showPlayerSelectionDialog(video),
                     ),
                   ),
-                  Container(width: 1, height: 48, color: AppColors.textSecondary.withOpacity(0.1)),
-                  
+                  Container(
+                      width: 1,
+                      height: 48,
+                      color: AppColors.textSecondary.withOpacity(0.1)),
                   Expanded(
                     child: ValueListenableBuilder(
                       // ✅ التعديل هنا: الاستماع لتقدم التحميل من DownloadManager
                       valueListenable: DownloadManager.downloadingProgress,
-                      builder: (context, Map<String, double> progresses, child) {
+                      builder:
+                          (context, Map<String, double> progresses, child) {
                         return ValueListenableBuilder(
-                          valueListenable: Hive.box('downloads_box').listenable(),
+                          valueListenable:
+                              Hive.box('downloads_box').listenable(),
                           builder: (context, Box box, _) {
                             // ✅ التعديل: الفحص باستخدام المفتاح الفريد للفيديو
-                            String storageKey = 'vid_$videoId'; 
-                            bool isDownloaded = box.containsKey(storageKey); 
-                            
+                            String storageKey = 'vid_$videoId';
+                            bool isDownloaded = box.containsKey(storageKey);
+
                             // ✅ التحقق من أن الفيديو قيد التحميل حالياً
-                            bool isDownloading = progresses.containsKey(videoId);
+                            bool isDownloading =
+                                progresses.containsKey(videoId);
 
                             String? sizeStr;
                             if (isDownloaded) {
-                               // ✅ التعديل: جلب البيانات بالمفتاح الصحيح
-                               final item = box.get(storageKey);
-                               if (item != null) {
-                                 int bytes = item['size'] ?? 0;
-                                 sizeStr = "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
-                               }
+                              // ✅ التعديل: جلب البيانات بالمفتاح الصحيح
+                              final item = box.get(storageKey);
+                              if (item != null) {
+                                int bytes = item['size'] ?? 0;
+                                sizeStr =
+                                    "${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB";
+                              }
                             }
 
                             if (isDownloaded) {
-                               return _buildStatusButton("SAVED ${sizeStr != null ? '($sizeStr)' : ''}", AppColors.success, LucideIcons.checkCircle);
+                              return _buildStatusButton(
+                                  "SAVED ${sizeStr != null ? '($sizeStr)' : ''}",
+                                  AppColors.success,
+                                  LucideIcons.checkCircle);
                             }
                             // ✅ سيتم عرض هذا الزر فوراً عند بدء التحميل
                             else if (isDownloading) {
-                               return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
-                            }
-                            else return _buildActionButton(
-                              "Download", 
-                              AppColors.textSecondary, 
-                              () => _prepareVideoDownload(videoId, video['title'], duration)
-                            );
+                              return _buildStatusButton("PROCESSING...",
+                                  AppColors.accentYellow, LucideIcons.loader);
+                            } else
+                              return _buildActionButton(
+                                  "Download",
+                                  AppColors.textSecondary,
+                                  () => _prepareVideoDownload(
+                                      videoId, video['title'], duration));
                           },
                         );
                       },
@@ -884,7 +977,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   }
 
   Widget _buildPdfsList(List<Map<String, dynamic>> pdfs) {
-    if (pdfs.isEmpty) return _buildEmptyState(LucideIcons.fileText, "No PDF files");
+    if (pdfs.isEmpty)
+      return _buildEmptyState(LucideIcons.fileText, "No PDF files");
 
     return ListView.builder(
       padding: const EdgeInsets.all(24),
@@ -892,7 +986,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       itemBuilder: (context, index) {
         final pdf = pdfs[index];
         final String pdfId = pdf['id'].toString();
-        
+
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
@@ -908,32 +1002,46 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 child: Row(
                   children: [
                     Container(
-                      width: 40, height: 40,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
                         color: AppColors.backgroundPrimary,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 2)
+                        ],
                       ),
-                      child: Icon(LucideIcons.fileText, color: AppColors.accentYellow, size: 18),
+                      child: Icon(LucideIcons.fileText,
+                          color: AppColors.accentYellow, size: 18),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(pdf['title'].toString().toUpperCase(), style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                          Text(pdf['title'].toString().toUpperCase(),
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary)),
                           const SizedBox(height: 4),
-                          Text("STUDY MATERIAL", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textSecondary.withOpacity(0.7))),
+                          Text("STUDY MATERIAL",
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textSecondary
+                                      .withOpacity(0.7))),
                         ],
                       ),
                     ),
-                    
+
                     // 🟢 زر التعديل (للمعلم فقط)
                     if (_isTeacher)
                       IconButton(
-                        icon: Icon(LucideIcons.edit2, size: 18, color: AppColors.accentYellow),
+                        icon: Icon(LucideIcons.edit2,
+                            size: 18, color: AppColors.accentYellow),
                         onPressed: () {
-                           Navigator.push(
+                          Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => ManageContentScreen(
@@ -942,38 +1050,58 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                                 parentId: _currentChapter['id'].toString(),
                               ),
                             ),
-                          ).then((val) => _handleReturnData(val)); // ✅ تحديث فوري
+                          ).then(
+                              (val) => _handleReturnData(val)); // ✅ تحديث فوري
                         },
                       ),
                   ],
                 ),
               ),
-              Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+              Divider(
+                  height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
               Row(
                 children: [
                   Expanded(
-                    child: _buildActionButton("Open File", AppColors.accentYellow, () {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => PdfViewerScreen(pdfId: pdfId, title: pdf['title'])));
+                    child: _buildActionButton(
+                        "Open File", AppColors.accentYellow, () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => PdfViewerScreen(
+                                  pdfId: pdfId, title: pdf['title'])));
                     }),
                   ),
-                  Container(width: 1, height: 48, color: AppColors.textSecondary.withOpacity(0.1)),
+                  Container(
+                      width: 1,
+                      height: 48,
+                      color: AppColors.textSecondary.withOpacity(0.1)),
                   Expanded(
                     child: ValueListenableBuilder(
                       // ✅ التعديل هنا أيضاً للـ PDFs
                       valueListenable: DownloadManager.downloadingProgress,
-                      builder: (context, Map<String, double> progresses, child) {
+                      builder:
+                          (context, Map<String, double> progresses, child) {
                         return ValueListenableBuilder(
-                          valueListenable: Hive.box('downloads_box').listenable(),
+                          valueListenable:
+                              Hive.box('downloads_box').listenable(),
                           builder: (context, Box box, _) {
                             // ✅ التعديل: الفحص باستخدام مفتاح الـ PDF
                             String storageKey = 'pdf_$pdfId';
                             bool isDownloaded = box.containsKey(storageKey);
-                            
+
                             bool isDownloading = progresses.containsKey(pdfId);
 
-                            if (isDownloaded) return _buildStatusButton("SAVED", AppColors.success, LucideIcons.checkCircle);
-                            else if (isDownloading) return _buildStatusButton("PROCESSING...", AppColors.accentYellow, LucideIcons.loader);
-                            else return _buildActionButton("Download", AppColors.textSecondary, () => _startPdfDownload(pdfId, pdf['title']));
+                            if (isDownloaded)
+                              return _buildStatusButton("SAVED",
+                                  AppColors.success, LucideIcons.checkCircle);
+                            else if (isDownloading)
+                              return _buildStatusButton("PROCESSING...",
+                                  AppColors.accentYellow, LucideIcons.loader);
+                            else
+                              return _buildActionButton(
+                                  "Download",
+                                  AppColors.textSecondary,
+                                  () => _startPdfDownload(pdfId, pdf['title']));
                           },
                         );
                       },
@@ -990,7 +1118,11 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
 
   // --- Widgets مساعدة ---
 
-  Widget _buildOptionTile({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
+  Widget _buildOptionTile(
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1008,13 +1140,21 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text(title,
+                      style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 10)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.5),
+                          fontSize: 10)),
                 ],
               ),
             ),
-            Icon(LucideIcons.chevronRight, color: AppColors.textSecondary.withOpacity(0.6), size: 18),
+            Icon(LucideIcons.chevronRight,
+                color: AppColors.textSecondary.withOpacity(0.6), size: 18),
           ],
         ),
       ),
@@ -1029,7 +1169,12 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         child: Container(
           height: 48,
           alignment: Alignment.center,
-          child: Text(label.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: color)),
+          child: Text(label.toUpperCase(),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: color)),
         ),
       ),
     );
@@ -1044,7 +1189,12 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5, color: color)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: color)),
         ],
       ),
     );
@@ -1057,13 +1207,19 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         children: [
           Icon(icon, size: 48, color: AppColors.textSecondary.withOpacity(0.3)),
           const SizedBox(height: 16),
-          Text(message.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2.0, color: AppColors.textSecondary.withOpacity(0.5))),
+          Text(message.toUpperCase(),
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2.0,
+                  color: AppColors.textSecondary.withOpacity(0.5))),
         ],
       ),
     );
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: AppColors.error));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.error));
   }
 }

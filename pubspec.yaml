@@ -1,7 +1,7 @@
 name: Medaad
 description: Modern Learning Platform (Dark Slate Design)
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+9
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -36,10 +36,10 @@ dependencies:
   
   
   # ✅ التعديل 1: استخدام نسخة GitHub للحصول على دوال الاستماع (addListener)
-  screen_protector:
-    git:
-      url: https://github.com/prongbang/screen_protector.git
-      ref: master
+  # screen_protector:
+  #   git:
+  #     url: https://github.com/prongbang/screen_protector.git
+  #     ref: master
 
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
@@ -80,6 +80,7 @@ dependencies:
   # Local Server (Offline Playback Proxy)
   shelf: ^1.4.2
   shelf_router: ^1.1.4
+  screen_protector: ^1.5.1
 
 dev_dependencies:
   flutter_test:

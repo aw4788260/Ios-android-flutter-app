@@ -34,13 +34,14 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   String? _error;
   Map<String, dynamic>? _content;
   bool _isTeacher = false;
-   
+
   final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
     super.initState();
-    FirebaseCrashlytics.instance.log("Opened Subject: ${widget.subjectTitle} (${widget.subjectId})");
+    FirebaseCrashlytics.instance
+        .log("Opened Subject: ${widget.subjectTitle} (${widget.subjectId})");
     _checkUserRole();
     _fetchContent();
   }
@@ -67,7 +68,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -78,8 +79,13 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         });
       }
     } catch (e, stack) {
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Fetching Subject Content Failed');
-      if (mounted) setState(() { _error = "Failed to load content."; _loading = false; });
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Fetching Subject Content Failed');
+      if (mounted)
+        setState(() {
+          _error = "Failed to load content.";
+          _loading = false;
+        });
     }
   }
 
@@ -87,8 +93,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   void _updateChapterList(dynamic result) {
     // إذا كانت النتيجة true فقط (بدون بيانات)، نعيد جلب البيانات كاملة من السيرفر
     if (result == true) {
-       _fetchContent();
-       return;
+      _fetchContent();
+      return;
     }
 
     if (result == null || _content == null) return;
@@ -97,16 +103,18 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
       List chapters = List.from(_content!['chapters'] ?? []);
 
       if (result is Map && result['deleted'] == true) {
-          // حذف شابتر
-          chapters.removeWhere((c) => c['id'].toString() == result['id'].toString());
+        // حذف شابتر
+        chapters
+            .removeWhere((c) => c['id'].toString() == result['id'].toString());
       } else if (result is Map<String, dynamic>) {
-          // إضافة أو تحديث
-          int index = chapters.indexWhere((c) => c['id'].toString() == result['id'].toString());
-          if (index != -1) {
-            chapters[index] = result; 
-          } else {
-            chapters.add(result); 
-          }
+        // إضافة أو تحديث
+        int index = chapters
+            .indexWhere((c) => c['id'].toString() == result['id'].toString());
+        if (index != -1) {
+          chapters[index] = result;
+        } else {
+          chapters.add(result);
+        }
       }
       _content!['chapters'] = chapters;
     });
@@ -114,8 +122,19 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return Scaffold(backgroundColor: AppColors.backgroundPrimary, body: Center(child: CircularProgressIndicator(color: AppColors.accentYellow)));
-    if (_error != null) return Scaffold(backgroundColor: AppColors.backgroundPrimary, appBar: AppBar(backgroundColor: Colors.transparent, leading: BackButton(color: AppColors.accentYellow)), body: Center(child: Text(_error!, style: TextStyle(color: AppColors.error))));
+    if (_loading)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          body: Center(
+              child: CircularProgressIndicator(color: AppColors.accentYellow)));
+    if (_error != null)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              leading: BackButton(color: AppColors.accentYellow)),
+          body: Center(
+              child: Text(_error!, style: TextStyle(color: AppColors.error))));
 
     final chapters = _content!['chapters'] as List;
     final exams = _content!['exams'] as List;
@@ -144,14 +163,19 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.backgroundSecondary,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.05)),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                        color: Colors.black12, blurRadius: 4)
+                                  ],
                                 ),
-                                child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                                child: Icon(LucideIcons.arrowLeft,
+                                    color: AppColors.accentYellow, size: 20),
                               ),
                             ),
                             const SizedBox(width: 16),
-                            
+
                             // ✅ Expanded للنصوص لتأخذ المساحة المتبقية فقط
                             Expanded(
                               child: Column(
@@ -206,14 +230,15 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                               ).then((val) {
                                 // ✅ تحديث البيانات عند العودة (val == true)
                                 if (val == true) _fetchContent();
-                              }); 
+                              });
                             } else {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => CreateExamScreen(subjectId: widget.subjectId),
+                                  builder: (_) => CreateExamScreen(
+                                      subjectId: widget.subjectId),
                                 ),
-                              ).then((_) => _fetchContent()); 
+                              ).then((_) => _fetchContent());
                             }
                           },
                           child: Container(
@@ -221,19 +246,23 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.accentYellow.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(50),
-                              border: Border.all(color: AppColors.accentYellow.withOpacity(0.5)),
+                              border: Border.all(
+                                  color:
+                                      AppColors.accentYellow.withOpacity(0.5)),
                             ),
                             child: Icon(
-                              _activeTab == 'chapters' ? LucideIcons.folderPlus : LucideIcons.filePlus, 
-                              color: AppColors.accentYellow, size: 22
-                            ),
+                                _activeTab == 'chapters'
+                                    ? LucideIcons.folderPlus
+                                    : LucideIcons.filePlus,
+                                color: AppColors.accentYellow,
+                                size: 22),
                           ),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Tab Switcher
                   Container(
                     padding: const EdgeInsets.all(4),
@@ -241,7 +270,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       color: AppColors.backgroundSecondary,
                       borderRadius: BorderRadius.circular(50),
                       border: Border.all(color: Colors.white.withOpacity(0.05)),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black26, blurRadius: 4)
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -269,19 +300,19 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   // --- قائمة الامتحانات ---
   Widget _buildExamsList(List allExams) {
     final visibleExams = allExams.where((exam) {
-       if (_isTeacher) return true; 
-       
-       if (exam['start_time'] != null) {
-         final DateTime startTime = DateTime.parse(exam['start_time']).toLocal();
-         if (DateTime.now().isBefore(startTime)) {
-            return false; 
-         }
-       }
-       return true;
+      if (_isTeacher) return true;
+
+      if (exam['start_time'] != null) {
+        final DateTime startTime = DateTime.parse(exam['start_time']).toLocal();
+        if (DateTime.now().isBefore(startTime)) {
+          return false;
+        }
+      }
+      return true;
     }).toList();
 
     if (visibleExams.isEmpty) {
-       return _buildEmptyState(LucideIcons.fileCheck, "No exams available yet");
+      return _buildEmptyState(LucideIcons.fileCheck, "No exams available yet");
     }
 
     return ListView.builder(
@@ -292,15 +323,15 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         final bool isCompleted = exam['isCompleted'] ?? false;
         final bool isExpired = exam['isExpired'] ?? false;
 
-        final Color statusColor = isCompleted 
-            ? AppColors.success 
-            : (isExpired ? AppColors.error : AppColors.accentOrange); 
+        final Color statusColor = isCompleted
+            ? AppColors.success
+            : (isExpired ? AppColors.error : AppColors.accentOrange);
 
         String statusText = "UNSOLVED";
         if (isCompleted) {
           statusText = "COMPLETED";
         } else if (isExpired) {
-          statusText = "EXPIRED"; 
+          statusText = "EXPIRED";
         }
 
         return Container(
@@ -317,21 +348,23 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
               GestureDetector(
                 onTap: () => _openExam(exam, isCompleted, isExpired),
                 child: Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.backgroundPrimary,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: statusColor.withOpacity(0.5)),
                   ),
                   child: Icon(
-                    isCompleted ? LucideIcons.checkCircle2 : (isExpired ? LucideIcons.clock : LucideIcons.fileX), 
-                    color: statusColor, 
-                    size: 20
-                  ),
+                      isCompleted
+                          ? LucideIcons.checkCircle2
+                          : (isExpired ? LucideIcons.clock : LucideIcons.fileX),
+                      color: statusColor,
+                      size: 20),
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // التفاصيل
               Expanded(
                 child: GestureDetector(
@@ -340,7 +373,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (exam['title'] ?? 'Untitled Exam').toString().toUpperCase(),
+                        (exam['title'] ?? 'Untitled Exam')
+                            .toString()
+                            .toUpperCase(),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -383,7 +418,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(LucideIcons.edit, color: AppColors.accentOrange, size: 20),
+                      icon: Icon(LucideIcons.edit,
+                          color: AppColors.accentOrange, size: 20),
                       tooltip: "تعديل الامتحان",
                       onPressed: () {
                         Navigator.push(
@@ -391,16 +427,17 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                           MaterialPageRoute(
                             builder: (_) => CreateExamScreen(
                               subjectId: widget.subjectId,
-                              examId: exam['id'].toString(), 
+                              examId: exam['id'].toString(),
                             ),
                           ),
-                        ).then((val) { 
-                          if (val == true) _fetchContent(); 
+                        ).then((val) {
+                          if (val == true) _fetchContent();
                         });
                       },
                     ),
                     IconButton(
-                      icon: Icon(LucideIcons.barChart2, color: AppColors.accentYellow, size: 20),
+                      icon: Icon(LucideIcons.barChart2,
+                          color: AppColors.accentYellow, size: 20),
                       tooltip: "Statistics",
                       onPressed: () {
                         Navigator.push(
@@ -418,7 +455,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                 )
               else
                 IconButton(
-                  icon: Icon(LucideIcons.chevronRight, size: 20, color: statusColor.withOpacity(0.5)),
+                  icon: Icon(LucideIcons.chevronRight,
+                      size: 20, color: statusColor.withOpacity(0.5)),
                   onPressed: () => _openExam(exam, isCompleted, isExpired),
                 ),
             ],
@@ -430,7 +468,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
     if (isCompleted) {
-      final attemptId = exam['last_attempt_id'] ?? exam['first_attempt_id'] ?? exam['attempt_id']; 
+      final attemptId = exam['last_attempt_id'] ??
+          exam['first_attempt_id'] ??
+          exam['attempt_id'];
       if (attemptId != null) {
         Navigator.push(
           context,
@@ -442,24 +482,26 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: Cannot load result."), backgroundColor: AppColors.error)
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text("Error: Cannot load result."),
+            backgroundColor: AppColors.error));
       }
     } else {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => ExamViewScreen(
-          examId: exam['id'].toString(),
-          examTitle: exam['title'] ?? 'Exam',
-          isCompleted: isCompleted,
-        )),
+        MaterialPageRoute(
+            builder: (_) => ExamViewScreen(
+                  examId: exam['id'].toString(),
+                  examTitle: exam['title'] ?? 'Exam',
+                  isCompleted: isCompleted,
+                )),
       );
     }
   }
 
   Widget _buildChaptersList(List chapters) {
-    if (chapters.isEmpty) return _buildEmptyState(LucideIcons.bookOpen, "No chapters found");
+    if (chapters.isEmpty)
+      return _buildEmptyState(LucideIcons.bookOpen, "No chapters found");
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -471,25 +513,26 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
         return GestureDetector(
           onTap: () {
-            final String courseTitle = _content?['course_title'] ?? 'Unknown Course';
-              
+            final String courseTitle =
+                _content?['course_title'] ?? 'Unknown Course';
+
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChapterContentsScreen(
-                  chapter: Map<String, dynamic>.from(chapter),
-                  courseTitle: courseTitle,
-                  subjectTitle: widget.subjectTitle,
-                  subjectId: widget.subjectId, // ✅ ضروري لتحديث المحتوى داخل الشابتر
-                )
-              ),
+                  builder: (_) => ChapterContentsScreen(
+                        chapter: Map<String, dynamic>.from(chapter),
+                        courseTitle: courseTitle,
+                        subjectTitle: widget.subjectTitle,
+                        subjectId: widget
+                            .subjectId, // ✅ ضروري لتحديث المحتوى داخل الشابتر
+                      )),
             ).then((updatedChapter) {
-               // ✅ التعديل هنا: استقبال الشابتر المحدث وتحديث القائمة المحلية
-               if (updatedChapter != null && updatedChapter is Map) {
-                 _updateChapterList(Map<String, dynamic>.from(updatedChapter)); 
-               } else {
-                 _fetchContent(); // كإجراء احتياطي فقط
-               }
+              // ✅ التعديل هنا: استقبال الشابتر المحدث وتحديث القائمة المحلية
+              if (updatedChapter != null && updatedChapter is Map) {
+                _updateChapterList(Map<String, dynamic>.from(updatedChapter));
+              } else {
+                _fetchContent(); // كإجراء احتياطي فقط
+              }
             });
           },
           child: Container(
@@ -499,17 +542,22 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
               color: AppColors.backgroundSecondary,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withOpacity(0.05)),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 4)
+              ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: AppColors.backgroundPrimary,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 2)
+                    ],
                   ),
                   child: Center(
                     child: Text(
@@ -528,7 +576,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (chapter['title'] ?? 'Chapter').toString().toUpperCase(),
+                        (chapter['title'] ?? 'Chapter')
+                            .toString()
+                            .toUpperCase(),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -541,7 +591,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(LucideIcons.hash, size: 10, color: AppColors.accentOrange),
+                          Icon(LucideIcons.hash,
+                              size: 10, color: AppColors.accentOrange),
                           const SizedBox(width: 4),
                           Text(
                             "${videosCount + pdfsCount} CONTENTS",
@@ -560,7 +611,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                 // 🟢 زر تعديل الشابتر للمعلم
                 if (_isTeacher)
                   IconButton(
-                    icon: Icon(LucideIcons.edit2, size: 18, color: AppColors.accentYellow),
+                    icon: Icon(LucideIcons.edit2,
+                        size: 18, color: AppColors.accentYellow),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -572,13 +624,14 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                           ),
                         ),
                       ).then((val) {
-                         // ✅ تحديث فوري عند العودة (true)
-                         if (val == true) _fetchContent();
+                        // ✅ تحديث فوري عند العودة (true)
+                        if (val == true) _fetchContent();
                       });
                     },
                   )
                 else
-                  Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondary),
+                  Icon(LucideIcons.chevronRight,
+                      size: 18, color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -601,7 +654,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           decoration: BoxDecoration(
             color: isActive ? AppColors.backgroundPrimary : Colors.transparent,
             borderRadius: BorderRadius.circular(50),
-            boxShadow: isActive ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+            boxShadow: isActive
+                ? [const BoxShadow(color: Colors.black12, blurRadius: 4)]
+                : [],
           ),
           child: Text(
             title.toUpperCase(),
@@ -609,7 +664,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isActive ? AppColors.accentYellow : AppColors.textSecondary,
+              color:
+                  isActive ? AppColors.accentYellow : AppColors.textSecondary,
               letterSpacing: 1.5,
             ),
           ),

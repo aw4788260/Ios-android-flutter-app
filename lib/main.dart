@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:Medaad/core/constants/app_colors.dart';
 import 'package:Medaad/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,8 @@ import 'core/services/app_state.dart';
 import 'core/services/audio_protection_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> snackbarKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
   runZonedGuarded<Future<void>>(() async {
@@ -139,7 +142,7 @@ class SecurityManager {
       bool isJailBroken = await SafeDevice.isJailBroken;
       bool isDevMode = await SafeDevice.isDevelopmentModeEnable;
 
-      // ✅ تحديد السبب بدقة
+      // // ✅ تحديد السبب بدقة
       if (isJailBroken) {
         _triggerBreach("الجهاز مكسور الحماية (Root)");
         return false;
@@ -164,7 +167,7 @@ class SecurityManager {
 
   // ✅ دالة تفعيل الإنذار تستقبل السبب وتخزنه للعرض
   void _triggerBreach(String reason) {
-    if (securityBreachReason.value != null) return;
+    // if (securityBreachReason.value != null) return;
 
     debugPrint("🚨 SECURITY BREACH: $reason");
 
@@ -178,6 +181,32 @@ class SecurityManager {
 
     // (اختياري) اهتزاز تحذيري
     HapticFeedback.heavyImpact();
+  }
+
+  Future<bool> forceReCheck() async {
+    // إعادة فحص حقيقية من الـ Native لكل الأسباب
+    bool isRecording = await _audioProtection
+        .checkRecordingStatus(); // تأكد أن هذه تنادي الـ MethodChannel
+    bool isDevMode = await SafeDevice.isDevelopmentModeEnable;
+    bool isJailBroken = await SafeDevice.isJailBroken;
+
+    if (!isRecording) //&& !isDevMode && !isJailBroken
+    {
+      securityBreachReason.value = null; // سيؤدي لإخفاء الشاشة الحمراء
+      return true;
+    } else {
+      // تحديث السبب سيجعل الواجهة "تنفض" نفسها وتظهر النص الجديد
+      if (isRecording) {
+        securityBreachReason.value = "لا يزال تسجيل الشاشة قيد العمل!";
+      } else if (isDevMode) {
+        securityBreachReason.value = "خيارات المطور لا تزال مفعلة!";
+      } else if (isJailBroken) {
+        securityBreachReason.value = "الجهاز لا يزال مكسور الحماية!";
+      } else {
+        securityBreachReason.value = "تم اكتشاف خرق أمني!";
+      }
+      return false;
+    }
   }
 }
 
@@ -285,6 +314,7 @@ class _EduVantageAppState extends State<EduVantageApp>
       builder: (context, currentMode, child) {
         return MaterialApp(
           navigatorKey: navigatorKey,
+          scaffoldMessengerKey: snackbarKey,
           debugShowCheckedModeBanner: false,
           title: 'مــــداد',
           theme: AppTheme.darkTheme.copyWith(
@@ -313,137 +343,167 @@ class _EduVantageAppState extends State<EduVantageApp>
                     // 🛑 إذا وجد نص، نظهر الشاشة الحمراء مع السبب المحدد
                     return Material(
                       type: MaterialType.transparency,
-                      child: Container(
-                        color: Colors.red.shade900, // لون أحمر داكن للتحذير
-                        width: double.infinity,
-                        height: double.infinity,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(LucideIcons.shieldAlert,
-                                color: Colors.white, size: 80),
-                            const SizedBox(height: 24),
-                            const Text(
-                              "SECURITY ALERT",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2.0,
-                                decoration: TextDecoration.none,
+                      child: Scaffold(
+                        backgroundColor: Colors.red.shade900,
+                        body: Container(
+                          color: Colors.red.shade900, // لون أحمر داكن للتحذير
+                          width: double.infinity,
+                          height: double.infinity,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(LucideIcons.shieldAlert,
+                                  color: Colors.white, size: 80),
+                              const SizedBox(height: 24),
+                              const Text(
+                                "SECURITY ALERT",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 2.0,
+                                  decoration: TextDecoration.none,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                            // ✅ عرض سبب المشكلة الفعلي القادم من SecurityManager
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 32.0),
-                              child: Text(
-                                breachReason, // هنا سيظهر النص المحدد (مثلاً: خيارات المطور مفعلة)
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    decoration: TextDecoration.none),
+                              // ✅ عرض سبب المشكلة الفعلي القادم من SecurityManager
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 32.0),
+                                child: Text(
+                                  breachReason, // هنا سيظهر النص المحدد (مثلاً: خيارات المطور مفعلة)
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.none),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 32),
+                              const SizedBox(height: 32),
 
-                            // ⚠️ صندوق التهديد بالحظر
-                            Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 32),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
-                                border:
-                                    Border.all(color: Colors.yellow, width: 2),
+                              // ⚠️ صندوق التهديد بالحظر
+                              Container(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 32),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.yellow, width: 2),
+                                ),
+                                child: const Column(
+                                  children: [
+                                    Text(
+                                      "⚠️ تنويه",
+                                      style: TextStyle(
+                                          color: Colors.yellow,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          decoration: TextDecoration.none),
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      "يرجى إغلاق التطبيقات المخالفة أو إيقاف خيارات المطور لضمان عمل التطبيق بأمان.",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          decoration: TextDecoration.none),
+                                      textDirection: TextDirection.rtl,
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: const Column(
+
+                              const SizedBox(height: 40),
+                              // ElevatedButton(
+                              //   onPressed: () => exit(0), // إغلاق التطبيق فوراً
+                              //   style: ElevatedButton.styleFrom(
+                              //     backgroundColor: Colors.white,
+                              //     foregroundColor: Colors.red.shade900,
+                              //     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              //   ),
+                              //   child: const Text("إغلاق التطبيق / EXIT", style: TextStyle(fontWeight: FontWeight.bold)),
+                              // )
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text(
-                                    "⚠️ تنويه",
-                                    style: TextStyle(
-                                        color: Colors.yellow,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        decoration: TextDecoration.none),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      // 1. تصفير القيمة أولاً لإجبار الواجهة على الاستعداد (التخلص من الحالة القديمة)
+                                      SecurityManager.instance
+                                          .securityBreachReason.value = null;
+
+                                      // 2. انتظار بسيط جداً لضمان معالجة الـ Reset
+                                      await Future.delayed(
+                                          const Duration(milliseconds: 100));
+
+                                      // 3. استدعاء الفحص الشامل فوراً
+                                      bool isSafe = await SecurityManager
+                                          .instance
+                                          .forceReCheck();
+
+                                      if (isSafe) {
+                                        // إذا أصبح آمناً، الـ Overlay سيختفي تلقائياً لأن القيمة أصبحت null
+                                        snackbarKey.currentState?.showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  "تم تحديث الحالة: الجهاز آمن الآن")),
+                                        );
+                                      } else {
+                                        // إذا لا زال هناك خرق، سيقوم forceReCheck بتحديث القيمة وظهور الشاشة الحمراء مجدداً
+                                        snackbarKey.currentState?.showSnackBar(
+                                          const SnackBar(
+                                              content: Text(
+                                                  "فشل التحقق: لا تزال المشكلة قائمة"),
+                                              backgroundColor: Colors.red),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.red.shade900,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 32, vertical: 12),
+                                    ),
+                                    child: const Text(
+                                      "إعادة المحاولة",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
                                   ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    "يرجى إغلاق التطبيقات المخالفة أو إيقاف خيارات المطور لضمان عمل التطبيق بأمان.",
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        decoration: TextDecoration.none),
-                                    textDirection: TextDirection.rtl,
+                                  const SizedBox(width: 16),
+
+                                  // زر اختياري لفتح الإعدادات
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      try {
+                                        await _settingsChannel
+                                            .invokeMethod("openSettings");
+                                      } catch (e) {
+                                        debugPrint(
+                                            "Failed to open settings: $e");
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 32, vertical: 12),
+                                    ),
+                                    child: const Text(
+                                      "فتح الإعدادات",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-
-                            const SizedBox(height: 40),
-                            // ElevatedButton(
-                            //   onPressed: () => exit(0), // إغلاق التطبيق فوراً
-                            //   style: ElevatedButton.styleFrom(
-                            //     backgroundColor: Colors.white,
-                            //     foregroundColor: Colors.red.shade900,
-                            //     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                            //   ),
-                            //   child: const Text("إغلاق التطبيق / EXIT", style: TextStyle(fontWeight: FontWeight.bold)),
-                            // )
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: () {
-                                    // إعادة المحاولة بعد أن المستخدم يصلح المشكلة
-                                    SecurityManager.instance
-                                        .securityBreachReason.value = null;
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: Colors.red.shade900,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 32, vertical: 12),
-                                  ),
-                                  child: const Text(
-                                    "إعادة المحاولة",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-
-                                // زر اختياري لفتح الإعدادات
-                                ElevatedButton(
-                                  onPressed: () async {
-                                    try {
-                                      await _settingsChannel
-                                          .invokeMethod("openSettings");
-                                    } catch (e) {
-                                      debugPrint("Failed to open settings: $e");
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 32, vertical: 12),
-                                  ),
-                                  child: const Text(
-                                    "فتح الإعدادات",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

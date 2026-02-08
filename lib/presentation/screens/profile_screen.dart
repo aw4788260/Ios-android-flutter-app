@@ -8,7 +8,7 @@ import '../../core/services/storage_service.dart';
 import '../../core/constants/api_constants.dart';
 
 // ✅ استيراد main.dart للوصول لخاصية إعادة التشغيل
-import '../../main.dart'; 
+import '../../main.dart';
 
 // شاشات الإعدادات العامة
 import 'edit_profile_screen.dart';
@@ -75,11 +75,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+            child: Text("Cancel",
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text("Delete", style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+            child: Text("Delete",
+                style: TextStyle(
+                    color: AppColors.error, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -94,7 +97,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
@@ -110,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             headers: {
               'Authorization': 'Bearer $token',
               'x-device-id': deviceId,
-              'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+              'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
             },
             validateStatus: (status) => status! < 500,
           ),
@@ -123,13 +127,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (mounted) {
         Navigator.pop(context); // إغلاق مؤشر التحميل
-        
+
         // التوجيه لشاشة الدخول
         Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
           (route) => false,
         );
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("Account deleted successfully."),
@@ -166,7 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               headers: {
                 'Authorization': 'Bearer $token',
                 'x-device-id': deviceId,
-                'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+                'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
               },
               validateStatus: (status) => status! < 500,
               sendTimeout: const Duration(seconds: 3),
@@ -203,10 +207,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ✅ دالة لتغيير الثيم وإعادة تشغيل التطبيق
   void _toggleThemeAndRestart() async {
     await AppState().toggleTheme();
-    
+
     // تأخير بسيط لضمان حفظ الإعدادات في Hive
     await Future.delayed(const Duration(milliseconds: 150));
-    
+
     if (mounted) {
       // 🔄 إعادة تشغيل التطبيق بالكامل لإصلاح الألوان
       RestartWidget.restartApp(context);
@@ -218,9 +222,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final isGuest = AppState().isGuest;
     final user = AppState().userData;
 
-    final String name = isGuest ? "GUEST USER" : (user?['first_name'] ?? "User").toUpperCase();
-    final String username = isGuest ? "Not Logged In" : (user?['username'] ?? "@user");
-    final String firstLetter = isGuest ? "?" : (name.isNotEmpty ? name[0] : "U");
+    final String name =
+        isGuest ? "GUEST USER" : (user?['first_name'] ?? "User").toUpperCase();
+    final String username =
+        isGuest ? "Not Logged In" : (user?['username'] ?? "@user");
+    final String firstLetter =
+        isGuest ? "?" : (name.isNotEmpty ? name[0] : "U");
 
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
@@ -258,30 +265,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: AppColors.backgroundSecondary,
                   borderRadius: BorderRadius.circular(24),
                   // ✅ استخدام لون حدود ديناميكي
-                  border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                  border: Border.all(
+                      color: AppColors.textSecondary.withOpacity(0.1)),
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black12, blurRadius: 8)
+                  ],
                 ),
                 child: Row(
                   children: [
                     // ✅ Avatar
                     Container(
-                      width: 64, height: 64,
+                      width: 64,
+                      height: 64,
                       decoration: BoxDecoration(
                         color: AppColors.backgroundPrimary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.accentYellow.withOpacity(0.5), width: 2),
-                        image: (_isTeacher && _profileImage != null && _profileImage!.isNotEmpty)
+                        border: Border.all(
+                            color: AppColors.accentYellow.withOpacity(0.5),
+                            width: 2),
+                        image: (_isTeacher &&
+                                _profileImage != null &&
+                                _profileImage!.isNotEmpty)
                             ? DecorationImage(
-                                image: NetworkImage(
-                                  _profileImage!.startsWith('http')
-                                      ? _profileImage!
-                                      : '$_baseUrl/api/public/get-avatar?file=$_profileImage'
-                                ),
+                                image: NetworkImage(_profileImage!
+                                        .startsWith('http')
+                                    ? _profileImage!
+                                    : '$_baseUrl/api/public/get-avatar?file=$_profileImage'),
                                 fit: BoxFit.cover,
                               )
                             : null,
                       ),
-                      child: (_isTeacher && _profileImage != null && _profileImage!.isNotEmpty)
+                      child: (_isTeacher &&
+                              _profileImage != null &&
+                              _profileImage!.isNotEmpty)
                           ? null
                           : Center(
                               child: Text(
@@ -309,7 +325,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: AppColors.backgroundPrimary,
                               borderRadius: BorderRadius.circular(4),
@@ -332,7 +349,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       GestureDetector(
                         onTap: () {
                           // ✅ تحديث البيانات عند العودة من شاشة التعديل
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()))
+                          Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const EditProfileScreen()))
                               .then((_) => _loadUserData());
                         },
                         child: Container(
@@ -340,9 +361,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.backgroundPrimary,
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                            border: Border.all(
+                                color:
+                                    AppColors.textSecondary.withOpacity(0.1)),
                           ),
-                          child: Icon(LucideIcons.edit2, size: 16, color: AppColors.accentYellow),
+                          child: Icon(LucideIcons.edit2,
+                              size: 16, color: AppColors.accentYellow),
                         ),
                       ),
                   ],
@@ -358,52 +382,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.only(left: 8, bottom: 12),
                   child: Text(
                     "TEACHER CONTROLS",
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 2.0),
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 2.0),
                   ),
                 ),
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSecondary,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.accentYellow.withOpacity(0.2)),
+                    border: Border.all(
+                        color: AppColors.accentYellow.withOpacity(0.2)),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       // 1. طلبات الاشتراك
-                      _buildMenuItem(
-                        context,
-                        icon: LucideIcons.bellRing,
-                        title: "Incoming Requests",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentRequestsScreen()))
-                      ),
-                      Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.bellRing,
+                          title: "Incoming Requests",
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const StudentRequestsScreen()))),
+                      Divider(
+                          height: 1,
+                          color: AppColors.textSecondary.withOpacity(0.1)),
 
                       // 2. إدارة الطلاب
-                      _buildMenuItem(
-                        context,
-                        icon: LucideIcons.users,
-                        title: "My Students",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageStudentsScreen()))
-                      ),
-                      Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.users,
+                          title: "My Students",
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ManageStudentsScreen()))),
+                      Divider(
+                          height: 1,
+                          color: AppColors.textSecondary.withOpacity(0.1)),
 
                       // 3. فريق العمل
-                      _buildMenuItem(
-                        context,
-                        icon: LucideIcons.shieldCheck,
-                        title: "Manage Team",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageTeamScreen()))
-                      ),
-                      Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.shieldCheck,
+                          title: "Manage Team",
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ManageTeamScreen()))),
+                      Divider(
+                          height: 1,
+                          color: AppColors.textSecondary.withOpacity(0.1)),
 
                       // 4. الإحصائيات المالية
-                      _buildMenuItem(
-                        context,
-                        icon: LucideIcons.barChart2,
-                        title: "Financial Stats",
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FinancialStatsScreen()))
-                      ),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.barChart2,
+                          title: "Financial Stats",
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const FinancialStatsScreen()))),
                     ],
                   ),
                 ),
@@ -416,26 +458,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   padding: const EdgeInsets.only(left: 8, bottom: 12),
                   child: Text(
                     "ACCOUNT SETTINGS",
-                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 2.0),
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 2.0),
                   ),
                 ),
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.backgroundSecondary,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                    border: Border.all(
+                        color: AppColors.textSecondary.withOpacity(0.1)),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
-                      _buildMenuItem(context, icon: LucideIcons.user, title: "Edit Profile", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())).then((_) => _loadUserData())),
-                      Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
-                      _buildMenuItem(context, icon: LucideIcons.lock, title: "Change Password", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.user,
+                          title: "Edit Profile",
+                          onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          const EditProfileScreen()))
+                              .then((_) => _loadUserData())),
+                      Divider(
+                          height: 1,
+                          color: AppColors.textSecondary.withOpacity(0.1)),
+                      _buildMenuItem(context,
+                          icon: LucideIcons.lock,
+                          title: "Change Password",
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ChangePasswordScreen()))),
 
                       // ⚠️ إظهار "طلباتي" فقط للطالب
                       if (!_isTeacher) ...[
-                        Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
-                        _buildMenuItem(context, icon: LucideIcons.clipboardList, title: "My Requests", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyRequestsScreen()))),
+                        Divider(
+                            height: 1,
+                            color: AppColors.textSecondary.withOpacity(0.1)),
+                        _buildMenuItem(context,
+                            icon: LucideIcons.clipboardList,
+                            title: "My Requests",
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const MyRequestsScreen()))),
                       ],
                     ],
                   ),
@@ -448,40 +520,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.only(left: 8, bottom: 12),
                 child: Text(
                   "GENERAL",
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 2.0),
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 2.0),
                 ),
               ),
               Container(
                 decoration: BoxDecoration(
                   color: AppColors.backgroundSecondary,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                  border: Border.all(
+                      color: AppColors.textSecondary.withOpacity(0.1)),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
-                    _buildMenuItem(
-                      context,
-                      icon: LucideIcons.info,
-                      title: "App Information",
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DevInfoScreen()))
-                    ),
-                    Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
+                    _buildMenuItem(context,
+                        icon: LucideIcons.info,
+                        title: "App Information",
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const DevInfoScreen()))),
+                    Divider(
+                        height: 1,
+                        color: AppColors.textSecondary.withOpacity(0.1)),
 
                     // ✅ زر التبديل بين الوضعين النهاري والليلي
                     _buildMenuItem(
                       context,
-                      icon: AppState.isDark ? LucideIcons.moon : LucideIcons.sun,
-                      title: AppState.isDark ? "Dark Mode / الوضع الليلي" : "Light Mode / الوضع النهاري",
+                      icon:
+                          AppState.isDark ? LucideIcons.moon : LucideIcons.sun,
+                      title: AppState.isDark
+                          ? "Dark Mode / الوضع الليلي"
+                          : "Light Mode / الوضع النهاري",
                       onTap: _toggleThemeAndRestart,
                       trailing: Switch(
                         value: AppState.isDark,
                         // ✅ ألوان الوضع النشط (Dark Mode)
                         activeColor: AppColors.accentYellow,
-                        activeTrackColor: AppColors.accentYellow.withOpacity(0.4),
-                        
+                        activeTrackColor:
+                            AppColors.accentYellow.withOpacity(0.4),
+
                         // ✅ ألوان الوضع غير النشط (Light Mode)
-                        inactiveThumbColor: Colors.grey.shade600, 
+                        inactiveThumbColor: Colors.grey.shade600,
                         inactiveTrackColor: Colors.grey.shade300,
 
                         onChanged: (val) {
@@ -503,16 +587,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Text(
                     "DANGER ZONE",
                     style: TextStyle(
-                      fontSize: 10, 
-                      fontWeight: FontWeight.bold, 
-                      color: AppColors.error, 
-                      letterSpacing: 2.0
-                    ),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.error,
+                        letterSpacing: 2.0),
                   ),
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.05), // لون خلفية خفيف للأحمر
+                    color: AppColors.error
+                        .withOpacity(0.05), // لون خلفية خفيف للأحمر
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.error.withOpacity(0.3)),
                   ),
@@ -524,7 +608,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: LucideIcons.trash2,
                         title: "Delete My Account",
                         // أيقونة حمراء لتمييز الخطر
-                        trailing: Icon(LucideIcons.chevronRight, size: 18, color: AppColors.error),
+                        trailing: Icon(LucideIcons.chevronRight,
+                            size: 18, color: AppColors.error),
                         onTap: _deleteAccount, // استدعاء دالة الحذف
                       ),
                     ],
@@ -539,30 +624,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isGuest ? AppColors.accentYellow : AppColors.error.withOpacity(0.1),
+                    color: isGuest
+                        ? AppColors.accentYellow
+                        : AppColors.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isGuest ? AppColors.accentYellow : AppColors.error.withOpacity(0.2)
-                    ),
+                        color: isGuest
+                            ? AppColors.accentYellow
+                            : AppColors.error.withOpacity(0.2)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        isGuest ? LucideIcons.logIn : LucideIcons.logOut,
-                        color: isGuest ? AppColors.backgroundPrimary : AppColors.error,
-                        size: 18
-                      ),
+                      Icon(isGuest ? LucideIcons.logIn : LucideIcons.logOut,
+                          color: isGuest
+                              ? AppColors.backgroundPrimary
+                              : AppColors.error,
+                          size: 18),
                       const SizedBox(width: 12),
-                      Text(
-                        isGuest ? "LOGIN / REGISTER" : "LOGOUT",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: isGuest ? AppColors.backgroundPrimary : AppColors.error,
-                          letterSpacing: 1.5
-                        )
-                      ),
+                      Text(isGuest ? "LOGIN / REGISTER" : "LOGOUT",
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isGuest
+                                  ? AppColors.backgroundPrimary
+                                  : AppColors.error,
+                              letterSpacing: 1.5)),
                     ],
                   ),
                 ),
@@ -576,7 +663,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ✅ دالة بناء العناصر
-  Widget _buildMenuItem(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap, String? badge, Widget? trailing}) {
+  Widget _buildMenuItem(BuildContext context,
+      {required IconData icon,
+      required String title,
+      required VoidCallback onTap,
+      String? badge,
+      Widget? trailing}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -590,26 +682,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.backgroundPrimary,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                  boxShadow: const [
+                    BoxShadow(color: Colors.black26, blurRadius: 2)
+                  ],
                 ),
                 child: Icon(icon, size: 18, color: AppColors.accentYellow),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                child: Text(title,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary)),
               ),
-
               if (trailing != null)
                 trailing
               else ...[
                 if (badge != null)
                   Container(
                     margin: const EdgeInsets.only(right: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(color: AppColors.accentOrange, borderRadius: BorderRadius.circular(50)),
-                    child: Text(badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: AppColors.accentOrange,
+                        borderRadius: BorderRadius.circular(50)),
+                    child: Text(badge,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
                   ),
-                Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondary),
+                Icon(LucideIcons.chevronRight,
+                    size: 18, color: AppColors.textSecondary),
               ]
             ],
           ),

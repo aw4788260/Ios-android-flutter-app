@@ -4,7 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart'; // ✅ ضروري لفتح الرابط
 import '../../core/constants/app_colors.dart';
-import 'course_details_screen.dart'; 
+import 'course_details_screen.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -39,11 +39,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             'x-device-id': deviceId,
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
         ),
       );
-      if (mounted) setState(() { _teacher = res.data; _loading = false; });
+      if (mounted)
+        setState(() {
+          _teacher = res.data;
+          _loading = false;
+        });
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,7 +57,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   Future<void> _launchWhatsApp(String phone) async {
     String cleanPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
     final Uri url = Uri.parse("https://wa.me/$cleanPhone");
-    
+
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         throw 'Could not launch $url';
@@ -61,7 +65,9 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not open WhatsApp"), backgroundColor: Colors.red),
+          const SnackBar(
+              content: Text("Could not open WhatsApp"),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -69,8 +75,17 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return Scaffold(backgroundColor: AppColors.backgroundPrimary, body: Center(child: CircularProgressIndicator(color: AppColors.accentYellow)));
-    if (_teacher == null) return Scaffold(backgroundColor: AppColors.backgroundPrimary, body: Center(child: Text("Error loading profile", style: TextStyle(color: AppColors.textPrimary))));
+    if (_loading)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          body: Center(
+              child: CircularProgressIndicator(color: AppColors.accentYellow)));
+    if (_teacher == null)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          body: Center(
+              child: Text("Error loading profile",
+                  style: TextStyle(color: AppColors.textPrimary))));
 
     final courses = List<Map<String, dynamic>>.from(_teacher!['courses'] ?? []);
 
@@ -93,9 +108,11 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                        border: Border.all(
+                            color: AppColors.textSecondary.withOpacity(0.1)),
                       ),
-                      child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                      child: Icon(LucideIcons.arrowLeft,
+                          color: AppColors.accentYellow, size: 20),
                     ),
                   ),
                 ),
@@ -109,9 +126,14 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                     color: AppColors.backgroundSecondary,
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.accentYellow, width: 2),
-                    boxShadow: [BoxShadow(color: AppColors.accentYellow.withOpacity(0.3), blurRadius: 20)],
+                    boxShadow: [
+                      BoxShadow(
+                          color: AppColors.accentYellow.withOpacity(0.3),
+                          blurRadius: 20)
+                    ],
                     // ✅ عرض الصورة إذا كانت موجودة
-                    image: (_teacher!['profile_image'] != null && _teacher!['profile_image'].toString().isNotEmpty)
+                    image: (_teacher!['profile_image'] != null &&
+                            _teacher!['profile_image'].toString().isNotEmpty)
                         ? DecorationImage(
                             image: NetworkImage(_teacher!['profile_image']),
                             fit: BoxFit.cover,
@@ -119,13 +141,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         : null,
                   ),
                   // ✅ عرض الأيقونة فقط إذا لم تكن هناك صورة
-                  child: (_teacher!['profile_image'] == null || _teacher!['profile_image'].toString().isEmpty)
-                      ? Icon(LucideIcons.user, size: 40, color: AppColors.textSecondary)
+                  child: (_teacher!['profile_image'] == null ||
+                          _teacher!['profile_image'].toString().isEmpty)
+                      ? Icon(LucideIcons.user,
+                          size: 40, color: AppColors.textSecondary)
                       : null,
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               Text(
                 _teacher!['name'].toString().toUpperCase(),
                 textAlign: TextAlign.center,
@@ -137,7 +161,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              
+
               Text(
                 _teacher!['specialty'] ?? 'INSTRUCTOR',
                 textAlign: TextAlign.center,
@@ -150,20 +174,26 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
               ),
 
               // ✅ (تمت الإضافة) زر الواتساب
-              if (_teacher!['whatsapp_number'] != null && 
+              if (_teacher!['whatsapp_number'] != null &&
                   _teacher!['whatsapp_number'].toString().isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Center(
                   child: ElevatedButton.icon(
-                    onPressed: () => _launchWhatsApp(_teacher!['whatsapp_number']),
-                    icon: const Icon(LucideIcons.messageCircle, color: Colors.white),
-                    label: const Text("Chat on WhatsApp", style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () =>
+                        _launchWhatsApp(_teacher!['whatsapp_number']),
+                    icon: const Icon(LucideIcons.messageCircle,
+                        color: Colors.white),
+                    label: const Text("Chat on WhatsApp",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366), // WhatsApp Green
+                      backgroundColor:
+                          const Color(0xFF25D366), // WhatsApp Green
                       foregroundColor: Colors.white,
                       elevation: 5,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30)),
                     ),
                   ),
                 ),
@@ -176,11 +206,14 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.backgroundSecondary,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                  border: Border.all(
+                      color: AppColors.textSecondary.withOpacity(0.1)),
                 ),
                 child: Column(
                   children: [
-                    Icon(LucideIcons.quote, color: AppColors.textSecondary.withOpacity(0.2), size: 32),
+                    Icon(LucideIcons.quote,
+                        color: AppColors.textSecondary.withOpacity(0.2),
+                        size: 32),
                     const SizedBox(height: 12),
                     Text(
                       _teacher!['bio'] ?? 'No bio available.',
@@ -198,12 +231,23 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
               // --- Courses Section ---
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Text("AVAILABLE COURSES", style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.5)),
+                child: Text("AVAILABLE COURSES",
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 1.5)),
               ),
               const SizedBox(height: 16),
 
               if (courses.isEmpty)
-                Center(child: Padding(padding: const EdgeInsets.all(20), child: Text("No courses found", style: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)))))
+                Center(
+                    child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text("No courses found",
+                            style: TextStyle(
+                                color:
+                                    AppColors.textSecondary.withOpacity(0.5)))))
               else
                 ListView.builder(
                   shrinkWrap: true,
@@ -214,8 +258,12 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                     final c = courses[index];
                     return GestureDetector(
                       onTap: () {
-                          // ✅ استخدام toString لتجنب مشاكل نوع البيانات
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => CourseDetailsScreen(courseCode: c['code']?.toString() ?? '')));
+                        // ✅ استخدام toString لتجنب مشاكل نوع البيانات
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => CourseDetailsScreen(
+                                    courseCode: c['code']?.toString() ?? '')));
                       },
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -223,7 +271,8 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.backgroundSecondary,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                          border: Border.all(
+                              color: AppColors.textSecondary.withOpacity(0.1)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -232,26 +281,30 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    c['title'] ?? 'Untitled', 
-                                    style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)
-                                  ),
+                                  Text(c['title'] ?? 'Untitled',
+                                      style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16)),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    "${c['price']} EGP", 
-                                    style: TextStyle(color: AppColors.accentYellow, fontSize: 12, fontWeight: FontWeight.bold)
-                                  ),
+                                  Text("${c['price']} EGP",
+                                      style: TextStyle(
+                                          color: AppColors.accentYellow,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
-                            Icon(LucideIcons.chevronRight, color: AppColors.textSecondary.withOpacity(0.4), size: 20),
+                            Icon(LucideIcons.chevronRight,
+                                color: AppColors.textSecondary.withOpacity(0.4),
+                                size: 20),
                           ],
                         ),
                       ),
                     );
                   },
                 ),
-              
+
               const SizedBox(height: 40),
             ],
           ),

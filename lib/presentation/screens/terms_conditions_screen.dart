@@ -77,8 +77,8 @@ class TermsConditionsScreen extends StatelessWidget {
                       _buildSection(
                         "3. المدفوعات والاسترداد",
                         "3. Payments & Refunds",
-                        "تخضع سياسة استرداد الأموال لطبيعة المدرس والمحتوى المقدم. يمكن في بعض الحالات استرداد المبلغ بعد مراجعة الإدارة.",
-                        "Refund policy is subject to the nature of the teacher and the content provided. In some cases, a refund may be issued after administration review."
+                        "تخضع أهلية الاسترداد وإجراءاته لسياسات مزود الدفع أو المنصة التي تم من خلالها إتمام المعاملة. في بعض الحالات، قد يتطلب الأمر مراجعة إضافية وفقًا لتلك السياسات.",
+                        "Refund eligibility and processing are subject to the policies of the applicable payment provider or platform used to complete the transaction. In some cases, additional review may be required in accordance with those policies."
                       ),
                     ],
                   ),

@@ -5,7 +5,7 @@
   "packages": [
     {
       "name": "Medaad",
-      "version": "1.0.0+3",
+      "version": "1.0.0+9",
       "dependencies": [
         "android_id",
         "audio_session",
@@ -92,6 +92,13 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "screen_protector",
+      "version": "1.5.1",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
@@ -337,13 +344,6 @@
         "uri_parser",
         "uuid",
         "web"
-      ]
-    },
-    {
-      "name": "screen_protector",
-      "version": "1.5.1",
-      "dependencies": [
-        "flutter"
       ]
     },
     {

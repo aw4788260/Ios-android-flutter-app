@@ -24,16 +24,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Future<void> _changePassword() async {
     // 1. التحقق من تطابق كلمة السر الجديدة قبل الإرسال
     if (_newPassController.text != _confirmPassController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text("Passwords do not match"), backgroundColor: AppColors.error)
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text("Passwords do not match"),
+          backgroundColor: AppColors.error));
       return;
     }
 
     if (_oldPassController.text.isEmpty || _newPassController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text("Please fill all fields"), backgroundColor: AppColors.error)
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text("Please fill all fields"),
+          backgroundColor: AppColors.error));
       return;
     }
 
@@ -61,7 +61,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           headers: {
             'Authorization': 'Bearer $token', // ✅ الهيدر الجديد
             'x-device-id': deviceId,
-            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
           },
           // لضمان استلام رسائل الخطأ من السيرفر حتى لو كان الكود 400 أو 401
           validateStatus: (status) => status! < 500,
@@ -71,16 +71,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (mounted) {
         // التحقق من نجاح العملية بناءً على رد السيرفر
         if (res.statusCode == 200 && res.data['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text("Password Updated Successfully"), backgroundColor: AppColors.success)
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text("Password Updated Successfully"),
+              backgroundColor: AppColors.success));
           Navigator.pop(context);
         } else {
           // عرض رسالة الخطأ القادمة من السيرفر (مثل: Incorrect old password)
-          String errorMsg = res.data['message'] ?? res.data['error'] ?? "Failed to update password";
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMsg), backgroundColor: AppColors.error)
-          );
+          String errorMsg = res.data['message'] ??
+              res.data['error'] ??
+              "Failed to update password";
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(errorMsg), backgroundColor: AppColors.error));
         }
       }
     } catch (e) {
@@ -90,8 +91,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           msg = e.response?.data['error'] ?? e.response?.data['message'] ?? msg;
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: AppColors.error)
-        );
+            SnackBar(content: Text(msg), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -117,37 +117,43 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.05)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4)
+                        ],
                       ),
-                      child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                      child: Icon(LucideIcons.arrowLeft,
+                          color: AppColors.accentYellow, size: 20),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Text(
                     "CHANGE PASSWORD",
                     style: TextStyle(
-                      fontSize: 20, 
-                      fontWeight: FontWeight.bold, 
-                      color: AppColors.textPrimary, 
-                      letterSpacing: -0.5
-                    ),
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5),
                   ),
                 ],
               ),
             ),
-            
+
             // Content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    _buildPasswordField("Current Password", "••••••••", _oldPassController),
+                    _buildPasswordField(
+                        "Current Password", "••••••••", _oldPassController),
                     const SizedBox(height: 20),
-                    _buildPasswordField("New Password", "Create new password", _newPassController),
+                    _buildPasswordField("New Password", "Create new password",
+                        _newPassController),
                     const SizedBox(height: 20),
-                    _buildPasswordField("Confirm New Password", "Confirm new password", _confirmPassController),
+                    _buildPasswordField("Confirm New Password",
+                        "Confirm new password", _confirmPassController),
                   ],
                 ),
               ),
@@ -164,23 +170,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     backgroundColor: AppColors.accentYellow,
                     foregroundColor: AppColors.backgroundPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 20),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
                     elevation: 10,
                     shadowColor: AppColors.accentYellow.withOpacity(0.2),
                   ),
-                  child: _isLoading 
-                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.backgroundPrimary, strokeWidth: 2))
-                    : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(LucideIcons.save, size: 18),
-                          SizedBox(width: 12),
-                          Text(
-                            "UPDATE PASSWORD", 
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)
-                          ),
-                        ],
-                      ),
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: AppColors.backgroundPrimary,
+                              strokeWidth: 2))
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(LucideIcons.save, size: 18),
+                            SizedBox(width: 12),
+                            Text("UPDATE PASSWORD",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1.0)),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -190,7 +203,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildPasswordField(String label, String hint, TextEditingController controller) {
+  Widget _buildPasswordField(
+      String label, String hint, TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -199,11 +213,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: Text(
             label.toUpperCase(),
             style: TextStyle(
-              fontSize: 10, 
-              fontWeight: FontWeight.bold, 
-              color: AppColors.accentYellow, 
-              letterSpacing: 1.5
-            ),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppColors.accentYellow,
+                letterSpacing: 1.5),
           ),
         ),
         Container(
@@ -217,11 +230,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             obscureText: true,
             style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
             decoration: InputDecoration(
-              prefixIcon: Icon(LucideIcons.lock, size: 18, color: AppColors.textSecondary),
+              prefixIcon: Icon(LucideIcons.lock,
+                  size: 18, color: AppColors.textSecondary),
               hintText: hint,
-              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+              hintStyle:
+                  TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: AppColors.accentYellow, width: 1),

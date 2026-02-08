@@ -29,24 +29,25 @@ class YoutubePlayerScreen extends StatefulWidget {
 }
 
 // ✅ إضافة Mixin لمراقبة حالة التطبيق
-class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsBindingObserver {
+class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
+    with WidgetsBindingObserver {
   late YoutubePlayerController _controller;
-  
+
   // ✅ متغيرات الحماية
   final AudioProtectionService _protectionService = AudioProtectionService();
   StreamSubscription? _recordingSubscription;
   bool _isRecordingDetected = false;
-   
+
   // متغيرات العلامة المائية
   Timer? _watermarkTimer;
   Alignment _watermarkAlignment = Alignment.topRight;
-  String _userIdText = ""; 
+  String _userIdText = "";
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this); // ✅ تفعيل المراقب
-    
+
     // ✅ 1. تفعيل وضع ملء الشاشة الأفقي
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     SystemChrome.setPreferredOrientations([
@@ -75,12 +76,13 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
           forceHD: false,
           isLive: false,
           loop: false,
-          enableCaption: false, 
-          disableDragSeek: false, 
+          enableCaption: false,
+          disableDragSeek: false,
         ),
       )..addListener(_playerListener);
     } catch (e, stack) {
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Youtube Player Init Error');
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Youtube Player Init Error');
     }
   }
 
@@ -89,37 +91,41 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     try {
       // منع Screenshot & Screen Recording
       // ✅ تم التصحيح هنا: استخدام FlutterWindowManagerPlus بدلاً من FlutterWindowManager
-      await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
-      
+      await FlutterWindowManagerPlus.addFlags(
+          FlutterWindowManagerPlus.FLAG_SECURE);
+
       // حظر التقاط الصوت
       await _protectionService.blockAudioCapture();
-      
+
       // بدء مراقبة تطبيقات التسجيل
       await _protectionService.startMonitoring();
-      
+
       // الاستماع لأي محاولة تسجيل
-      _recordingSubscription = _protectionService.recordingStateStream.listen((isRecording) {
+      _recordingSubscription =
+          _protectionService.recordingStateStream.listen((isRecording) {
         if (isRecording) {
           _handleRecordingDetected();
         }
       });
     } catch (e) {
-      FirebaseCrashlytics.instance.recordError(e, null, reason: 'Protection Init Error');
+      FirebaseCrashlytics.instance
+          .recordError(e, null, reason: 'Protection Init Error');
     }
   }
 
   // ✅ التعامل مع اكتشاف التسجيل (تم التعديل لإيقاف الصوت)
   void _handleRecordingDetected() {
     if (!mounted) return;
-    
+
     // حتى إذا تم الكشف مسبقاً، نتأكد من تطبيق الإيقاف مرة أخرى
     setState(() => _isRecordingDetected = true);
-    
+
     // 🛑 كتم الصوت وإيقاف الفيديو فوراً
     _controller.mute(); // كتم الصوت
     _controller.pause(); // إيقاف الفيديو
-    
-    FirebaseCrashlytics.instance.log("🚨 Security: Screen Recording Detected on YouTube Player! Muted & Paused.");
+
+    FirebaseCrashlytics.instance.log(
+        "🚨 Security: Screen Recording Detected on YouTube Player! Muted & Paused.");
   }
 
   // ✅ إعادة تفعيل الحماية عند العودة للتطبيق
@@ -129,32 +135,35 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
       _controller.pause();
     } else if (state == AppLifecycleState.resumed) {
       _protectionService.blockAudioCapture();
-      
+
       // إذا كان هناك تسجيل، نعيد تطبيق الحظر (كتم وإيقاف)
       if (_isRecordingDetected) {
-         _controller.mute();
-         _controller.pause();
+        _controller.mute();
+        _controller.pause();
       }
     }
   }
 
   void _playerListener() {
     if (_controller.value.hasError) {
-      FirebaseCrashlytics.instance.log("Youtube Player Error: ${_controller.value.errorCode}");
+      FirebaseCrashlytics.instance
+          .log("Youtube Player Error: ${_controller.value.errorCode}");
     }
-    
+
     // ✅ حارس إضافي: إذا كان الفيديو يعمل وهناك تسجيل، أوقفه
     if (_isRecordingDetected && _controller.value.isPlaying) {
-       _controller.pause();
-       _controller.mute();
+      _controller.pause();
+      _controller.mute();
     }
   }
 
   void _getUserId() {
     String displayText = '';
-      
+
     if (AppState().userData != null) {
-      displayText = AppState().userData!['phone'] ?? '';
+      displayText = AppState().userData!['phone'] == null
+          ? AppState().userData!['username'] ?? ''
+          : AppState().userData!['phone'] ?? '';
     }
 
     if (displayText.isEmpty) {
@@ -169,7 +178,7 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     }
 
     setState(() {
-      _userIdText = displayText.isNotEmpty ? displayText : 'User';
+      _userIdText = displayText.isNotEmpty ? displayText : 'Unknown User';
     });
   }
 
@@ -198,15 +207,16 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
     _recordingSubscription?.cancel();
     _protectionService.stopMonitoring();
     WakelockPlus.disable(); // ✅ إيقاف Wakelock
-    
+
     _watermarkTimer?.cancel();
     _controller.removeListener(_playerListener);
     _controller.dispose();
-      
+
     // استعادة وضع النظام الطبيعي
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values); 
-      
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
     super.dispose();
   }
 
@@ -247,15 +257,15 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6), 
+                  color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   _userIdText,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9), 
+                    color: Colors.white.withOpacity(0.9),
                     fontWeight: FontWeight.bold,
-                    fontSize: 11, 
+                    fontSize: 11,
                   ),
                 ),
               ),
@@ -277,12 +287,14 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
                         color: Colors.black54,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 20),
+                      child: const Icon(LucideIcons.arrowLeft,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: Colors.black54,
                       borderRadius: BorderRadius.circular(4),
@@ -311,11 +323,10 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
                   const Text(
                     "SECURITY ALERT",
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0
-                    ),
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -331,9 +342,11 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen> with WidgetsB
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.red.shade900,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 12),
                     ),
-                    child: const Text("CLOSE PLAYER", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text("CLOSE PLAYER",
+                        style: TextStyle(fontWeight: FontWeight.bold)),
                   )
                 ],
               ),

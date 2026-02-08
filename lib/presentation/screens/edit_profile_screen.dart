@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:image_picker/image_picker.dart'; 
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/services/app_state.dart'; 
+import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
-import '../../core/services/teacher_service.dart'; 
+import '../../core/services/teacher_service.dart';
 import '../widgets/custom_text_field.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -26,7 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _usernameController;
-   
+
   // حقول المدرس الإضافية
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _specialtyController = TextEditingController();
@@ -42,8 +42,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   bool _isLoading = false;
   bool _isTeacher = false;
-   
-  final TeacherService _teacherService = TeacherService(); 
+
+  final TeacherService _teacherService = TeacherService();
   final String _baseUrl = ApiConstants.baseUrl;
 
   @override
@@ -53,20 +53,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController();
     _phoneController = TextEditingController();
     _usernameController = TextEditingController();
-    
+
     // 2. بدء عملية التحقق من الدور وتحميل البيانات
     _checkRoleAndLoad();
   }
 
   // دالة لفحص الدور ثم استدعاء التحميل المناسب
   Future<void> _checkRoleAndLoad() async {
-      var box = await StorageService.openBox('auth_box');
-      if (mounted) {
-        setState(() {
-          _isTeacher = box.get('role') == 'teacher';
-        });
-        _loadUserData();
-      }
+    var box = await StorageService.openBox('auth_box');
+    if (mounted) {
+      setState(() {
+        _isTeacher = box.get('role') == 'teacher';
+      });
+      _loadUserData();
+    }
   }
 
   // ✅ الدالة الأساسية لجلب البيانات (من السيرفر للمدرس، أو محلياً للطالب)
@@ -77,26 +77,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_isTeacher) {
         // أ) محاولة جلب البيانات الأحدث من السيرفر
         final data = await _teacherService.getTeacherProfile();
-        
+
         // ب) تحديث الحقول النصية
         _nameController.text = data['name'] ?? "";
         _phoneController.text = data['phone'] ?? "";
         _usernameController.text = data['username'] ?? "";
-        
+
         _bioController.text = data['bio'] ?? "";
         _specialtyController.text = data['specialty'] ?? "";
         _whatsappController.text = data['whatsapp_number'] ?? "";
-        
+
         if (data['profile_image'] != null) {
           _currentImageUrl = data['profile_image'];
         }
 
         // ج) تعبئة قوائم الدفع الديناميكية
         final paymentDetails = data['payment_details'] ?? {};
-        _populateListControllers(_cashNumberControllers, paymentDetails['cash_numbers']);
-        _populateListControllers(_instapayNumberControllers, paymentDetails['instapay_numbers']);
-        _populateListControllers(_instapayLinkControllers, paymentDetails['instapay_links']);
-
+        _populateListControllers(
+            _cashNumberControllers, paymentDetails['cash_numbers']);
+        _populateListControllers(
+            _instapayNumberControllers, paymentDetails['instapay_numbers']);
+        _populateListControllers(
+            _instapayLinkControllers, paymentDetails['instapay_links']);
       } else {
         // للطالب: الاعتماد على البيانات المحلية + AppState
         await _loadFromCacheFallback();
@@ -106,9 +108,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // في حال الفشل (أوفلاين)، نلجأ للكاش
       await _loadFromCacheFallback();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not fetch latest data, showing cached version."), backgroundColor: Colors.orange)
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content:
+                Text("Could not fetch latest data, showing cached version."),
+            backgroundColor: Colors.orange));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -116,7 +119,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   // ✅ دالة مساعدة لتحويل مصفوفة البيانات إلى TextControllers
-  void _populateListControllers(List<TextEditingController> controllersList, dynamic dataList) {
+  void _populateListControllers(
+      List<TextEditingController> controllersList, dynamic dataList) {
     // تنظيف القديم
     for (var c in controllersList) c.dispose();
     controllersList.clear();
@@ -128,7 +132,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     }
-    
+
     // إضافة حقل فارغ افتراضي إذا كانت القائمة فارغة
     if (controllersList.isEmpty) {
       controllersList.add(TextEditingController());
@@ -138,29 +142,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // ✅ دالة التحميل من الكاش (الاحتياطية + AppState) المعدلة
   Future<void> _loadFromCacheFallback() async {
     var box = await StorageService.openBox('auth_box');
-    
+
     // ✅ التعديل: محاولة جلب البيانات من AppState أولاً (حيث توجد بيانات init-data)
     final userData = AppState().userData;
 
     // الأولية لـ AppState، ثم Hive، ثم قيمة فارغة
-    _nameController.text = userData?['first_name'] ?? userData?['name'] ?? box.get('first_name') ?? "";
-    
+    _nameController.text = userData?['first_name'] ??
+        userData?['name'] ??
+        box.get('first_name') ??
+        "";
+
     // ✅ هنا الإصلاح الأساسي لرقم الهاتف
     _phoneController.text = userData?['phone'] ?? box.get('phone') ?? "";
-    
-    _usernameController.text = userData?['username'] ?? box.get('username') ?? "";
-    
+
+    _usernameController.text =
+        userData?['username'] ?? box.get('username') ?? "";
+
     if (_isTeacher) {
       // للمدرسين أيضاً نستخدم نفس المنطق للبيانات الإضافية
       _bioController.text = userData?['bio'] ?? box.get('bio') ?? "";
-      _specialtyController.text = userData?['specialty'] ?? box.get('specialty') ?? "";
-      _whatsappController.text = userData?['whatsapp_number'] ?? box.get('whatsapp_number') ?? "";
-      
+      _specialtyController.text =
+          userData?['specialty'] ?? box.get('specialty') ?? "";
+      _whatsappController.text =
+          userData?['whatsapp_number'] ?? box.get('whatsapp_number') ?? "";
+
       _currentImageUrl = userData?['profile_image'] ?? box.get('profile_image');
-      
-      _populateListControllers(_cashNumberControllers, box.get('cash_numbers', defaultValue: []));
-      _populateListControllers(_instapayNumberControllers, box.get('instapay_numbers', defaultValue: []));
-      _populateListControllers(_instapayLinkControllers, box.get('instapay_links', defaultValue: []));
+
+      _populateListControllers(
+          _cashNumberControllers, box.get('cash_numbers', defaultValue: []));
+      _populateListControllers(_instapayNumberControllers,
+          box.get('instapay_numbers', defaultValue: []));
+      _populateListControllers(_instapayLinkControllers,
+          box.get('instapay_links', defaultValue: []));
     }
   }
 
@@ -176,7 +189,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    if (!_isTeacher) return; 
+    if (!_isTeacher) return;
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) setState(() => _selectedImage = File(image.path));
@@ -205,12 +218,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
 
-      List<String> cashList = _cashNumberControllers.map((c) => c.text.trim()).where((text) => text.isNotEmpty).toList();
-      List<String> instaNumList = _instapayNumberControllers.map((c) => c.text.trim()).where((text) => text.isNotEmpty).toList();
-      List<String> instaLinkList = _instapayLinkControllers.map((c) => c.text.trim()).where((text) => text.isNotEmpty).toList();
+      List<String> cashList = _cashNumberControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+      List<String> instaNumList = _instapayNumberControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+      List<String> instaLinkList = _instapayLinkControllers
+          .map((c) => c.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
 
       Map<String, dynamic> dataToSend = {
-        'firstName': _nameController.text, 
+        'firstName': _nameController.text,
         'phone': _phoneController.text,
         'username': _usernameController.text,
       };
@@ -224,14 +246,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         dataToSend['instapayLinksList'] = instaLinkList;
 
         if (_selectedImage != null) {
-           String newImageUrl = await _teacherService.uploadProfileImage(_selectedImage!);
-           dataToSend['profileImage'] = newImageUrl;
-           _currentImageUrl = newImageUrl;
+          String newImageUrl =
+              await _teacherService.uploadProfileImage(_selectedImage!);
+          dataToSend['profileImage'] = newImageUrl;
+          _currentImageUrl = newImageUrl;
         }
       }
 
-      String endpoint = _isTeacher 
-          ? '$_baseUrl/api/teacher/update-profile' 
+      String endpoint = _isTeacher
+          ? '$_baseUrl/api/teacher/update-profile'
           : '$_baseUrl/api/student/update-profile';
 
       final res = await Dio().post(
@@ -240,7 +263,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': const String.fromEnvironment('APP_SECRET'), 
+          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
         }),
       );
 
@@ -250,15 +273,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           AppState().userData!['username'] = _usernameController.text;
           AppState().userData!['phone'] = _phoneController.text;
           if (_isTeacher && dataToSend.containsKey('profileImage')) {
-             AppState().userData!['profile_image'] = dataToSend['profileImage'];
+            AppState().userData!['profile_image'] = dataToSend['profileImage'];
           }
         }
-        
+
         // تحديث الكاش المحلي
         await box.put('first_name', _nameController.text);
         await box.put('username', _usernameController.text);
         await box.put('phone', _phoneController.text);
-        
+
         if (_isTeacher) {
           await box.put('bio', _bioController.text);
           await box.put('specialty', _specialtyController.text);
@@ -267,22 +290,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           await box.put('cash_numbers', cashList);
           await box.put('instapay_numbers', instaNumList);
           await box.put('instapay_links', instaLinkList);
-          
-          if (dataToSend.containsKey('profileImage')) await box.put('profile_image', dataToSend['profileImage']);
+
+          if (dataToSend.containsKey('profileImage'))
+            await box.put('profile_image', dataToSend['profileImage']);
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Updated Successfully"), backgroundColor: AppColors.success));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text("Profile Updated Successfully"),
+              backgroundColor: AppColors.success));
           Navigator.pop(context);
         }
       }
     } catch (e) {
       if (mounted) {
         String errorMsg = "Failed to update profile";
-        if(e is DioException) {
-           errorMsg = e.response?.data['message'] ?? e.response?.data['error'] ?? errorMsg;
+        if (e is DioException) {
+          errorMsg = e.response?.data['message'] ??
+              e.response?.data['error'] ??
+              errorMsg;
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: AppColors.error));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(errorMsg), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -308,16 +337,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.05)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4)
+                        ],
                       ),
-                      child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                      child: Icon(LucideIcons.arrowLeft,
+                          color: AppColors.accentYellow, size: 20),
                     ),
                   ),
                   const SizedBox(width: 16),
                   Text(
                     "EDIT PROFILE",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary, letterSpacing: -0.5),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.5),
                   ),
                 ],
               ),
@@ -327,7 +364,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Form( 
+                child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,27 +376,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             child: Stack(
                               children: [
                                 Container(
-                                  width: 100, height: 100,
+                                  width: 100,
+                                  height: 100,
                                   decoration: BoxDecoration(
                                     color: AppColors.backgroundSecondary,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: AppColors.accentYellow, width: 2),
+                                    border: Border.all(
+                                        color: AppColors.accentYellow,
+                                        width: 2),
                                     image: _selectedImage != null
-                                        ? DecorationImage(image: FileImage(_selectedImage!), fit: BoxFit.cover)
-                                        : (_currentImageUrl != null && _currentImageUrl!.isNotEmpty
-                                            ? DecorationImage(image: NetworkImage(_currentImageUrl!), fit: BoxFit.cover)
+                                        ? DecorationImage(
+                                            image: FileImage(_selectedImage!),
+                                            fit: BoxFit.cover)
+                                        : (_currentImageUrl != null &&
+                                                _currentImageUrl!.isNotEmpty
+                                            ? DecorationImage(
+                                                image: NetworkImage(
+                                                    _currentImageUrl!),
+                                                fit: BoxFit.cover)
                                             : null),
                                   ),
-                                  child: (_selectedImage == null && (_currentImageUrl == null || _currentImageUrl!.isEmpty))
-                                      ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                                  child: (_selectedImage == null &&
+                                          (_currentImageUrl == null ||
+                                              _currentImageUrl!.isEmpty))
+                                      ? const Icon(Icons.person,
+                                          size: 50, color: Colors.grey)
                                       : null,
                                 ),
                                 Positioned(
-                                  bottom: 0, right: 0,
+                                  bottom: 0,
+                                  right: 0,
                                   child: Container(
                                     padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(color: AppColors.accentYellow, shape: BoxShape.circle),
-                                    child: const Icon(Icons.camera_alt, size: 16, color: Colors.black),
+                                    decoration: BoxDecoration(
+                                        color: AppColors.accentYellow,
+                                        shape: BoxShape.circle),
+                                    child: const Icon(Icons.camera_alt,
+                                        size: 16, color: Colors.black),
                                   ),
                                 ),
                               ],
@@ -367,53 +420,65 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        const Center(child: Text("Tap to change photo", style: TextStyle(color: Colors.grey, fontSize: 10))),
+                        const Center(
+                            child: Text("Tap to change photo",
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 10))),
                         const SizedBox(height: 20),
                       ],
-
                       CustomTextField(
                         label: "Full Name",
                         controller: _nameController,
                         hintText: "Enter your full name",
                         prefixIcon: LucideIcons.user,
-                        validator: (value) => value == null || value.isEmpty ? "Name is required" : null,
+                        validator: (value) => value == null || value.isEmpty
+                            ? "Name is required"
+                            : null,
                       ),
                       const SizedBox(height: 20),
-                      
                       CustomTextField(
                         label: "Phone Number",
                         controller: _phoneController,
                         hintText: "01xxxxxxxxx",
                         prefixIcon: LucideIcons.phone,
                         keyboardType: TextInputType.phone,
-                        validator: (value) => value == null || value.length < 11 ? "Invalid phone number" : null,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return null;
+                          return value.length < 11
+                              ? "Invalid phone number"
+                              : null;
+                        },
                       ),
                       const SizedBox(height: 20),
-                      
                       CustomTextField(
                         label: "Username",
                         controller: _usernameController,
                         hintText: "English letters & numbers only",
                         prefixIcon: LucideIcons.atSign,
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9]')),
                         ],
                         validator: (value) {
-                          if (value == null || value.isEmpty) return "Username is required";
+                          if (value == null || value.isEmpty)
+                            return "Username is required";
                           if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
                             return "Only English letters & numbers allowed (No spaces)";
                           }
                           return null;
                         },
                       ),
-                      
                       if (_isTeacher) ...[
                         const SizedBox(height: 20),
                         const Divider(color: Colors.white10),
                         const SizedBox(height: 10),
-                        Text("TEACHER INFO", style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                        Text("TEACHER INFO",
+                            style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5)),
                         const SizedBox(height: 15),
-                        
                         CustomTextField(
                           label: "Specialty / Job Title",
                           controller: _specialtyController,
@@ -421,7 +486,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           prefixIcon: LucideIcons.briefcase,
                         ),
                         const SizedBox(height: 20),
-
                         CustomTextField(
                           label: "WhatsApp Number (For Students)",
                           controller: _whatsappController,
@@ -430,11 +494,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           keyboardType: TextInputType.phone,
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(top: 6, left: 8, bottom: 20),
+                          padding: const EdgeInsets.only(
+                              top: 6, left: 8, bottom: 20),
                           // ✅ تم التعديل هنا: استخدام AppColors.textSecondary بدلاً من Colors.white38
-                          child: Text("Enter number with country code without '+' (e.g. 201xxxxxxxxx)", style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                          child: Text(
+                              "Enter number with country code without '+' (e.g. 201xxxxxxxxx)",
+                              style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11)),
                         ),
-                        
                         CustomTextField(
                           label: "Bio / About Me",
                           controller: _bioController,
@@ -443,41 +511,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           keyboardType: TextInputType.multiline,
                           maxLines: 3,
                         ),
-
                         const SizedBox(height: 30),
                         const Divider(color: Colors.white10),
                         const SizedBox(height: 10),
-                        Text("PAYMENT METHODS", style: TextStyle(color: AppColors.accentYellow, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                        Text("PAYMENT METHODS",
+                            style: TextStyle(
+                                color: AppColors.accentYellow,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5)),
                         const SizedBox(height: 20),
-
                         _buildDynamicList(
                           title: "Cash Wallet Numbers",
                           controllers: _cashNumberControllers,
                           hint: "Enter Wallet Number",
                           onAdd: () => _addController(_cashNumberControllers),
-                          onRemove: (idx) => _removeController(_cashNumberControllers, idx),
+                          onRemove: (idx) =>
+                              _removeController(_cashNumberControllers, idx),
                           icon: Icons.account_balance_wallet,
                           isNumeric: true,
                         ),
                         const SizedBox(height: 24),
-
                         _buildDynamicList(
                           title: "InstaPay Numbers",
                           controllers: _instapayNumberControllers,
                           hint: "Enter InstaPay Phone Number",
-                          onAdd: () => _addController(_instapayNumberControllers),
-                          onRemove: (idx) => _removeController(_instapayNumberControllers, idx),
+                          onAdd: () =>
+                              _addController(_instapayNumberControllers),
+                          onRemove: (idx) => _removeController(
+                              _instapayNumberControllers, idx),
                           icon: Icons.phone_iphone,
                           isNumeric: true,
                         ),
                         const SizedBox(height: 24),
-
                         _buildDynamicList(
                           title: "InstaPay Links / Usernames",
                           controllers: _instapayLinkControllers,
                           hint: "username@instapay or Link",
                           onAdd: () => _addController(_instapayLinkControllers),
-                          onRemove: (idx) => _removeController(_instapayLinkControllers, idx),
+                          onRemove: (idx) =>
+                              _removeController(_instapayLinkControllers, idx),
                           icon: LucideIcons.link,
                           isNumeric: false,
                         ),
@@ -499,20 +572,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     backgroundColor: AppColors.accentYellow,
                     foregroundColor: AppColors.backgroundPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 20),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
                     elevation: 10,
                     shadowColor: AppColors.accentYellow.withOpacity(0.2),
                   ),
-                  child: _isLoading 
-                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.backgroundPrimary))
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(LucideIcons.save, size: 18),
-                          SizedBox(width: 12),
-                          Text("SAVE CHANGES", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0)),
-                        ],
-                      ),
+                  child: _isLoading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: AppColors.backgroundPrimary))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(LucideIcons.save, size: 18),
+                            SizedBox(width: 12),
+                            Text("SAVE CHANGES",
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    letterSpacing: 1.0)),
+                          ],
+                        ),
                 ),
               ),
             ),
@@ -537,19 +619,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold)),
             InkWell(
               onTap: onAdd,
               child: Container(
                 padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: AppColors.accentOrange.withOpacity(0.2), shape: BoxShape.circle),
-                child: const Icon(Icons.add, color: AppColors.accentOrange, size: 18),
+                decoration: BoxDecoration(
+                    color: AppColors.accentOrange.withOpacity(0.2),
+                    shape: BoxShape.circle),
+                child: const Icon(Icons.add,
+                    color: AppColors.accentOrange, size: 18),
               ),
             )
           ],
         ),
         const SizedBox(height: 10),
-        
         ...List.generate(controllers.length, (index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
@@ -557,27 +645,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               children: [
                 Expanded(
                   child: CustomTextField(
-                    label: "", 
+                    label: "",
                     controller: controllers[index],
                     hintText: hint,
                     prefixIcon: icon,
-                    keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+                    keyboardType:
+                        isNumeric ? TextInputType.number : TextInputType.text,
                   ),
                 ),
                 const SizedBox(width: 10),
                 InkWell(
                   onTap: () => onRemove(index),
-                  child: const Icon(Icons.remove_circle_outline, color: AppColors.error, size: 24),
+                  child: const Icon(Icons.remove_circle_outline,
+                      color: AppColors.error, size: 24),
                 ),
               ],
             ),
           );
         }),
-        
         if (controllers.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 5),
-            child: Text("Click + to add a number/link", style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12, fontStyle: FontStyle.italic)),
+            child: Text("Click + to add a number/link",
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic)),
           ),
       ],
     );
