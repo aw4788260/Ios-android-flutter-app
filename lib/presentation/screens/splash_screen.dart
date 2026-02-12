@@ -224,7 +224,8 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (isGuest) {
         deviceId ??= 'guest_device_${DateTime.now().millisecondsSinceEpoch}';
-        await _initAsGuest(deviceId);
+        // ✅ تم تمرير box للدالة لتخزين الإعدادات
+        await _initAsGuest(deviceId, box);
         return;
       }
 
@@ -287,7 +288,8 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  Future<void> _initAsGuest(String deviceId) async {
+  // ✅ تم تحديث الدالة لاستقبال Box وحفظ freeMode
+  Future<void> _initAsGuest(String deviceId, Box box) async {
     try {
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
@@ -303,6 +305,10 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (response.statusCode == 200) {
         AppState().updateFromInitData(response.data);
+        
+        // ✅ حفظ حالة الوضع المجاني للزائر (الاسم القديم)
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+        await box.put('free_mode', serverFreeMode);
       }
     } catch (_) {
     } finally {
@@ -340,6 +346,10 @@ class _SplashScreenState extends State<SplashScreen>
       if (response.statusCode == 200 && response.data['success'] == true) {
         // ✅ 1. تحديث الحالة في الذاكرة الحية
         AppState().updateFromInitData(response.data);
+
+        // ✅ حفظ حالة الوضع المجاني باستخدام الاسم القديم (freeMode)
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+        await box.put('free_mode', serverFreeMode);
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
         // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ
