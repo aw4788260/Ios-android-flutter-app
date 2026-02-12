@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // ✅ إضافة مكتبة Hive
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/course_model.dart';
@@ -19,6 +20,11 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 1. قراءة حالة الوضع المجاني من الذاكرة المحلية
+    // (يتم فتح الصندوق في Splash Screen لذلك يمكن استدعاؤه مباشرة هنا)
+    final box = Hive.box('auth_box');
+    final bool isFreeMode = box.get('free_mode', defaultValue: false);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -51,20 +57,24 @@ class CourseCard extends StatelessWidget {
                   // صورة الخلفية
                   if (course.imageUrl != null && course.imageUrl!.isNotEmpty)
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(16)),
                       child: Image.network(
                         course.imageUrl!,
                         width: double.infinity,
                         height: 140,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(LucideIcons.image, color: Colors.white10, size: 48),
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Center(
+                          child: Icon(LucideIcons.image,
+                              color: Colors.white10, size: 48),
                         ),
                       ),
                     )
                   else
                     const Center(
-                      child: Icon(LucideIcons.image, color: Colors.white10, size: 48),
+                      child: Icon(LucideIcons.image,
+                          color: Colors.white10, size: 48),
                     ),
 
                   // Badge للمادة (يسار علوي)
@@ -72,7 +82,8 @@ class CourseCard extends StatelessWidget {
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(6),
@@ -89,22 +100,24 @@ class CourseCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ✅ التعديل الجديد: عرض كود الكورس بنفس ستايل الصفحة الرئيسية (أسفل يمين الصورة)
+                  // كود الكورس (أسفل يمين الصورة)
                   Positioned(
                     bottom: 8,
                     right: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        // خلفية سوداء نصف شفافة لضمان الوضوح فوق الصورة
                         color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.accentOrange.withOpacity(0.3), width: 0.5),
+                        border: Border.all(
+                            color: AppColors.accentOrange.withOpacity(0.3),
+                            width: 0.5),
                       ),
                       child: Text(
-                        "#${course.code}", 
+                        "#${course.code}",
                         style: const TextStyle(
-                          color: AppColors.accentOrange, // نفس اللون البرتقالي
+                          color: AppColors.accentOrange,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
@@ -123,20 +136,23 @@ class CourseCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.accentYellow, // لون مميز للتعديل
+                            color: AppColors.accentYellow,
                             shape: BoxShape.circle,
                             boxShadow: [
-                              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4),
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 4),
                             ],
                           ),
-                          child: const Icon(LucideIcons.edit2, size: 16, color: Colors.black),
+                          child: const Icon(LucideIcons.edit2,
+                              size: 16, color: Colors.black),
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            
+
             // 2. تفاصيل الكورس
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -155,18 +171,20 @@ class CourseCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  
+
                   Row(
                     children: [
-                      const Icon(LucideIcons.user, size: 14, color: AppColors.textSecondary),
+                      const Icon(LucideIcons.user,
+                          size: 14, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(
-                        course.instructorName, // ✅ تم التعديل ليطابق المودل الجديد
-                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        course.instructorName,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 12),
                   const Divider(color: Colors.white10),
                   const SizedBox(height: 12),
@@ -175,21 +193,33 @@ class CourseCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "${course.fullPrice.toInt()} EGP", // ✅ تم التعديل ليطابق المودل الجديد
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      // ✅ منطق إخفاء السعر
+                      isFreeMode
+                          ? const Text(
+                              "Free Access",
+                              style: TextStyle(
+                                color: AppColors.success, // لون أخضر مميز
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            )
+                          : Text(
+                              "${course.fullPrice.toInt()} EGP",
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: AppColors.accentYellow,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(LucideIcons.arrowRight, size: 16, color: Colors.black),
+                        child: const Icon(LucideIcons.arrowRight,
+                            size: 16, color: Colors.black),
                       ),
                     ],
                   ),
