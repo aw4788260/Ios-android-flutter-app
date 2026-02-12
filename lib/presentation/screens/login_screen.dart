@@ -12,7 +12,6 @@ import '../../core/services/app_state.dart';
 import 'main_wrapper.dart';
 import 'register_screen.dart';
 import '../../core/services/storage_service.dart';
-// تأكد من أن المسارات صحيحة لمشروعك
 import '../../core/constants/api_constants.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -120,20 +119,19 @@ class _LoginScreenState extends State<LoginScreen> {
         await box.put('user_id', userMap['id'].toString());
         await box.put('username', userMap['username']);
         await box.put('first_name', userMap['firstName']);
-        await box.put('phone', userMap['phone'] ?? ''); // حفظ الهاتف إن وجد
+        await box.put('phone', userMap['phone'] ?? ''); 
         
-        // ✅ [هام جداً] حفظ نوع المستخدم (معلم/طالب)
+        // حفظ نوع المستخدم (معلم/طالب)
         await box.put('role', userMap['role']); 
 
-        // ✅ [تمت الإضافة] حفظ رابط صورة البروفايل إذا وجد (للمعلمين)
+        // حفظ رابط صورة البروفايل إذا وجد (للمعلمين)
         if (userMap['profileImage'] != null) {
            await box.put('profile_image', userMap['profileImage']);
         } else {
-           // حذف القيمة القديمة إذا لم تكن موجودة الآن
            await box.delete('profile_image');
         }
 
-        // ✅ حفظ التوكن القادم من السيرفر
+        // حفظ التوكن القادم من السيرفر
         if (data['token'] != null) {
           await box.put('jwt_token', data['token']);
         }
@@ -145,10 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
         // تحديث حالة التطبيق بالبيانات الجديدة
         AppState().updateUserData({
             ...userMap,
-            'profile_image': userMap['profileImage'] // التأكد من تمرير الصورة للذاكرة
+            'profile_image': userMap['profileImage'] 
         });
         
-        // جلب البيانات الأولية (مع تمرير التوكن ضمناً عبر الهيدرز المعدلة)
+        // جلب البيانات الأولية وحفظ إعدادات الوضع المجاني
         await _fetchInitData(deviceId);
 
         if (mounted) {
@@ -187,6 +185,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
+
+        // ✅ [تعديل] معالجة الوضع المجاني للضيف
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+        
+        // ⛔ إجبار الإغلاق للأندرويد
+        if (Platform.isAndroid) {
+          serverFreeMode = false;
+        }
+        
+        await box.put('free_mode', serverFreeMode);
       }
       
       await box.put('is_guest', true);
@@ -233,6 +241,16 @@ class _LoginScreenState extends State<LoginScreen> {
       
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
+
+        // ✅ [تعديل] استقبال المتغير باسم freeMode القديم وحفظه
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+
+        // ⛔ إجبار الإغلاق للأندرويد دائماً
+        if (Platform.isAndroid) {
+          serverFreeMode = false;
+        }
+
+        await box.put('free_mode', serverFreeMode);
       }
     } catch (e) {
       debugPrint("Init Data Error: $e");
