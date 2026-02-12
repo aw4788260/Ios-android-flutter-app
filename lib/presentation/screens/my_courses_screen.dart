@@ -22,6 +22,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   String _searchTerm = '';
   bool _isTeacher = false;
   bool _isUpdating = false;
+  bool _isFreeMode = false; // ✅ متغير لحفظ حالة الوضع المجاني
    
   // ✅ تعريف خدمة المدرس
   final TeacherService _teacherService = TeacherService();
@@ -35,9 +36,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   Future<void> _checkUserRole() async {
     var box = await StorageService.openBox('auth_box');
     String? role = box.get('role');
+    bool freeMode = box.get('free_mode', defaultValue: false); // ✅ قراءة الوضع من التخزين
+    
     if (mounted) {
       setState(() {
         _isTeacher = role == 'teacher';
+        _isFreeMode = freeMode; // ✅ تحديث الحالة
       });
     }
   }
@@ -658,14 +662,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                "${course.fullPrice.toInt()} EGP", 
-                                style: TextStyle(
-                                  color: AppColors.accentYellow,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              // ✅ هنا التعديل: إخفاء السعر فقط إذا كان الوضع المجاني مفعلاً
+                              if (!_isFreeMode)
+                                Text(
+                                  "${course.fullPrice.toInt()} EGP", 
+                                  style: TextStyle(
+                                    color: AppColors.accentYellow,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ],
