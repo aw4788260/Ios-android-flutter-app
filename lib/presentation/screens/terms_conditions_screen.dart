@@ -74,11 +74,12 @@ class TermsConditionsScreen extends StatelessWidget {
                       ),
                       Divider(color: AppColors.textSecondary.withOpacity(0.1), height: 40),
 
+                      // ✅ تم التعديل هنا لإزالة أي ذكر للدفع
                       _buildSection(
-                        "3. المدفوعات والاسترداد",
-                        "3. Payments & Refunds",
-                        "تخضع سياسة استرداد الأموال لطبيعة المدرس والمحتوى المقدم. يمكن في بعض الحالات استرداد المبلغ بعد مراجعة الإدارة.",
-                        "Refund policy is subject to the nature of the teacher and the content provided. In some cases, a refund may be issued after administration review."
+                        "3. الوصول للمحتوى",
+                        "3. Content Access",
+                        "يتم تفعيل الوصول للمحتوى التعليمي (الكورسات والمواد) عن طريق الإدارة أو أكواد التفعيل المخصصة. تحتفظ الإدارة بحق تنظيم الوصول وإدارة الصلاحيات.",
+                        "Access to educational content (courses and subjects) is activated via administration or specific activation codes. The administration reserves the right to regulate access and manage permissions."
                       ),
                     ],
                   ),
