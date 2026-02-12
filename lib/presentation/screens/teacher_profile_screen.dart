@@ -19,11 +19,23 @@ class TeacherProfileScreen extends StatefulWidget {
 class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   Map<String, dynamic>? _teacher;
   bool _loading = true;
+  bool _isFreeMode = false; // ✅ متغير لحفظ حالة الوضع المجاني
 
   @override
   void initState() {
     super.initState();
+    _checkFreeMode(); // ✅ التحقق من الوضع
     _fetchTeacher();
+  }
+
+  // ✅ دالة التحقق من الوضع المجاني
+  Future<void> _checkFreeMode() async {
+    var box = await StorageService.openBox('auth_box');
+    if (mounted) {
+      setState(() {
+        _isFreeMode = box.get('free_mode', defaultValue: false);
+      });
+    }
   }
 
   Future<void> _fetchTeacher() async {
@@ -149,7 +161,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 ),
               ),
 
-              // ✅ (تمت الإضافة) زر الواتساب
+              // ✅ زر الواتساب
               if (_teacher!['whatsapp_number'] != null && 
                   _teacher!['whatsapp_number'].toString().isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -236,11 +248,15 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                                     c['title'] ?? 'Untitled', 
                                     style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "${c['price']} EGP", 
-                                    style: TextStyle(color: AppColors.accentYellow, fontSize: 12, fontWeight: FontWeight.bold)
-                                  ),
+                                  
+                                  // ✅ التعديل: إخفاء السعر إذا كان الوضع المجاني مفعلاً
+                                  if (!_isFreeMode) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "${c['price']} EGP", 
+                                      style: TextStyle(color: AppColors.accentYellow, fontSize: 12, fontWeight: FontWeight.bold)
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
