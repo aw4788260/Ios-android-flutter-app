@@ -4,7 +4,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import 'checkout_screen.dart';
-import 'teacher_profile_screen.dart'; 
+import 'teacher_profile_screen.dart';
+import 'login_screen.dart'; // ✅ استيراد صفحة الدخول
 import '../../core/services/storage_service.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -22,23 +23,46 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
   List<String> _selectedSubjectIds = [];
   bool _isFullCourse = false;
   final String _baseUrl = ApiConstants.baseUrl;
-   
-  bool _isTeacher = false; // ✅ متغير لحفظ الدور
+
+  bool _isTeacher = false;
+  bool _isFreeMode = false; // ✅ متغير الوضع المجاني
+  bool _enrolling = false; // ✅ حالة التحميل عند التفعيل
+
+  // 🔒 كلمة السر المتطابقة مع الباك اند
+  static const String _activationSecret = "Medaad_Free_Activation_2026_Secure";
 
   @override
   void initState() {
     super.initState();
-    _checkUserRole(); // ✅ التحقق من الدور
-    _fetchDetails();
+    _checkAccess(); // ✅ التحقق من الصلاحيات والوضع
   }
 
-  Future<void> _checkUserRole() async {
+  Future<void> _checkAccess() async {
     var box = await StorageService.openBox('auth_box');
+    
+    // 1. التحقق من الزائر (Guest Check)
+    bool isGuest = box.get('is_guest', defaultValue: false);
+    if (isGuest) {
+      if (mounted) {
+         // توجيه الزائر لصفحة الدخول فوراً
+         Navigator.pushReplacement(
+           context, 
+           MaterialPageRoute(builder: (_) => const LoginScreen())
+         );
+      }
+      return;
+    }
+
+    // 2. التحقق من الدور والوضع المجاني
     String? role = box.get('role');
+    bool freeMode = box.get('free_mode', defaultValue: false);
+
     if (mounted) {
       setState(() {
         _isTeacher = role == 'teacher';
+        _isFreeMode = freeMode;
       });
+      _fetchDetails();
     }
   }
 
@@ -69,6 +93,65 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
     }
   }
 
+  // ✅ دالة التفعيل المجاني المباشر
+  Future<void> _enrollFree() async {
+    setState(() => _enrolling = true);
+    try {
+      var box = await StorageService.openBox('auth_box');
+      String? token = box.get('jwt_token');
+      String? deviceId = box.get('device_id');
+      String? userId = box.get('user_id');
+
+      // تجهيز البيانات المختارة
+      List<Map<String, dynamic>> selectedItems = [];
+      if (_isFullCourse) {
+        selectedItems.add({'id': _courseData!['id'], 'type': 'course'});
+      } else {
+        for (var sub in _courseData!['subjects']) {
+          if (_selectedSubjectIds.contains(sub['id'].toString())) {
+            selectedItems.add({'id': sub['id'], 'type': 'subject'});
+          }
+        }
+      }
+
+      if (selectedItems.isEmpty) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select items first")));
+         setState(() => _enrolling = false);
+         return;
+      }
+
+      final res = await Dio().post(
+        '$_baseUrl/api/student/enroll-free', // تأكد أن هذا المسار موجود في الباك اند
+        data: {'items': selectedItems},
+        options: Options(headers: {
+          'Authorization': 'Bearer $token',
+          'x-device-id': deviceId,
+          'x-user-id': userId,
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          'x-free-secret': _activationSecret, // ✅ إرسال كلمة السر في الهيدر
+        }),
+      );
+
+      if (res.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Activation Successful! ✅"), backgroundColor: AppColors.success)
+        );
+        // إعادة تحميل الصفحة لتحديث الحالة إلى المملوكة
+        _fetchDetails(); 
+        setState(() {
+           _selectedSubjectIds.clear();
+           _isFullCourse = false;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to activate. Try again."), backgroundColor: AppColors.error)
+      );
+    } finally {
+      setState(() => _enrolling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return Scaffold(backgroundColor: AppColors.backgroundPrimary, body: Center(child: CircularProgressIndicator(color: AppColors.accentYellow)));
@@ -77,7 +160,6 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
     final course = _courseData!;
     final teacher = course['teacher'] ?? {};
     final String teacherName = teacher['name'] ?? "Unknown Instructor";
-    // نستخدم هذا المتغير لصفحة البروفايل (String)
     final String? teacherIdString = teacher['id']?.toString(); 
 
     final subjects = List<Map<String, dynamic>>.from(course['subjects'] ?? []);
@@ -149,7 +231,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                       ),
                       const SizedBox(height: 20),
                       
-                      // ✅ تصميم جديد وأنيق لبطاقة المدرس (New Elegant Instructor Card)
+                      // Instructor Card
                       GestureDetector(
                         onTap: () {
                           if (teacherIdString != null && teacherIdString.isNotEmpty) {
@@ -173,7 +255,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                             border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min, // تأخذ حجم المحتوى فقط
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
                                 width: 40, height: 40,
@@ -223,7 +305,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                       
                       const SizedBox(height: 40),
 
-                      // ✅ إذا كان المستخدم مدرساً: إخفاء خيارات الشراء وعرض رسالة
+                      // ✅ للمعلمين: إخفاء كل شيء
                       if (_isTeacher) 
                         Container(
                           padding: const EdgeInsets.all(24),
@@ -251,8 +333,11 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                           ),
                         )
                       else ...[
-                        // الكود الأصلي لخيارات الشراء (يظهر فقط للطلاب)
-                        Text("PURCHASE OPTIONS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accentYellow, letterSpacing: 2.0)),
+                        // ✅ تغيير النص ليكون عاماً
+                        Text(
+                          _isFreeMode ? "COURSE CONTENT" : "PURCHASE OPTIONS", 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.accentYellow, letterSpacing: 2.0)
+                        ),
                         const SizedBox(height: 20),
 
                         // 1. Full Course Option
@@ -277,12 +362,15 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text("FULL COURSE ACCESS", style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+                                      // ✅ نصوص عامة
+                                      Text(_isFreeMode ? "FULL COURSE" : "FULL COURSE ACCESS", style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                                       const SizedBox(height: 4),
                                       Text("Access all subjects & exams", style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                                     ],
                                   ),
-                                  Text("$fullPrice EGP", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.w900, fontSize: 18)),
+                                  // ✅ إخفاء السعر
+                                  if (!_isFreeMode)
+                                    Text("$fullPrice EGP", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.w900, fontSize: 18)),
                                 ],
                               ),
                             ),
@@ -360,7 +448,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                                     ),
                                     if (isOwned || isCourseOwned)
                                       Text("OWNED", style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold))
-                                    else
+                                    else if (!_isFreeMode) // ✅ إخفاء السعر هنا
                                       Text("${sub['price']} EGP", style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
@@ -368,7 +456,7 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
                             );
                           }),
                         ],
-                      ], // نهاية الشرط (else)
+                      ], // نهاية else (not teacher)
                     ],
                   ),
                 ),
@@ -376,76 +464,91 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen> {
             ],
           ),
 
-          // --- Bottom Checkout Bar ---
-          // ✅ إخفاء الشريط السفلي تماماً إذا كان المستخدم مدرساً
-          if (currentPrice > 0 && !_isTeacher)
-            Positioned(
-              bottom: 0, left: 0, right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundSecondary,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  border: Border(top: BorderSide(color: AppColors.textSecondary.withOpacity(0.1))),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5))],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("TOTAL PAYABLE", style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                        const SizedBox(height: 4),
-                        Text("$currentPrice EGP", style: TextStyle(color: AppColors.accentYellow, fontSize: 24, fontWeight: FontWeight.w900)),
-                      ],
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        List<Map<String, dynamic>> selectedItems = [];
-                        if (_isFullCourse) {
-                          selectedItems.add({'id': course['id'], 'type': 'course', 'title': course['title'], 'price': fullPrice});
-                        } else {
-                          for (var sub in subjects) {
-                            if (_selectedSubjectIds.contains(sub['id'].toString())) {
-                              selectedItems.add({'id': sub['id'], 'type': 'subject', 'title': sub['title'], 'price': sub['price']});
-                            }
-                          }
-                        }
-                        
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CheckoutScreen(
-                              amount: currentPrice,
-                              paymentInfo: Map<String, dynamic>.from(course['paymentInfo'] ?? {}),
-                              selectedItems: selectedItems,
-                              // ✅ التعديل هنا: تمرير teacherId
-                              teacherId: teacher['id'], 
-                            ),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.accentYellow,
-                        foregroundColor: AppColors.backgroundPrimary,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      child: Row(
-                        children: const [
-                          Text("CHECKOUT", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.0)),
-                          SizedBox(width: 8),
-                          Icon(LucideIcons.arrowRight, size: 18),
+          // --- Bottom Action Bar ---
+          // يظهر الشريط إذا تم اختيار عناصر (أو الوضع الطبيعي) وليس معلماً
+          if (((_isFullCourse || _selectedSubjectIds.isNotEmpty) || !_isFreeMode) && !_isTeacher)
+            if (currentPrice > 0 || _isFreeMode) // شرط إضافي: إما هناك سعر (عادي) أو وضع مجاني
+              Positioned(
+                bottom: 0, left: 0, right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    border: Border(top: BorderSide(color: AppColors.textSecondary.withOpacity(0.1))),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, -5))],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // القسم الأيسر: السعر أو رسالة التفعيل
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!_isFreeMode) ...[
+                            Text("TOTAL PAYABLE", style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                            const SizedBox(height: 4),
+                            Text("$currentPrice EGP", style: TextStyle(color: AppColors.accentYellow, fontSize: 24, fontWeight: FontWeight.w900)),
+                          ] else 
+                             Text("Free Activation", style: TextStyle(color: AppColors.success, fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                    ),
-                  ],
+                      
+                      // الزر: إما Checkout أو Activate
+                      ElevatedButton(
+                        onPressed: _enrolling ? null : () {
+                           // ✅ 1. الوضع المجاني: تفعيل مباشر
+                           if (_isFreeMode) {
+                              _enrollFree();
+                           } 
+                           // ✅ 2. الوضع العادي: الذهاب للدفع
+                           else {
+                              List<Map<String, dynamic>> selectedItems = [];
+                              if (_isFullCourse) {
+                                selectedItems.add({'id': course['id'], 'type': 'course', 'title': course['title'], 'price': fullPrice});
+                              } else {
+                                for (var sub in subjects) {
+                                  if (_selectedSubjectIds.contains(sub['id'].toString())) {
+                                    selectedItems.add({'id': sub['id'], 'type': 'subject', 'title': sub['title'], 'price': sub['price']});
+                                  }
+                                }
+                              }
+                              
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CheckoutScreen(
+                                    amount: currentPrice,
+                                    paymentInfo: Map<String, dynamic>.from(course['paymentInfo'] ?? {}),
+                                    selectedItems: selectedItems,
+                                    teacherId: teacher['id'], 
+                                  ),
+                                ),
+                              );
+                           }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFreeMode ? AppColors.success : AppColors.accentYellow, // لون مختلف
+                          foregroundColor: AppColors.backgroundPrimary,
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 0,
+                        ),
+                        child: _enrolling 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Row(
+                            children: [
+                              Text(_isFreeMode ? "ACTIVATE" : "CHECKOUT", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.0)),
+                              const SizedBox(width: 8),
+                              Icon(_isFreeMode ? LucideIcons.unlock : LucideIcons.arrowRight, size: 18),
+                            ],
+                          ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
         ],
       ),
     );
