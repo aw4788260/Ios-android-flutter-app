@@ -1,7 +1,7 @@
 name: Medaad
 description: Modern Learning Platform (Dark Slate Design)
 publish_to: 'none'
-version: 1.0.0+9
+version: 1.0.0+14
 
 environment:
   sdk: '>=3.2.3 <4.0.0'
@@ -81,6 +81,7 @@ dependencies:
   shelf: ^1.4.2
   shelf_router: ^1.1.4
   screen_protector: ^1.5.1
+  secure_display: ^0.1.1
 
 dev_dependencies:
   flutter_test:

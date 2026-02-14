@@ -211,8 +211,7 @@ class DownloadManager with WidgetsBindingObserver {
       // ✅ استخراج التوكن والبصمة
       final deviceId = box.get('device_id');
       final token = box.get('jwt_token');
-      const String appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
-      //String.fromEnvironment('APP_SECRET');
+      const String appSecret = const String.fromEnvironment('APP_SECRET');
 
       // ✅ بناء الهيدرز الموحدة
       final Map<String, dynamic> requestHeaders = {

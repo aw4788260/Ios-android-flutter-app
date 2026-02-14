@@ -117,7 +117,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         },
         options: Options(
           headers: {
-            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
           validateStatus: (status) => status! < 500,
         ),
@@ -240,7 +240,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              _buildInputLabel("Phone Number"),
+              _buildInputLabel("Phone Number (Optional)"),
               const SizedBox(height: 4),
               _buildTextField(
                 controller: _phoneController,

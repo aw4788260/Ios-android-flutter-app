@@ -74,11 +74,12 @@ class TermsConditionsScreen extends StatelessWidget {
                       ),
                       Divider(color: AppColors.textSecondary.withOpacity(0.1), height: 40),
 
+                      // ✅ تم التعديل هنا لإزالة أي ذكر للدفع
                       _buildSection(
-                        "3. المدفوعات والاسترداد",
-                        "3. Payments & Refunds",
-                        "تخضع أهلية الاسترداد وإجراءاته لسياسات مزود الدفع أو المنصة التي تم من خلالها إتمام المعاملة. في بعض الحالات، قد يتطلب الأمر مراجعة إضافية وفقًا لتلك السياسات.",
-                        "Refund eligibility and processing are subject to the policies of the applicable payment provider or platform used to complete the transaction. In some cases, additional review may be required in accordance with those policies."
+                        "3. الوصول للمحتوى",
+                        "3. Content Access",
+                        "يتم تفعيل الوصول للمحتوى التعليمي (الكورسات والمواد) عن طريق الإدارة أو أكواد التفعيل المخصصة. تحتفظ الإدارة بحق تنظيم الوصول وإدارة الصلاحيات.",
+                        "Access to educational content (courses and subjects) is activated via administration or specific activation codes. The administration reserves the right to regulate access and manage permissions."
                       ),
                     ],
                   ),

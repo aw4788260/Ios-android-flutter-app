@@ -61,7 +61,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           headers: {
             'Authorization': 'Bearer $token', // ✅ الهيدر الجديد
             'x-device-id': deviceId,
-            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
           // لضمان استلام رسائل الخطأ من السيرفر حتى لو كان الكود 400 أو 401
           validateStatus: (status) => status! < 500,

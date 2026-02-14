@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -19,11 +21,23 @@ class TeacherProfileScreen extends StatefulWidget {
 class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
   Map<String, dynamic>? _teacher;
   bool _loading = true;
+  bool _isFreeMode = false; // ✅ متغير لحفظ حالة الوضع المجاني
 
   @override
   void initState() {
     super.initState();
+    _checkFreeMode(); // ✅ التحقق من الوضع
     _fetchTeacher();
+  }
+
+  // ✅ دالة التحقق من الوضع المجاني
+  Future<void> _checkFreeMode() async {
+    var box = await StorageService.openBox('auth_box');
+    if (mounted) {
+      setState(() {
+        _isFreeMode = box.get('free_mode', defaultValue: false);
+      });
+    }
   }
 
   Future<void> _fetchTeacher() async {
@@ -39,7 +53,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             'x-device-id': deviceId,
-            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
         ),
       );
@@ -173,7 +187,7 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                 ),
               ),
 
-              // ✅ (تمت الإضافة) زر الواتساب
+              // ✅ زر الواتساب
               if (_teacher!['whatsapp_number'] != null &&
                   _teacher!['whatsapp_number'].toString().isNotEmpty) ...[
                 const SizedBox(height: 20),
@@ -286,12 +300,16 @@ class _TeacherProfileScreenState extends State<TeacherProfileScreen> {
                                           color: AppColors.textPrimary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16)),
-                                  const SizedBox(height: 4),
-                                  Text("${c['price']} EGP",
-                                      style: TextStyle(
-                                          color: AppColors.accentYellow,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold)),
+
+                                  // ✅ التعديل: إخفاء السعر إذا كان الوضع المجاني مفعلاً
+                                  if (!_isFreeMode) ...[
+                                    const SizedBox(height: 4),
+                                    Text("${c['price']} EGP",
+                                        style: TextStyle(
+                                            color: AppColors.accentYellow,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold)),
+                                  ],
                                 ],
                               ),
                             ),

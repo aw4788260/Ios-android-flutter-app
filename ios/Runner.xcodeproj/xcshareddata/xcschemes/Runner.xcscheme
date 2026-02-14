@@ -76,7 +76,7 @@
       <EnvironmentVariables>
          <EnvironmentVariable
             key = "APP_SECRET"
-            value = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only"
+            value = const String.fromEnvironment('APP_SECRET')
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>

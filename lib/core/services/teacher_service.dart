@@ -9,7 +9,7 @@ class TeacherService {
   final String baseUrl = ApiConstants.apiUrl;
 
   // يفضل تعريف Secret التطبيق هنا أو جلبه من البيئة لضمان المرور من حماية السيرفر
-  final String _appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
+  final String _appSecret = const String.fromEnvironment('APP_SECRET');
 
   // 🔒 دالة تجهيز الهيدر (Token + Device ID + App Secret)
   Future<Options> _getHeaders({bool isUpload = false}) async {

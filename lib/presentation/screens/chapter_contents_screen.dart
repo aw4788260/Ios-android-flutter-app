@@ -76,7 +76,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 
@@ -220,7 +220,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 
@@ -304,7 +304,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 
@@ -398,7 +398,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 

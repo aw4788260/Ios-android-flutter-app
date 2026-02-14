@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:Medaad/core/services/security_manager.dart';
+import 'package:Medaad/core/services/update_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
@@ -7,11 +9,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
-import '../../main.dart'; // ✅ استيراد ملف main.dart للوصول لكلاس الحماية
 import 'login_screen.dart';
 import 'main_wrapper.dart';
 import 'privacy_policy_screen.dart';
@@ -184,6 +186,19 @@ class _SplashScreenState extends State<SplashScreen>
       var box = await StorageService.openBox('auth_box');
       await StorageService.openBox('downloads_box');
 
+      final UpdateService _updateService = UpdateService();
+
+      final updateResult = await _updateService.checkUpdate();
+
+      if (!mounted) return;
+
+      if (updateResult.status != UpdateStatus.none) {
+        await _handleUpdate(updateResult);
+        if (updateResult.status == UpdateStatus.force) {
+          return;
+        }
+      }
+
       bool termsAccepted = box.get('terms_accepted', defaultValue: false);
       if (!termsAccepted) {
         await Future.delayed(const Duration(seconds: 1));
@@ -209,7 +224,8 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (isGuest) {
         deviceId ??= 'guest_device_${DateTime.now().millisecondsSinceEpoch}';
-        await _initAsGuest(deviceId);
+        // ✅ تم تمرير box للدالة لتخزين الإعدادات
+        await _initAsGuest(deviceId, box);
         return;
       }
 
@@ -243,7 +259,37 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  Future<void> _initAsGuest(String deviceId) async {
+  Future<void> _handleUpdate(UpdateResult result) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: result.status == UpdateStatus.optional,
+      builder: (_) => AlertDialog(
+        title: const Text("تحديث التطبيق"),
+        content: Text(result.message),
+        actions: [
+          if (result.status == UpdateStatus.optional)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // يقفل فقط
+              },
+              child: const Text("لاحقًا"),
+            ),
+          ElevatedButton(
+            onPressed: () async {
+              final uri = Uri.parse(result.storeUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            child: const Text("تحديث الآن"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ تم تحديث الدالة لاستقبال Box وحفظ freeMode
+  Future<void> _initAsGuest(String deviceId, Box box) async {
     try {
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
@@ -251,7 +297,7 @@ class _SplashScreenState extends State<SplashScreen>
           headers: {
             'x-user-id': '0',
             'x-device-id': deviceId,
-            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -259,6 +305,14 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (response.statusCode == 200) {
         AppState().updateFromInitData(response.data);
+
+        // ✅ حفظ حالة الوضع المجاني للزائر (الاسم القديم)
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+        if (Platform.isAndroid) {
+          await box.put('free_mode', false);
+        } else {
+          await box.put('free_mode', serverFreeMode);
+        }
       }
     } catch (_) {
     } finally {
@@ -287,7 +341,7 @@ class _SplashScreenState extends State<SplashScreen>
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             'x-device-id': deviceId,
-            'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+            'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -296,6 +350,14 @@ class _SplashScreenState extends State<SplashScreen>
       if (response.statusCode == 200 && response.data['success'] == true) {
         // ✅ 1. تحديث الحالة في الذاكرة الحية
         AppState().updateFromInitData(response.data);
+
+        // ✅ حفظ حالة الوضع المجاني باستخدام الاسم القديم (freeMode)
+        bool serverFreeMode = response.data['freeMode'] ?? false;
+        if (Platform.isAndroid) {
+          await box.put('free_mode', false);
+        } else {
+          await box.put('free_mode', serverFreeMode);
+        }
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
         // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ

@@ -1,3 +1,4 @@
+import 'package:Medaad/core/services/widgets/restart_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -114,7 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             headers: {
               'Authorization': 'Bearer $token',
               'x-device-id': deviceId,
-              'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+              'x-app-secret': const String.fromEnvironment('APP_SECRET'),
             },
             validateStatus: (status) => status! < 500,
           ),
@@ -170,7 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               headers: {
                 'Authorization': 'Bearer $token',
                 'x-device-id': deviceId,
-                'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+                'x-app-secret': const String.fromEnvironment('APP_SECRET'),
               },
               validateStatus: (status) => status! < 500,
               sendTimeout: const Duration(seconds: 3),

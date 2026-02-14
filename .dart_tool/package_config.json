@@ -482,6 +482,12 @@
       "languageVersion": "3.5"
     },
     {
+      "name": "get",
+      "rootUri": "file:///Users/mohamedhisham/.pub-cache/hosted/pub.dev/get-4.7.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
       "name": "get_it",
       "rootUri": "file:///Users/mohamedhisham/.pub-cache/hosted/pub.dev/get_it-9.2.0",
       "packageUri": "lib/",
@@ -936,6 +942,12 @@
       "rootUri": "file:///Users/mohamedhisham/.pub-cache/hosted/pub.dev/screen_protector-1.5.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "secure_display",
+      "rootUri": "file:///Users/mohamedhisham/.pub-cache/hosted/pub.dev/secure_display-0.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "shared_preferences",

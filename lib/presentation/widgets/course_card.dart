@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // ✅ إضافة مكتبة Hive
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
 import '../../data/models/course_model.dart';
@@ -19,6 +20,11 @@ class CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 1. قراءة حالة الوضع المجاني من الذاكرة المحلية
+    // (يتم فتح الصندوق في Splash Screen لذلك يمكن استدعاؤه مباشرة هنا)
+    final box = Hive.box('auth_box');
+    final bool isFreeMode = box.get('free_mode', defaultValue: false);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -94,7 +100,7 @@ class CourseCard extends StatelessWidget {
                     ),
                   ),
 
-                  // ✅ التعديل الجديد: عرض كود الكورس بنفس ستايل الصفحة الرئيسية (أسفل يمين الصورة)
+                  // كود الكورس (أسفل يمين الصورة)
                   Positioned(
                     bottom: 8,
                     right: 8,
@@ -102,7 +108,6 @@ class CourseCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        // خلفية سوداء نصف شفافة لضمان الوضوح فوق الصورة
                         color: Colors.black.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
@@ -112,7 +117,7 @@ class CourseCard extends StatelessWidget {
                       child: Text(
                         "#${course.code}",
                         style: const TextStyle(
-                          color: AppColors.accentOrange, // نفس اللون البرتقالي
+                          color: AppColors.accentOrange,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.0,
@@ -131,7 +136,7 @@ class CourseCard extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.accentYellow, // لون مميز للتعديل
+                            color: AppColors.accentYellow,
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
@@ -173,8 +178,7 @@ class CourseCard extends StatelessWidget {
                           size: 14, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(
-                        course
-                            .instructorName, // ✅ تم التعديل ليطابق المودل الجديد
+                        course.instructorName,
                         style: TextStyle(
                             color: AppColors.textSecondary, fontSize: 12),
                       ),
@@ -189,14 +193,25 @@ class CourseCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "${course.fullPrice.toInt()} EGP", // ✅ تم التعديل ليطابق المودل الجديد
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+                      // ✅ منطق إخفاء السعر
+                      isFreeMode
+                          ? const Text(
+                              "Free Access",
+                              style: TextStyle(
+                                color: AppColors.success, // لون أخضر مميز
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            )
+                          : Text(
+                              "${course.fullPrice.toInt()} EGP",
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(

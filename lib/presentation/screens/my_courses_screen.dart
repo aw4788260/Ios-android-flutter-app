@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_colors.dart';
@@ -22,7 +24,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   String _searchTerm = '';
   bool _isTeacher = false;
   bool _isUpdating = false;
-   
+  bool _isFreeMode = false; // ✅ متغير لحفظ حالة الوضع المجاني
+
   // ✅ تعريف خدمة المدرس
   final TeacherService _teacherService = TeacherService();
 
@@ -35,9 +38,13 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
   Future<void> _checkUserRole() async {
     var box = await StorageService.openBox('auth_box');
     String? role = box.get('role');
+    bool freeMode =
+        box.get('free_mode', defaultValue: false); // ✅ قراءة الوضع من التخزين
+
     if (mounted) {
       setState(() {
         _isTeacher = role == 'teacher';
+        _isFreeMode = freeMode; // ✅ تحديث الحالة
       });
     }
   }
@@ -60,7 +67,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
       // 2. إعادة تحميل حالة التطبيق العامة (والتي ستقرأ الآن الكاش المحدث)
       await AppState().reloadAppInit();
-
     } catch (e) {
       debugPrint("Error refreshing data: $e");
     } finally {
@@ -104,13 +110,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 48, height: 48,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           color: AppColors.backgroundSecondary,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.05)),
                         ),
-                        child: Icon(LucideIcons.lock, color: AppColors.textSecondary, size: 24),
+                        child: Icon(LucideIcons.lock,
+                            color: AppColors.textSecondary, size: 24),
                       ),
                       const SizedBox(width: 16),
                       Column(
@@ -148,10 +157,14 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.05)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 4)
+                        ],
                       ),
-                      child: Icon(LucideIcons.shoppingCart, color: AppColors.accentYellow, size: 22),
+                      child: Icon(LucideIcons.shoppingCart,
+                          color: AppColors.accentYellow, size: 22),
                     ),
                   ),
                 ],
@@ -164,7 +177,9 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(LucideIcons.shieldAlert, size: 64, color: AppColors.textSecondary.withOpacity(0.2)),
+                    Icon(LucideIcons.shieldAlert,
+                        size: 64,
+                        color: AppColors.textSecondary.withOpacity(0.2)),
                     const SizedBox(height: 24),
                     Text(
                       "LOGIN REQUIRED",
@@ -178,25 +193,32 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                     const SizedBox(height: 8),
                     Text(
                       "Sign in to access your purchased lessons.",
-                      style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 12),
+                      style: TextStyle(
+                          color: AppColors.textSecondary.withOpacity(0.7),
+                          fontSize: 12),
                     ),
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: () {
-                        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        Navigator.of(context, rootNavigator: true)
+                            .pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (context) => const LoginScreen()),
                           (route) => false,
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accentYellow,
                         foregroundColor: AppColors.backgroundPrimary,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                       child: const Text(
                         "LOGIN NOW",
-                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, letterSpacing: 1.0),
                       ),
                     ),
                   ],
@@ -227,13 +249,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 48, height: 48,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           color: AppColors.backgroundSecondary,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withOpacity(0.05)),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.05)),
                         ),
-                        child: Icon(LucideIcons.bookOpen, color: AppColors.accentYellow, size: 24),
+                        child: Icon(LucideIcons.bookOpen,
+                            color: AppColors.accentYellow, size: 24),
                       ),
                       const SizedBox(width: 16),
                       Column(
@@ -263,7 +288,7 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       ),
                     ],
                   ),
-                   
+
                   // Buttons
                   Row(
                     children: [
@@ -274,7 +299,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const ManageContentScreen(contentType: ContentType.course),
+                                builder: (_) => const ManageContentScreen(
+                                    contentType: ContentType.course),
                               ),
                             ).then((value) {
                               // ✅ عند العودة بنجاح (value == true)، نقوم بالتحديث
@@ -288,9 +314,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.accentYellow.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(50),
-                              border: Border.all(color: AppColors.accentYellow.withOpacity(0.5)),
+                              border: Border.all(
+                                  color:
+                                      AppColors.accentYellow.withOpacity(0.5)),
                             ),
-                            child: Icon(LucideIcons.plusSquare, color: AppColors.accentYellow, size: 22),
+                            child: Icon(LucideIcons.plusSquare,
+                                color: AppColors.accentYellow, size: 22),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -304,10 +333,14 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.backgroundSecondary,
                             borderRadius: BorderRadius.circular(50),
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
-                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.05)),
+                            boxShadow: const [
+                              BoxShadow(color: Colors.black26, blurRadius: 4)
+                            ],
                           ),
-                          child: Icon(LucideIcons.shoppingCart, color: AppColors.accentYellow, size: 22),
+                          child: Icon(LucideIcons.shoppingCart,
+                              color: AppColors.accentYellow, size: 22),
                         ),
                       ),
                     ],
@@ -315,11 +348,11 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 ],
               ),
             ),
-            
             if (_isUpdating)
               Expanded(
                 child: Center(
-                  child: CircularProgressIndicator(color: AppColors.accentYellow),
+                  child:
+                      CircularProgressIndicator(color: AppColors.accentYellow),
                 ),
               )
             else
@@ -341,14 +374,17 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                         itemCount: libraryItems.length,
                         itemBuilder: (context, index) {
                           final item = libraryItems[index];
-                           
+
                           final String title = item['title'] ?? 'Unknown';
-                          final String instructor = item['instructor'] ?? 'Instructor';
+                          final String instructor =
+                              item['instructor'] ?? 'Instructor';
                           final String code = item['code']?.toString() ?? '';
                           final String id = item['id'].toString();
-                           
+
                           final String description = item['description'] ?? '';
-                          final double localPrice = double.tryParse(item['price']?.toString() ?? '0') ?? 0.0;
+                          final double localPrice = double.tryParse(
+                                  item['price']?.toString() ?? '0') ??
+                              0.0;
 
                           List<dynamic>? subjectsToPass;
                           if (item['owned_subjects'] is List) {
@@ -364,15 +400,18 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                     courseId: id,
                                     courseTitle: title,
                                     courseCode: code,
-                                    instructorName: instructor, 
-                                    preLoadedSubjects: subjectsToPass, 
+                                    instructorName: instructor,
+                                    preLoadedSubjects: subjectsToPass,
                                   ),
                                 ),
                               ).then((updatedSubjects) {
-                                if (updatedSubjects != null && updatedSubjects is List) {
-                                  final index = AppState().myLibrary.indexWhere((c) => c['id'].toString() == id);
+                                if (updatedSubjects != null &&
+                                    updatedSubjects is List) {
+                                  final index = AppState().myLibrary.indexWhere(
+                                      (c) => c['id'].toString() == id);
                                   if (index != -1) {
-                                    AppState().myLibrary[index]['owned_subjects'] = updatedSubjects;
+                                    AppState().myLibrary[index]
+                                        ['owned_subjects'] = updatedSubjects;
                                     if (mounted) setState(() {});
                                   }
                                 }
@@ -384,37 +423,53 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                               decoration: BoxDecoration(
                                 color: AppColors.backgroundSecondary,
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: Colors.white.withOpacity(0.05)),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8)],
+                                border: Border.all(
+                                    color: Colors.white.withOpacity(0.05)),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8)
+                                ],
                               ),
                               child: Row(
                                 children: [
                                   Container(
-                                    width: 48, height: 48,
+                                    width: 48,
+                                    height: 48,
                                     decoration: BoxDecoration(
                                       color: AppColors.backgroundPrimary,
                                       borderRadius: BorderRadius.circular(12),
-                                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                                      boxShadow: const [
+                                        BoxShadow(
+                                            color: Colors.black26,
+                                            blurRadius: 4)
+                                      ],
                                     ),
-                                    child: Icon(
-                                      LucideIcons.playCircle, 
-                                      color: AppColors.accentOrange, 
-                                      size: 24
-                                    ),
+                                    child: Icon(LucideIcons.playCircle,
+                                        color: AppColors.accentOrange,
+                                        size: 24),
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         if (code.isNotEmpty)
                                           Container(
-                                            margin: const EdgeInsets.only(bottom: 4),
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            margin: const EdgeInsets.only(
+                                                bottom: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: AppColors.accentOrange.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(color: AppColors.accentOrange.withOpacity(0.2), width: 0.5),
+                                              color: AppColors.accentOrange
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: AppColors.accentOrange
+                                                      .withOpacity(0.2),
+                                                  width: 0.5),
                                             ),
                                             child: Text(
                                               "#$code",
@@ -425,7 +480,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                               ),
                                             ),
                                           ),
-
                                         Text(
                                           title.toUpperCase(),
                                           style: TextStyle(
@@ -443,7 +497,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                             Text(
                                               instructor.toUpperCase(),
                                               style: TextStyle(
-                                                color: AppColors.textSecondary.withOpacity(0.7),
+                                                color: AppColors.textSecondary
+                                                    .withOpacity(0.7),
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.bold,
                                                 letterSpacing: 1.5,
@@ -454,14 +509,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                       ],
                                     ),
                                   ),
-                                   
+
                                   // 🟢 زر التعديل (داخل البطاقة)
                                   if (_isTeacher)
                                     GestureDetector(
                                       onTap: () {
                                         double realPrice = localPrice;
                                         try {
-                                          final freshCourse = AppState().allCourses.firstWhere((c) => c.id == id);
+                                          final freshCourse = AppState()
+                                              .allCourses
+                                              .firstWhere((c) => c.id == id);
                                           realPrice = freshCourse.fullPrice;
                                         } catch (_) {}
 
@@ -489,15 +546,23 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                       child: Container(
                                         padding: const EdgeInsets.all(8),
                                         decoration: BoxDecoration(
-                                          color: AppColors.accentYellow.withOpacity(0.1),
+                                          color: AppColors.accentYellow
+                                              .withOpacity(0.1),
                                           shape: BoxShape.circle,
-                                          border: Border.all(color: AppColors.accentYellow.withOpacity(0.3)),
+                                          border: Border.all(
+                                              color: AppColors.accentYellow
+                                                  .withOpacity(0.3)),
                                         ),
-                                        child: Icon(LucideIcons.edit3, color: AppColors.accentYellow, size: 18),
+                                        child: Icon(LucideIcons.edit3,
+                                            color: AppColors.accentYellow,
+                                            size: 18),
                                       ),
                                     )
                                   else
-                                    Icon(LucideIcons.chevronRight, color: AppColors.textSecondary.withOpacity(0.6), size: 20),
+                                    Icon(LucideIcons.chevronRight,
+                                        color: AppColors.textSecondary
+                                            .withOpacity(0.6),
+                                        size: 20),
                                 ],
                               ),
                             ),
@@ -513,10 +578,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
 
   // --- 4. واجهة المتجر ---
   Widget _buildMarketView() {
-    final availableCourses = AppState().allCourses.where((course) => 
-      course.title.toLowerCase().contains(_searchTerm.toLowerCase()) ||
-      course.code.toLowerCase().contains(_searchTerm.toLowerCase())
-    ).toList();
+    final availableCourses = AppState()
+        .allCourses
+        .where((course) =>
+            course.title.toLowerCase().contains(_searchTerm.toLowerCase()) ||
+            course.code.toLowerCase().contains(_searchTerm.toLowerCase()))
+        .toList();
 
     double screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = 2;
@@ -540,10 +607,14 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: Colors.white.withOpacity(0.05)),
-                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.05)),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 4)
+                        ],
                       ),
-                      child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                      child: Icon(LucideIcons.arrowLeft,
+                          color: AppColors.accentYellow, size: 20),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -559,7 +630,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                 ],
               ),
             ),
-             
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Container(
@@ -576,10 +646,13 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                     prefixIcon: Icon(
                       LucideIcons.search,
                       size: 18,
-                      color: _searchTerm.isNotEmpty ? AppColors.accentYellow : AppColors.textSecondary,
+                      color: _searchTerm.isNotEmpty
+                          ? AppColors.accentYellow
+                          : AppColors.textSecondary,
                     ),
                     hintText: "Find excellence...",
-                    hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.6)),
+                    hintStyle: TextStyle(
+                        color: AppColors.textSecondary.withOpacity(0.6)),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -589,7 +662,6 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
               ),
             ),
             const SizedBox(height: 24),
-             
             Expanded(
               child: GridView.builder(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -608,7 +680,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CourseDetailsScreen(courseCode: course.code),
+                          builder: (context) =>
+                              CourseDetailsScreen(courseCode: course.code),
                         ),
                       );
                     },
@@ -617,8 +690,13 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.backgroundSecondary,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withOpacity(0.2)),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)],
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.2)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4)
+                        ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,8 +705,12 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(LucideIcons.compass, size: 14, color: AppColors.accentYellow),
-                              Icon(LucideIcons.shoppingCart, size: 14, color: AppColors.textSecondary.withOpacity(0.4)),
+                              Icon(LucideIcons.compass,
+                                  size: 14, color: AppColors.accentYellow),
+                              Icon(LucideIcons.shoppingCart,
+                                  size: 14,
+                                  color:
+                                      AppColors.textSecondary.withOpacity(0.4)),
                             ],
                           ),
                           Text(
@@ -649,7 +731,8 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                               Text(
                                 course.instructorName.toUpperCase(),
                                 style: TextStyle(
-                                  color: AppColors.textSecondary.withOpacity(0.7),
+                                  color:
+                                      AppColors.textSecondary.withOpacity(0.7),
                                   fontSize: 9,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 1.5,
@@ -658,14 +741,16 @@ class _MyCoursesScreenState extends State<MyCoursesScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                "${course.fullPrice.toInt()} EGP", 
-                                style: TextStyle(
-                                  color: AppColors.accentYellow,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              // ✅ هنا التعديل: إخفاء السعر فقط إذا كان الوضع المجاني مفعلاً
+                              if (!_isFreeMode)
+                                Text(
+                                  "${course.fullPrice.toInt()} EGP",
+                                  style: TextStyle(
+                                    color: AppColors.accentYellow,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         ],

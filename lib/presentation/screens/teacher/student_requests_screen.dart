@@ -20,7 +20,7 @@ class _StudentRequestsScreenState extends State<StudentRequestsScreen> {
   // بيانات المصادقة للصور
   String? _token;
   String? _deviceId;
-  final String _appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
+  final String _appSecret = const String.fromEnvironment('APP_SECRET');
 
   final String _baseUrl = ApiConstants.baseUrl;
   String get _receiptProxyUrl =>

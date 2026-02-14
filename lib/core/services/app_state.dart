@@ -236,7 +236,7 @@ class AppState {
           'Authorization': 'Bearer $token',
           'x-device-id':
               deviceId, // ✅ 2. إرسال معرف الجهاز (بدونه يعتبرك السيرفر ضيفاً)
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 

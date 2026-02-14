@@ -55,6 +55,9 @@
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>نرسل لك إشعارات لتحديثك بحالة الطلبات والتنبيهات المهمة</string>
 
+	<key>UIApplicationSupportsSecureContent</key>
+	<true/>
+
 	<key>UIFileSharingEnabled</key>
 	<false/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

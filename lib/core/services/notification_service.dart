@@ -39,6 +39,7 @@ class NotificationService {
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
+
     await androidImplementation?.requestNotificationsPermission();
 
     // 3. ✅ إنشاء قنوات الإشعارات يدوياً لتفادي RemoteServiceException

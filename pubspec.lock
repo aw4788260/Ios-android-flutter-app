@@ -632,6 +632,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.1"
+  get:
+    dependency: transitive
+    description:
+      name: get
+      sha256: "5ed34a7925b85336e15d472cc4cfe7d9ebf4ab8e8b9f688585bf6b50f4c3d79a"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.7.3"
   get_it:
     dependency: "direct main"
     description:
@@ -1240,6 +1248,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.1"
+  secure_display:
+    dependency: "direct main"
+    description:
+      name: secure_display
+      sha256: "6f994a3829adaf7bad9809e1746d281e5675e49084313b643e7ddb62617aa7ff"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.1"
   shared_preferences:
     dependency: "direct main"
     description:

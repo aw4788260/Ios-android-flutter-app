@@ -74,7 +74,7 @@ class _CourseMaterialsScreenState extends State<CourseMaterialsScreen> {
         options: Options(headers: {
           if (token != null) 'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
-          'x-app-secret': "My_Sup3r_S3cr3t_K3y_For_Android_App_Only",
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
 

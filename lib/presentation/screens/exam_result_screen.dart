@@ -28,7 +28,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
   String? _userId;
   String? _deviceId;
   String? _token; // ✅ التوكن ضروري للصور والطلبات
-  final String _appSecret = "My_Sup3r_S3cr3t_K3y_For_Android_App_Only";
+  final String _appSecret = const String.fromEnvironment('APP_SECRET');
   final String _baseUrl = ApiConstants.baseUrl;
 
   @override
