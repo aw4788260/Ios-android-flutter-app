@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ لاستخدام الحافظة (Clipboard)
+import 'package:flutter/services.dart'; 
 import 'package:dio/dio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,14 +16,14 @@ class CheckoutScreen extends StatefulWidget {
   final double amount;
   final Map<String, dynamic> paymentInfo;
   final List<Map<String, dynamic>> selectedItems;
-  final int? teacherId; // ✅ 1. متغير جديد لاستقبال رقم المدرس
+  final int? teacherId; 
 
   const CheckoutScreen({
     super.key,
     required this.amount,
     required this.paymentInfo,
     required this.selectedItems,
-    this.teacherId, // ✅ إضافته للمنشئ
+    this.teacherId, 
   });
 
   @override
@@ -32,25 +32,28 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _discountController = TextEditingController(); // 🆕 متحكم الخصم
   File? _receiptImage;
   bool _isUploading = false;
    
-  // ✅ متغيرات جديدة لإدارة حالة البيانات
   bool _isLoadingPaymentData = false;
   late Map<String, dynamic> _currentPaymentInfo;
 
+  // 🆕 متغيرات الخصم (Coupons)
+  double? _discountedAmount;
+  String? _appliedCode;
+  bool _isCheckingDiscount = false;
+
   final String _baseUrl = ApiConstants.baseUrl;
+  
   @override
   void initState() {
     super.initState();
-    // نبدأ بالبيانات الممررة، ثم نتحقق إذا كانت تحتاج لتحديث
     _currentPaymentInfo = widget.paymentInfo;
     _checkAndFetchPaymentInfo();
   }
 
-  /// ✅ دالة ذكية للتحقق من البيانات وجلبها إذا كانت ناقصة
   Future<void> _checkAndFetchPaymentInfo() async {
-    // التحقق هل هناك أي بيانات موجودة فعلاً؟
     final cash = _currentPaymentInfo['cash_numbers'] as List?;
     final instaNum = _currentPaymentInfo['instapay_numbers'] as List?;
     final instaLink = _currentPaymentInfo['instapay_links'] as List?;
@@ -59,10 +62,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                    (instaNum != null && instaNum.isNotEmpty) ||
                    (instaLink != null && instaLink.isNotEmpty);
 
-    // إذا كانت البيانات موجودة، لا داعي للتحميل
     if (hasData) return;
 
-    // ✅ 2. الأولوية لاستخدام teacherId إذا تم تمريره (وهو الأسرع والأضمن)
     if (widget.teacherId != null) {
       setState(() => _isLoadingPaymentData = true);
       try {
@@ -70,7 +71,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         
         final response = await Dio().get(
           '$_baseUrl/api/public/get-payment-info',
-          queryParameters: { 'teacherId': widget.teacherId }, // ✅ إرسال رقم المدرس مباشرة
+          queryParameters: { 'teacherId': widget.teacherId }, 
         );
 
         if (response.statusCode == 200 && response.data != null) {
@@ -85,24 +86,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       } finally {
         if (mounted) setState(() => _isLoadingPaymentData = false);
       }
-      return; // ✅ نخرج من الدالة لأننا استخدمنا الطريقة الأفضل
+      return; 
     }
 
-    // الطريقة الاحتياطية: إذا لم تكن البيانات موجودة، ولم يتم تمرير Teacher ID
     if (widget.selectedItems.isNotEmpty) {
       setState(() => _isLoadingPaymentData = true);
       try {
         final firstItem = widget.selectedItems.first;
         Map<String, dynamic> queryParams = {};
 
-        // محاولة استنتاج المعرف (كورس أم مادة)
         if (firstItem.containsKey('course_id') && firstItem['course_id'] != null) {
            queryParams['subjectId'] = firstItem['id'];
         } else {
            queryParams['courseId'] = firstItem['id'];
         }
         
-        // جلب البيانات من الـ API
         final response = await Dio().get(
           '$_baseUrl/api/public/get-payment-info',
           queryParameters: queryParams,
@@ -121,6 +119,88 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (mounted) setState(() => _isLoadingPaymentData = false);
       }
     }
+  }
+
+  // =================================================================
+  // 🟢 دوال التحقق من كود الخصم (Coupons Logic)
+  // =================================================================
+  Future<void> _applyDiscountCode() async {
+    if (_discountController.text.trim().isEmpty) return;
+
+    setState(() => _isCheckingDiscount = true);
+    FocusScope.of(context).unfocus(); // إخفاء لوحة المفاتيح
+
+    try {
+      var box = await StorageService.openBox('auth_box');
+      
+      // محاولة الحصول على رقم المدرس بأكثر من طريقة لضمان إرساله مع الكود
+      int? tId = widget.teacherId;
+      if (tId == null && _currentPaymentInfo['teacher_id'] != null) {
+        tId = int.tryParse(_currentPaymentInfo['teacher_id'].toString());
+      }
+
+      final response = await Dio().post(
+        '$_baseUrl/api/student/validate-discount',
+        data: {
+          'code': _discountController.text.trim(),
+          'teacher_id': tId,
+        },
+        options: Options(headers: {
+          'Authorization': 'Bearer ${box.get('jwt_token')}',
+          'x-device-id': box.get('device_id'),
+          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+        }),
+      );
+
+      if (response.statusCode == 200 && response.data['success']) {
+        final discountData = response.data['discount'];
+        
+        double newTotal = widget.amount;
+        
+        // حساب السعر الجديد بناءً على نوع الخصم المرجّع من السيرفر
+        if (discountData['discount_type'] == 'percentage') {
+          double percent = double.parse(discountData['discount_value'].toString());
+          newTotal = widget.amount - (widget.amount * (percent / 100));
+        } else if (discountData['discount_type'] == 'fixed') {
+          newTotal = double.parse(discountData['discount_value'].toString());
+        }
+
+        // منع السعر من أن يصبح سالباً
+        if (newTotal < 0) newTotal = 0;
+
+        setState(() {
+          _discountedAmount = newTotal;
+          _appliedCode = _discountController.text.trim().toUpperCase();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text("تم تطبيق كود الخصم بنجاح!"), backgroundColor: AppColors.success),
+        );
+      }
+    } on DioException catch (e) {
+      String msg = "كود الخصم غير صحيح أو تم استخدامه مسبقاً.";
+      if (e.response != null && e.response?.data != null && e.response?.data['message'] != null) {
+        msg = e.response?.data['message'];
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text("حدث خطأ في الاتصال"), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingDiscount = false);
+    }
+  }
+
+  // دالة لإزالة الكود المُطبّق
+  void _removeDiscount() {
+    setState(() {
+      _discountedAmount = null;
+      _appliedCode = null;
+      _discountController.clear();
+    });
   }
 
   Future<void> _pickImage() async {
@@ -145,7 +225,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  // ✅ دالة لنسخ النص إلى الحافظة
   void _copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -174,11 +253,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       String fileName = _receiptImage!.path.split('/').last;
       
-      FormData formData = FormData.fromMap({
+      // ✅ تجهيز البيانات لإرسالها
+      Map<String, dynamic> formMap = {
         'receiptFile': await MultipartFile.fromFile(_receiptImage!.path, filename: fileName),
         'user_note': _noteController.text,
         'selectedItems': jsonEncode(widget.selectedItems),
-      });
+      };
+
+      // ✅ إضافة الكود للطلب إذا كان موجوداً
+      if (_appliedCode != null) {
+        formMap['discount_code'] = _appliedCode;
+      }
+
+      FormData formData = FormData.fromMap(formMap);
 
       final response = await Dio().post(
         '$_baseUrl/api/student/request-course',
@@ -249,7 +336,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ نستخدم _currentPaymentInfo بدلاً من widget.paymentInfo لضمان عرض البيانات المحدثة
     final List cashNumbers = (_currentPaymentInfo['cash_numbers'] as List?) ?? [];
     final List instapayNumbers = (_currentPaymentInfo['instapay_numbers'] as List?) ?? [];
     final List instapayLinks = (_currentPaymentInfo['instapay_links'] as List?) ?? [];
@@ -292,7 +378,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Amount Box
+                      // ✅ مربع المبلغ مع إظهار السعر المشطوب إن وُجد
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(32),
@@ -306,9 +392,93 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text("TOTAL AMOUNT", style: TextStyle(color: AppColors.textSecondary, fontSize: 10, letterSpacing: 2.0, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
-                            Text("${widget.amount} EGP", style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.accentYellow)),
+                            
+                            if (_discountedAmount != null) ...[
+                              // عرض السعر القديم مشطوباً
+                              Text(
+                                "${widget.amount} EGP", 
+                                style: TextStyle(
+                                  fontSize: 18, 
+                                  fontWeight: FontWeight.bold, 
+                                  color: AppColors.error,
+                                  decoration: TextDecoration.lineThrough,
+                                )
+                              ),
+                              const SizedBox(height: 4),
+                              // عرض السعر الجديد
+                              Text(
+                                "${_discountedAmount!.toStringAsFixed(0)} EGP", 
+                                style: TextStyle(fontSize: 42, fontWeight: FontWeight.w900, color: AppColors.success)
+                              ),
+                            ] else ...[
+                              Text("${widget.amount} EGP", style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: AppColors.accentYellow)),
+                            ]
                           ],
                         ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // 🆕 إدخال كود الخصم (Discount Code Input)
+                      Text("DISCOUNT CODE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 1.5)),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 55,
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _appliedCode != null ? AppColors.success : Colors.white.withOpacity(0.05)),
+                              ),
+                              child: TextField(
+                                controller: _discountController,
+                                enabled: _appliedCode == null, // إقفال الحقل إذا تم تطبيق كود بالفعل
+                                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                                decoration: InputDecoration(
+                                  hintText: "Enter code here",
+                                  hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                                  border: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          
+                          if (_appliedCode != null)
+                            // زر حذف الكود بعد تطبيقه
+                            InkWell(
+                              onTap: _removeDiscount,
+                              child: Container(
+                                height: 55,
+                                width: 55,
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.error),
+                                ),
+                                child: Icon(LucideIcons.trash2, color: AppColors.error),
+                              ),
+                            )
+                          else
+                            // زر التفعيل
+                            InkWell(
+                              onTap: _isCheckingDiscount ? null : _applyDiscountCode,
+                              child: Container(
+                                height: 55,
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentYellow,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: _isCheckingDiscount 
+                                  ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: AppColors.backgroundPrimary, strokeWidth: 2))
+                                  : Text("APPLY", style: TextStyle(color: AppColors.backgroundPrimary, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 32),
 
@@ -411,7 +581,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: TextField(
                           controller: _noteController,
-                          style: TextStyle(color: AppColors.textPrimary), // ✅ تصحيح لون النص
+                          style: TextStyle(color: AppColors.textPrimary),
                           maxLines: 3,
                           decoration: InputDecoration(
                             hintText: "Add any notes...",
@@ -453,7 +623,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ✅ ويدجت للأرقام مع زر نسخ
   Widget _buildCopyableCard(String title, String value, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -497,7 +666,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ✅ ويدجت للروابط مع زر فتح وزر نسخ
   Widget _buildLinkCard(String link) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
