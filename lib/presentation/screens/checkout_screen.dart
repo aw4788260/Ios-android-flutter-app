@@ -162,7 +162,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           double percent = double.parse(discountData['discount_value'].toString());
           newTotal = widget.amount - (widget.amount * (percent / 100));
         } else if (discountData['discount_type'] == 'fixed') {
-          newTotal = double.parse(discountData['discount_value'].toString());
+          // ✅ تم التعديل: طرح قيمة الخصم من السعر الأساسي بدلاً من مساواته بها
+          double fixedDiscount = double.parse(discountData['discount_value'].toString());
+          newTotal = widget.amount - fixedDiscount;
         }
 
         // منع السعر من أن يصبح سالباً
