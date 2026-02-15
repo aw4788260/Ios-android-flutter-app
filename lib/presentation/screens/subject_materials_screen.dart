@@ -344,9 +344,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           backgroundColor: AppColors.backgroundPrimary,
           appBar: AppBar(
               backgroundColor: Colors.transparent,
-              leading: BackButton(color: AppColors.accentYellow)),
+              leading: const BackButton(color: AppColors.accentYellow)),
           body: Center(
-              child: Text(_error!, style: TextStyle(color: AppColors.error))));
+              child: Text(_error!, style: const TextStyle(color: AppColors.error))));
 
     final chapters = _content!['chapters'] as List;
     final exams = _content!['exams'] as List;
@@ -381,7 +381,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                         color: Colors.black12, blurRadius: 4)
                                   ],
                                 ),
-                                child: Icon(LucideIcons.arrowLeft,
+                                child: const Icon(LucideIcons.arrowLeft,
                                     color: AppColors.accentYellow, size: 20),
                               ),
                             ),
@@ -395,7 +395,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                     scrollDirection: Axis.horizontal,
                                     child: Text(
                                       widget.subjectTitle.toUpperCase(),
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.textPrimary,
@@ -405,7 +405,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
+                                  const Text(
                                     "SUBJECT CONTENTS",
                                     style: TextStyle(
                                       fontSize: 9,
@@ -582,7 +582,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         (exam['title'] ?? 'Untitled Exam')
                             .toString()
                             .toUpperCase(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -624,7 +624,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(LucideIcons.edit,
+                      icon: const Icon(LucideIcons.edit,
                           color: AppColors.accentOrange, size: 20),
                       tooltip: "تعديل الامتحان",
                       onPressed: () {
@@ -642,7 +642,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       },
                     ),
                     IconButton(
-                      icon: Icon(LucideIcons.barChart2,
+                      icon: const Icon(LucideIcons.barChart2,
                           color: AppColors.accentYellow, size: 20),
                       tooltip: "Statistics",
                       onPressed: () {
@@ -672,7 +672,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     );
   }
 
-  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان وإظهار نافذة التأكيد
+  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان وإظهار نافذة التأكيد للجميع
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
     if (isCompleted) {
       // 1. إذا كان الامتحان محلول مسبقاً، اذهب للنتيجة مباشرة
@@ -690,68 +690,54 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Error: Cannot load result."),
             backgroundColor: AppColors.error));
       }
     } else {
       // 2. إذا كان الامتحان "غير محلول" (Unsolved)
-      
-      // لا نظهر رسالة التأكيد للمعلم حتى يتمكن من الدخول واستعراض الامتحان بسهولة
-      if (_isTeacher) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => ExamViewScreen(
-                    examId: exam['id'].toString(),
-                    examTitle: exam['title'] ?? 'Exam',
-                    isCompleted: isCompleted,
-                  )),
-        ).then((_) => _fetchContent());
-      } else {
-        // إذا كان المستخدم طالباً، أظهر نافذة التأكيد قبل بدء التايمر
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: AppColors.backgroundSecondary,
-            title: const Text(
-              'تأكيد بدء الامتحان',
-              style: TextStyle(color: AppColors.textPrimary),
-            ),
-            content: const Text(
-              'هل أنت مستعد؟ سيتم بدء الامتحان واحتساب الوقت بمجرد تأكيدك.',
-              style: TextStyle(color: AppColors.textSecondary, height: 1.5),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('إلغاء',
-                    style: TextStyle(color: AppColors.textSecondary)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentYellow),
-                onPressed: () {
-                  Navigator.pop(ctx); // إغلاق النافذة المنبثقة
-                  
-                  // الذهاب للامتحان وبدء الوقت
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ExamViewScreen(
-                              examId: exam['id'].toString(),
-                              examTitle: exam['title'] ?? 'Exam',
-                              isCompleted: isCompleted,
-                            )),
-                  ).then((_) => _fetchContent()); // تحديث البيانات عند العودة
-                },
-                child: const Text('بدء الامتحان',
-                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-              ),
-            ],
+      // يتم إظهار نافذة التأكيد قبل بدء التايمر للجميع (طالب أو معلم)
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.backgroundSecondary,
+          title: const Text(
+            'تأكيد بدء الامتحان',
+            style: TextStyle(color: AppColors.textPrimary),
           ),
-        );
-      }
+          content: const Text(
+            'هل أنت مستعد؟ سيتم بدء الامتحان واحتساب الوقت بمجرد تأكيدك.',
+            style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('إلغاء',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentYellow),
+              onPressed: () {
+                Navigator.pop(ctx); // إغلاق النافذة المنبثقة
+                
+                // الذهاب للامتحان وبدء الوقت
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => ExamViewScreen(
+                            examId: exam['id'].toString(),
+                            examTitle: exam['title'] ?? 'Exam',
+                            isCompleted: isCompleted,
+                          )),
+                ).then((_) => _fetchContent()); // تحديث البيانات عند العودة
+              },
+              child: const Text('بدء الامتحان',
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -816,7 +802,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   child: Center(
                     child: Text(
                       "${index + 1}".padLeft(2, '0'),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: AppColors.accentYellow,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -833,7 +819,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         (chapter['title'] ?? 'Chapter')
                             .toString()
                             .toUpperCase(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -845,12 +831,12 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(LucideIcons.hash,
+                          const Icon(LucideIcons.hash,
                               size: 10, color: AppColors.accentOrange),
                           const SizedBox(width: 4),
                           Text(
                             "${videosCount + pdfsCount} CONTENTS",
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textSecondary,
@@ -881,7 +867,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
                     if (_isTeacher)
                       IconButton(
-                        icon: Icon(LucideIcons.edit2,
+                        icon: const Icon(LucideIcons.edit2,
                             size: 18, color: AppColors.accentYellow),
                         onPressed: () {
                           Navigator.push(
@@ -899,7 +885,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         },
                       )
                     else
-                      Icon(LucideIcons.chevronRight,
+                      const Icon(LucideIcons.chevronRight,
                           size: 18, color: AppColors.textSecondary),
                   ],
                 ),
