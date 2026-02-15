@@ -81,11 +81,12 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     } catch (e, stack) {
       FirebaseCrashlytics.instance
           .recordError(e, stack, reason: 'Fetching Subject Content Failed');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = "Failed to load content.";
           _loading = false;
         });
+      }
     }
   }
 
@@ -132,22 +133,22 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           builder: (context, setState) {
             return AlertDialog(
               backgroundColor: AppColors.backgroundSecondary,
-              title: const Text('رأيك يهمنا', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('رأيك يهمنا', style: TextStyle(color: AppColors.textPrimary)),
               content: TextField(
                 controller: feedbackController,
                 maxLines: 4,
-                style: const TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'اكتب رأيك أو ملاحظاتك عن هذا الفصل (رأيك مجهول الهوية)',
                   hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3))),
-                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
                 ),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('إلغاء', style: TextStyle(color: AppColors.textSecondary)),
+                  child: Text('إلغاء', style: TextStyle(color: AppColors.textSecondary)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow),
@@ -271,22 +272,22 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
             return AlertDialog(
               backgroundColor: AppColors.backgroundSecondary,
-              title: const Text('آراء الطلاب المجهولة', style: TextStyle(color: AppColors.textPrimary)),
+              title: Text('آراء الطلاب المجهولة', style: TextStyle(color: AppColors.textPrimary)),
               content: SizedBox(
                 width: double.maxFinite,
                 height: MediaQuery.of(context).size.height * 0.5,
                 child: isInitialLoading
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
+                    ? Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
                     : feedbacks.isEmpty
-                        ? const Center(child: Text("لا توجد آراء مسجلة حتى الآن", style: TextStyle(color: AppColors.textSecondary)))
+                        ? Center(child: Text("لا توجد آراء مسجلة حتى الآن", style: TextStyle(color: AppColors.textSecondary)))
                         : ListView.builder(
                             controller: scrollController,
                             itemCount: feedbacks.length + (isFetchingMore ? 1 : 0),
                             itemBuilder: (context, index) {
                               if (index == feedbacks.length) {
-                                return const Center(
+                                return Center(
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                                    padding: const EdgeInsets.symmetric(vertical: 16.0),
                                     child: CircularProgressIndicator(color: AppColors.accentYellow, strokeWidth: 2),
                                   ),
                                 );
@@ -300,12 +301,12 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(LucideIcons.messageSquare, color: AppColors.accentYellow, size: 20),
+                                      Icon(LucideIcons.messageSquare, color: AppColors.accentYellow, size: 20),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           feedbacks[index]['content'],
-                                          style: const TextStyle(color: AppColors.textPrimary),
+                                          style: TextStyle(color: AppColors.textPrimary),
                                         ),
                                       ),
                                     ],
@@ -318,7 +319,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('إغلاق', style: TextStyle(color: AppColors.accentYellow)),
+                  child: Text('إغلاق', style: TextStyle(color: AppColors.accentYellow)),
                 ),
               ],
             );
@@ -334,19 +335,21 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading)
+    if (_loading) {
       return Scaffold(
           backgroundColor: AppColors.backgroundPrimary,
           body: Center(
               child: CircularProgressIndicator(color: AppColors.accentYellow)));
-    if (_error != null)
+    }
+    if (_error != null) {
       return Scaffold(
           backgroundColor: AppColors.backgroundPrimary,
           appBar: AppBar(
               backgroundColor: Colors.transparent,
-              leading: const BackButton(color: AppColors.accentYellow)),
+              leading: BackButton(color: AppColors.accentYellow)),
           body: Center(
               child: Text(_error!, style: const TextStyle(color: AppColors.error))));
+    }
 
     final chapters = _content!['chapters'] as List;
     final exams = _content!['exams'] as List;
@@ -381,7 +384,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                         color: Colors.black12, blurRadius: 4)
                                   ],
                                 ),
-                                child: const Icon(LucideIcons.arrowLeft,
+                                child: Icon(LucideIcons.arrowLeft,
                                     color: AppColors.accentYellow, size: 20),
                               ),
                             ),
@@ -395,7 +398,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                     scrollDirection: Axis.horizontal,
                                     child: Text(
                                       widget.subjectTitle.toUpperCase(),
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.textPrimary,
@@ -405,7 +408,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  const Text(
+                                  Text(
                                     "SUBJECT CONTENTS",
                                     style: TextStyle(
                                       fontSize: 9,
@@ -582,7 +585,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         (exam['title'] ?? 'Untitled Exam')
                             .toString()
                             .toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -624,7 +627,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(LucideIcons.edit,
+                      icon: Icon(LucideIcons.edit,
                           color: AppColors.accentOrange, size: 20),
                       tooltip: "تعديل الامتحان",
                       onPressed: () {
@@ -642,7 +645,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       },
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.barChart2,
+                      icon: Icon(LucideIcons.barChart2,
                           color: AppColors.accentYellow, size: 20),
                       tooltip: "Statistics",
                       onPressed: () {
@@ -701,18 +704,18 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: AppColors.backgroundSecondary,
-          title: const Text(
+          title: Text(
             'تأكيد بدء الامتحان',
             style: TextStyle(color: AppColors.textPrimary),
           ),
-          content: const Text(
+          content: Text(
             'هل أنت مستعد؟ سيتم بدء الامتحان واحتساب الوقت بمجرد تأكيدك.',
             style: TextStyle(color: AppColors.textSecondary, height: 1.5),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('إلغاء',
+              child: Text('إلغاء',
                   style: TextStyle(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
@@ -742,8 +745,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   }
 
   Widget _buildChaptersList(List chapters) {
-    if (chapters.isEmpty)
+    if (chapters.isEmpty) {
       return _buildEmptyState(LucideIcons.bookOpen, "No chapters found");
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -802,7 +806,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   child: Center(
                     child: Text(
                       "${index + 1}".padLeft(2, '0'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.accentYellow,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -819,7 +823,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         (chapter['title'] ?? 'Chapter')
                             .toString()
                             .toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -831,12 +835,12 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(LucideIcons.hash,
+                          Icon(LucideIcons.hash,
                               size: 10, color: AppColors.accentOrange),
                           const SizedBox(width: 4),
                           Text(
                             "${videosCount + pdfsCount} CONTENTS",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                               color: AppColors.textSecondary,
@@ -855,7 +859,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   children: [
                     // 💬 زر تقييم الشابتر
                     IconButton(
-                      icon: const Icon(LucideIcons.messageCircle, size: 20, color: AppColors.textSecondary),
+                      icon: Icon(LucideIcons.messageCircle, size: 20, color: AppColors.textSecondary),
                       onPressed: () {
                         if (_isTeacher) {
                           _showTeacherFeedbackDialog(chapter['id'].toString());
@@ -867,7 +871,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
                     if (_isTeacher)
                       IconButton(
-                        icon: const Icon(LucideIcons.edit2,
+                        icon: Icon(LucideIcons.edit2,
                             size: 18, color: AppColors.accentYellow),
                         onPressed: () {
                           Navigator.push(
@@ -885,7 +889,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         },
                       )
                     else
-                      const Icon(LucideIcons.chevronRight,
+                      Icon(LucideIcons.chevronRight,
                           size: 18, color: AppColors.textSecondary),
                   ],
                 ),
