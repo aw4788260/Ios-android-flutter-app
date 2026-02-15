@@ -34,13 +34,14 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   String? _error;
   Map<String, dynamic>? _content;
   bool _isTeacher = false;
-   
+
   final String _baseUrl = ApiConstants.baseUrl;
 
   @override
   void initState() {
     super.initState();
-    FirebaseCrashlytics.instance.log("Opened Subject: ${widget.subjectTitle} (${widget.subjectId})");
+    FirebaseCrashlytics.instance
+        .log("Opened Subject: ${widget.subjectTitle} (${widget.subjectId})");
     _checkUserRole();
     _fetchContent();
   }
@@ -78,17 +79,21 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         });
       }
     } catch (e, stack) {
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Fetching Subject Content Failed');
-      if (mounted) setState(() { _error = "Failed to load content."; _loading = false; });
+      FirebaseCrashlytics.instance
+          .recordError(e, stack, reason: 'Fetching Subject Content Failed');
+      if (mounted)
+        setState(() {
+          _error = "Failed to load content.";
+          _loading = false;
+        });
     }
   }
 
   // ✅ دالة لتحديث الشابتر في القائمة محلياً (Optimistic Update) أو بعد العودة
   void _updateChapterList(dynamic result) {
-    // إذا كانت النتيجة true فقط (بدون بيانات)، نعيد جلب البيانات كاملة من السيرفر
     if (result == true) {
-       _fetchContent();
-       return;
+      _fetchContent();
+      return;
     }
 
     if (result == null || _content == null) return;
@@ -97,25 +102,251 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
       List chapters = List.from(_content!['chapters'] ?? []);
 
       if (result is Map && result['deleted'] == true) {
-          // حذف شابتر
-          chapters.removeWhere((c) => c['id'].toString() == result['id'].toString());
+        chapters
+            .removeWhere((c) => c['id'].toString() == result['id'].toString());
       } else if (result is Map<String, dynamic>) {
-          // إضافة أو تحديث
-          int index = chapters.indexWhere((c) => c['id'].toString() == result['id'].toString());
-          if (index != -1) {
-            chapters[index] = result; 
-          } else {
-            chapters.add(result); 
-          }
+        int index = chapters
+            .indexWhere((c) => c['id'].toString() == result['id'].toString());
+        if (index != -1) {
+          chapters[index] = result;
+        } else {
+          chapters.add(result);
+        }
       }
       _content!['chapters'] = chapters;
     });
   }
 
+  // ===========================================================================
+  // 🟢 نظام الآراء المجهولة (Anonymous Feedback)
+  // ===========================================================================
+
+  void _showStudentFeedbackDialog(String chapterId) {
+    final TextEditingController feedbackController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: AppColors.backgroundSecondary,
+              title: const Text('رأيك يهمنا', style: TextStyle(color: AppColors.textPrimary)),
+              content: TextField(
+                controller: feedbackController,
+                maxLines: 4,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'اكتب رأيك أو ملاحظاتك عن هذا الفصل (رأيك مجهول الهوية)',
+                  hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.3))),
+                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: AppColors.accentYellow)),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إلغاء', style: TextStyle(color: AppColors.textSecondary)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow),
+                  onPressed: isSubmitting ? null : () async {
+                    if (feedbackController.text.trim().isEmpty) return;
+                    setState(() => isSubmitting = true);
+
+                    try {
+                      var box = await StorageService.openBox('auth_box');
+                      final res = await Dio().post(
+                        '$_baseUrl/api/student/submit-feedback',
+                        data: {
+                          'chapter_id': chapterId,
+                          'content': feedbackController.text.trim(),
+                        },
+                        options: Options(headers: {
+                          'Authorization': 'Bearer ${box.get('jwt_token')}',
+                          'x-device-id': box.get('device_id'),
+                          'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+                        }),
+                      );
+
+                      if (res.statusCode == 200) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("تم إرسال رأيك بنجاح، شكراً لك!"), 
+                            backgroundColor: AppColors.success
+                          )
+                        );
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("حدث خطأ في الاتصال"), backgroundColor: AppColors.error)
+                      );
+                    } finally {
+                      setState(() => isSubmitting = false);
+                    }
+                  },
+                  child: isSubmitting 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) 
+                    : const Text('إرسال', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+  }
+
+  void _showTeacherFeedbackDialog(String chapterId) {
+    List<dynamic> feedbacks = [];
+    int currentPage = 1;
+    bool isInitialLoading = true;
+    bool isFetchingMore = false;
+    bool hasMoreData = true;
+    bool isInit = true;
+
+    final ScrollController scrollController = ScrollController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+
+            Future<void> fetchFeedbacks() async {
+              try {
+                var box = await StorageService.openBox('auth_box');
+                final res = await Dio().get(
+                  '$_baseUrl/api/teacher/get-feedback',
+                  queryParameters: {
+                    'chapter_id': chapterId,
+                    'page': currentPage,
+                    'limit': 10,
+                  },
+                  options: Options(headers: {
+                    'Authorization': 'Bearer ${box.get('jwt_token')}',
+                    'x-device-id': box.get('device_id'),
+                    'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+                  }),
+                );
+
+                if (res.statusCode == 200) {
+                  List newData = res.data['data'];
+                  setState(() {
+                    feedbacks.addAll(newData);
+                    hasMoreData = res.data['hasMore'] ?? false;
+                    isInitialLoading = false;
+                    isFetchingMore = false;
+                  });
+                }
+              } catch (e) {
+                setState(() {
+                  isInitialLoading = false;
+                  isFetchingMore = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("فشل جلب الآراء"), backgroundColor: AppColors.error)
+                );
+              }
+            }
+
+            if (isInit) {
+              isInit = false;
+              fetchFeedbacks();
+              
+              scrollController.addListener(() {
+                if (scrollController.position.pixels >= scrollController.position.maxScrollExtent - 50 &&
+                    !isFetchingMore &&
+                    hasMoreData) {
+                  setState(() {
+                    isFetchingMore = true;
+                    currentPage++;
+                  });
+                  fetchFeedbacks();
+                }
+              });
+            }
+
+            return AlertDialog(
+              backgroundColor: AppColors.backgroundSecondary,
+              title: const Text('آراء الطلاب المجهولة', style: TextStyle(color: AppColors.textPrimary)),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: MediaQuery.of(context).size.height * 0.5,
+                child: isInitialLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.accentYellow))
+                    : feedbacks.isEmpty
+                        ? const Center(child: Text("لا توجد آراء مسجلة حتى الآن", style: TextStyle(color: AppColors.textSecondary)))
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: feedbacks.length + (isFetchingMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == feedbacks.length) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                                    child: CircularProgressIndicator(color: AppColors.accentYellow, strokeWidth: 2),
+                                  ),
+                                );
+                              }
+
+                              return Card(
+                                color: AppColors.backgroundPrimary,
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(LucideIcons.messageSquare, color: AppColors.accentYellow, size: 20),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          feedbacks[index]['content'],
+                                          style: const TextStyle(color: AppColors.textPrimary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إغلاق', style: TextStyle(color: AppColors.accentYellow)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
+  // واجهة المستخدم (UI)
+  // ===========================================================================
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return Scaffold(backgroundColor: AppColors.backgroundPrimary, body: Center(child: CircularProgressIndicator(color: AppColors.accentYellow)));
-    if (_error != null) return Scaffold(backgroundColor: AppColors.backgroundPrimary, appBar: AppBar(backgroundColor: Colors.transparent, leading: BackButton(color: AppColors.accentYellow)), body: Center(child: Text(_error!, style: TextStyle(color: AppColors.error))));
+    if (_loading)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          body: Center(
+              child: CircularProgressIndicator(color: AppColors.accentYellow)));
+    if (_error != null)
+      return Scaffold(
+          backgroundColor: AppColors.backgroundPrimary,
+          appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              leading: BackButton(color: AppColors.accentYellow)),
+          body: Center(
+              child: Text(_error!, style: TextStyle(color: AppColors.error))));
 
     final chapters = _content!['chapters'] as List;
     final exams = _content!['exams'] as List;
@@ -133,7 +364,6 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // ✅ الجزء الأيسر: زر الرجوع + العناوين (مع Expanded)
                       Expanded(
                         child: Row(
                           children: [
@@ -144,20 +374,23 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.backgroundSecondary,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.white.withOpacity(0.05)),
-                                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.05)),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                        color: Colors.black12, blurRadius: 4)
+                                  ],
                                 ),
-                                child: Icon(LucideIcons.arrowLeft, color: AppColors.accentYellow, size: 20),
+                                child: Icon(LucideIcons.arrowLeft,
+                                    color: AppColors.accentYellow, size: 20),
                               ),
                             ),
                             const SizedBox(width: 16),
-                            
-                            // ✅ Expanded للنصوص لتأخذ المساحة المتبقية فقط
+
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // ✅ SingleChildScrollView للعنوان الطويل جداً
                                   SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
                                     child: Text(
@@ -166,7 +399,6 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                         color: AppColors.textPrimary,
-                                        // تمت إزالة overflow: ellipsis للسماح بالسحب
                                         letterSpacing: -0.5,
                                       ),
                                       maxLines: 1,
@@ -189,9 +421,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         ),
                       ),
 
-                      // 🟢 زر إضافة محتوى (يظهر للمعلم فقط)
                       if (_isTeacher) ...[
-                        const SizedBox(width: 10), // مسافة أمان
+                        const SizedBox(width: 10),
                         GestureDetector(
                           onTap: () {
                             if (_activeTab == 'chapters') {
@@ -204,16 +435,16 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                                   ),
                                 ),
                               ).then((val) {
-                                // ✅ تحديث البيانات عند العودة (val == true)
                                 if (val == true) _fetchContent();
-                              }); 
+                              });
                             } else {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => CreateExamScreen(subjectId: widget.subjectId),
+                                  builder: (_) => CreateExamScreen(
+                                      subjectId: widget.subjectId),
                                 ),
-                              ).then((_) => _fetchContent()); 
+                              ).then((_) => _fetchContent());
                             }
                           },
                           child: Container(
@@ -221,19 +452,23 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.accentYellow.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(50),
-                              border: Border.all(color: AppColors.accentYellow.withOpacity(0.5)),
+                              border: Border.all(
+                                  color:
+                                      AppColors.accentYellow.withOpacity(0.5)),
                             ),
                             child: Icon(
-                              _activeTab == 'chapters' ? LucideIcons.folderPlus : LucideIcons.filePlus, 
-                              color: AppColors.accentYellow, size: 22
-                            ),
+                                _activeTab == 'chapters'
+                                    ? LucideIcons.folderPlus
+                                    : LucideIcons.filePlus,
+                                color: AppColors.accentYellow,
+                                size: 22),
                           ),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Tab Switcher
                   Container(
                     padding: const EdgeInsets.all(4),
@@ -241,7 +476,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       color: AppColors.backgroundSecondary,
                       borderRadius: BorderRadius.circular(50),
                       border: Border.all(color: Colors.white.withOpacity(0.05)),
-                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black26, blurRadius: 4)
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -269,19 +506,19 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
   // --- قائمة الامتحانات ---
   Widget _buildExamsList(List allExams) {
     final visibleExams = allExams.where((exam) {
-       if (_isTeacher) return true; 
-       
-       if (exam['start_time'] != null) {
-         final DateTime startTime = DateTime.parse(exam['start_time']).toLocal();
-         if (DateTime.now().isBefore(startTime)) {
-            return false; 
-         }
-       }
-       return true;
+      if (_isTeacher) return true;
+
+      if (exam['start_time'] != null) {
+        final DateTime startTime = DateTime.parse(exam['start_time']).toLocal();
+        if (DateTime.now().isBefore(startTime)) {
+          return false;
+        }
+      }
+      return true;
     }).toList();
 
     if (visibleExams.isEmpty) {
-       return _buildEmptyState(LucideIcons.fileCheck, "No exams available yet");
+      return _buildEmptyState(LucideIcons.fileCheck, "No exams available yet");
     }
 
     return ListView.builder(
@@ -292,15 +529,15 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         final bool isCompleted = exam['isCompleted'] ?? false;
         final bool isExpired = exam['isExpired'] ?? false;
 
-        final Color statusColor = isCompleted 
-            ? AppColors.success 
-            : (isExpired ? AppColors.error : AppColors.accentOrange); 
+        final Color statusColor = isCompleted
+            ? AppColors.success
+            : (isExpired ? AppColors.error : AppColors.accentOrange);
 
         String statusText = "UNSOLVED";
         if (isCompleted) {
           statusText = "COMPLETED";
         } else if (isExpired) {
-          statusText = "EXPIRED"; 
+          statusText = "EXPIRED";
         }
 
         return Container(
@@ -317,21 +554,23 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
               GestureDetector(
                 onTap: () => _openExam(exam, isCompleted, isExpired),
                 child: Container(
-                  width: 48, height: 48,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     color: AppColors.backgroundPrimary,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: statusColor.withOpacity(0.5)),
                   ),
                   child: Icon(
-                    isCompleted ? LucideIcons.checkCircle2 : (isExpired ? LucideIcons.clock : LucideIcons.fileX), 
-                    color: statusColor, 
-                    size: 20
-                  ),
+                      isCompleted
+                          ? LucideIcons.checkCircle2
+                          : (isExpired ? LucideIcons.clock : LucideIcons.fileX),
+                      color: statusColor,
+                      size: 20),
                 ),
               ),
               const SizedBox(width: 16),
-              
+
               // التفاصيل
               Expanded(
                 child: GestureDetector(
@@ -340,7 +579,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (exam['title'] ?? 'Untitled Exam').toString().toUpperCase(),
+                        (exam['title'] ?? 'Untitled Exam')
+                            .toString()
+                            .toUpperCase(),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -383,7 +624,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: Icon(LucideIcons.edit, color: AppColors.accentOrange, size: 20),
+                      icon: Icon(LucideIcons.edit,
+                          color: AppColors.accentOrange, size: 20),
                       tooltip: "تعديل الامتحان",
                       onPressed: () {
                         Navigator.push(
@@ -391,16 +633,17 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                           MaterialPageRoute(
                             builder: (_) => CreateExamScreen(
                               subjectId: widget.subjectId,
-                              examId: exam['id'].toString(), 
+                              examId: exam['id'].toString(),
                             ),
                           ),
-                        ).then((val) { 
-                          if (val == true) _fetchContent(); 
+                        ).then((val) {
+                          if (val == true) _fetchContent();
                         });
                       },
                     ),
                     IconButton(
-                      icon: Icon(LucideIcons.barChart2, color: AppColors.accentYellow, size: 20),
+                      icon: Icon(LucideIcons.barChart2,
+                          color: AppColors.accentYellow, size: 20),
                       tooltip: "Statistics",
                       onPressed: () {
                         Navigator.push(
@@ -418,7 +661,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                 )
               else
                 IconButton(
-                  icon: Icon(LucideIcons.chevronRight, size: 20, color: statusColor.withOpacity(0.5)),
+                  icon: Icon(LucideIcons.chevronRight,
+                      size: 20, color: statusColor.withOpacity(0.5)),
                   onPressed: () => _openExam(exam, isCompleted, isExpired),
                 ),
             ],
@@ -428,9 +672,13 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     );
   }
 
+  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان وإظهار نافذة التأكيد
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
     if (isCompleted) {
-      final attemptId = exam['last_attempt_id'] ?? exam['first_attempt_id'] ?? exam['attempt_id']; 
+      // 1. إذا كان الامتحان محلول مسبقاً، اذهب للنتيجة مباشرة
+      final attemptId = exam['last_attempt_id'] ??
+          exam['first_attempt_id'] ??
+          exam['attempt_id'];
       if (attemptId != null) {
         Navigator.push(
           context,
@@ -442,24 +690,74 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: Cannot load result."), backgroundColor: AppColors.error)
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text("Error: Cannot load result."),
+            backgroundColor: AppColors.error));
       }
     } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ExamViewScreen(
-          examId: exam['id'].toString(),
-          examTitle: exam['title'] ?? 'Exam',
-          isCompleted: isCompleted,
-        )),
-      );
+      // 2. إذا كان الامتحان "غير محلول" (Unsolved)
+      
+      // لا نظهر رسالة التأكيد للمعلم حتى يتمكن من الدخول واستعراض الامتحان بسهولة
+      if (_isTeacher) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ExamViewScreen(
+                    examId: exam['id'].toString(),
+                    examTitle: exam['title'] ?? 'Exam',
+                    isCompleted: isCompleted,
+                  )),
+        ).then((_) => _fetchContent());
+      } else {
+        // إذا كان المستخدم طالباً، أظهر نافذة التأكيد قبل بدء التايمر
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.backgroundSecondary,
+            title: const Text(
+              'تأكيد بدء الامتحان',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+            content: const Text(
+              'هل أنت مستعد؟ سيتم بدء الامتحان واحتساب الوقت بمجرد تأكيدك.',
+              style: TextStyle(color: AppColors.textSecondary, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentYellow),
+                onPressed: () {
+                  Navigator.pop(ctx); // إغلاق النافذة المنبثقة
+                  
+                  // الذهاب للامتحان وبدء الوقت
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ExamViewScreen(
+                              examId: exam['id'].toString(),
+                              examTitle: exam['title'] ?? 'Exam',
+                              isCompleted: isCompleted,
+                            )),
+                  ).then((_) => _fetchContent()); // تحديث البيانات عند العودة
+                },
+                child: const Text('بدء الامتحان',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
   Widget _buildChaptersList(List chapters) {
-    if (chapters.isEmpty) return _buildEmptyState(LucideIcons.bookOpen, "No chapters found");
+    if (chapters.isEmpty)
+      return _buildEmptyState(LucideIcons.bookOpen, "No chapters found");
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -471,25 +769,24 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
         return GestureDetector(
           onTap: () {
-            final String courseTitle = _content?['course_title'] ?? 'Unknown Course';
-              
+            final String courseTitle =
+                _content?['course_title'] ?? 'Unknown Course';
+
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => ChapterContentsScreen(
-                  chapter: Map<String, dynamic>.from(chapter),
-                  courseTitle: courseTitle,
-                  subjectTitle: widget.subjectTitle,
-                  subjectId: widget.subjectId, // ✅ ضروري لتحديث المحتوى داخل الشابتر
-                )
-              ),
+                  builder: (_) => ChapterContentsScreen(
+                        chapter: Map<String, dynamic>.from(chapter),
+                        courseTitle: courseTitle,
+                        subjectTitle: widget.subjectTitle,
+                        subjectId: widget.subjectId, 
+                      )),
             ).then((updatedChapter) {
-               // ✅ التعديل هنا: استقبال الشابتر المحدث وتحديث القائمة المحلية
-               if (updatedChapter != null && updatedChapter is Map) {
-                 _updateChapterList(Map<String, dynamic>.from(updatedChapter)); 
-               } else {
-                 _fetchContent(); // كإجراء احتياطي فقط
-               }
+              if (updatedChapter != null && updatedChapter is Map) {
+                _updateChapterList(Map<String, dynamic>.from(updatedChapter));
+              } else {
+                _fetchContent(); 
+              }
             });
           },
           child: Container(
@@ -499,17 +796,22 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
               color: AppColors.backgroundSecondary,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.white.withOpacity(0.05)),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 4)
+              ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: AppColors.backgroundPrimary,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.white.withOpacity(0.1)),
-                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 2)],
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black26, blurRadius: 2)
+                    ],
                   ),
                   child: Center(
                     child: Text(
@@ -528,7 +830,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (chapter['title'] ?? 'Chapter').toString().toUpperCase(),
+                        (chapter['title'] ?? 'Chapter')
+                            .toString()
+                            .toUpperCase(),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -541,7 +845,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(LucideIcons.hash, size: 10, color: AppColors.accentOrange),
+                          Icon(LucideIcons.hash,
+                              size: 10, color: AppColors.accentOrange),
                           const SizedBox(width: 4),
                           Text(
                             "${videosCount + pdfsCount} CONTENTS",
@@ -557,28 +862,47 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     ],
                   ),
                 ),
-                // 🟢 زر تعديل الشابتر للمعلم
-                if (_isTeacher)
-                  IconButton(
-                    icon: Icon(LucideIcons.edit2, size: 18, color: AppColors.accentYellow),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ManageContentScreen(
-                            contentType: ContentType.chapter,
-                            initialData: chapter,
-                            parentId: widget.subjectId,
-                          ),
-                        ),
-                      ).then((val) {
-                         // ✅ تحديث فوري عند العودة (true)
-                         if (val == true) _fetchContent();
-                      });
-                    },
-                  )
-                else
-                  Icon(LucideIcons.chevronRight, size: 18, color: AppColors.textSecondary),
+                
+                // 🟢 أزرار الشابتر (التقييم بجوار القلم أو السهم)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 💬 زر تقييم الشابتر
+                    IconButton(
+                      icon: const Icon(LucideIcons.messageCircle, size: 20, color: AppColors.textSecondary),
+                      onPressed: () {
+                        if (_isTeacher) {
+                          _showTeacherFeedbackDialog(chapter['id'].toString());
+                        } else {
+                          _showStudentFeedbackDialog(chapter['id'].toString());
+                        }
+                      },
+                    ),
+
+                    if (_isTeacher)
+                      IconButton(
+                        icon: Icon(LucideIcons.edit2,
+                            size: 18, color: AppColors.accentYellow),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ManageContentScreen(
+                                contentType: ContentType.chapter,
+                                initialData: chapter,
+                                parentId: widget.subjectId,
+                              ),
+                            ),
+                          ).then((val) {
+                            if (val == true) _fetchContent();
+                          });
+                        },
+                      )
+                    else
+                      Icon(LucideIcons.chevronRight,
+                          size: 18, color: AppColors.textSecondary),
+                  ],
+                ),
               ],
             ),
           ),
@@ -601,7 +925,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           decoration: BoxDecoration(
             color: isActive ? AppColors.backgroundPrimary : Colors.transparent,
             borderRadius: BorderRadius.circular(50),
-            boxShadow: isActive ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+            boxShadow: isActive
+                ? [const BoxShadow(color: Colors.black12, blurRadius: 4)]
+                : [],
           ),
           child: Text(
             title.toUpperCase(),
@@ -609,7 +935,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isActive ? AppColors.accentYellow : AppColors.textSecondary,
+              color:
+                  isActive ? AppColors.accentYellow : AppColors.textSecondary,
               letterSpacing: 1.5,
             ),
           ),
