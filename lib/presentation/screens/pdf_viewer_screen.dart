@@ -14,7 +14,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/app_state.dart';
 import '../../core/services/file_crypto_service.dart';
 import '../../core/models/drawing_model.dart';
-import '../../core/models/comment_model.dart'; // ✅ استدعاء مودل التعليقات
+import '../../core/models/comment_model.dart'; 
 import '../../core/services/storage_service.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -56,7 +56,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   double _eraserSize = 0.04;
 
   Map<int, List<DrawingLine>> _pageDrawings = {};
-  Map<int, List<CommentModel>> _pageComments = {}; // ✅ تخزين التعليقات
+  Map<int, List<CommentModel>> _pageComments = {}; 
   
   DrawingLine? _currentLine;
   int _activePage = 0;
@@ -491,12 +491,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
                 return Stack(
                   children: [
-                    // طبقة الرسم والخلفية
+                    // طبقة الرسم والخلفية (تضيف تعليقات جديدة)
                     IgnorePointer(
                       ignoring: !_isDrawingMode,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTapDown: (details) {
+                        onTapUp: (details) {
                           if (_selectedTool == 3) {
                             _addComment(details, context, pageRect, page.pageNumber);
                           }
@@ -520,34 +520,38 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     // طبقة أيقونات التعليقات المضافة مسبقاً
                     if (_isOffline)
                       ...comments.map((comment) => Positioned(
-                        left: (comment.dx * pageRect.width) - (15 * comment.scale), // المركز
-                        top: (comment.dy * pageRect.height) - (15 * comment.scale),
-                        child: IgnorePointer(
-                          ignoring: !_isDrawingMode,
-                          child: GestureDetector(
-                            onScaleUpdate: (details) {
-                              setState(() {
-                                if (details.pointerCount == 1) { // سحب وتحريك 
-                                  comment.dx += details.focalPointDelta.dx / pageRect.width;
-                                  comment.dy += details.focalPointDelta.dy / pageRect.height;
-                                } else if (details.pointerCount == 2) { // تكبير وتصغير
-                                  comment.scale = (comment.scale * details.scale).clamp(0.5, 3.0);
-                                }
-                              });
-                            },
-                            onTap: () => _showCommentDialog(page.pageNumber, comment),
-                            child: Transform.scale(
-                              scale: comment.scale,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.backgroundSecondary.withOpacity(0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white24, width: 1),
-                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 6)]
-                                ),
-                                child: Icon(LucideIcons.messageSquare, color: Color(comment.color), size: 24),
+                        left: (comment.dx * pageRect.width) - (20 * comment.scale), 
+                        top: (comment.dy * pageRect.height) - (20 * comment.scale),
+                        // ✅ تم إزالة IgnorePointer لتعمل النقرة حتى لو كان القلم مغلقاً
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque, // ✅ لمنع الحدث من الوصول لطبقة الرسم الخلفية
+                          onScaleStart: _isDrawingMode ? (_) {} : null, // ✅ استلام الحدث بقوة
+                          onScaleEnd: _isDrawingMode ? (_) {} : null,
+                          onScaleUpdate: _isDrawingMode ? (details) {
+                            setState(() {
+                              if (details.pointerCount == 1) { // سحب وتحريك 
+                                comment.dx += details.focalPointDelta.dx / pageRect.width;
+                                comment.dy += details.focalPointDelta.dy / pageRect.height;
+                              } else if (details.pointerCount == 2) { // تكبير وتصغير
+                                comment.scale = (comment.scale * details.scale).clamp(0.5, 3.0);
+                              }
+                            });
+                          } : null,
+                          onTap: () => _showCommentDialog(page.pageNumber, comment),
+                          child: Transform.scale(
+                            scale: comment.scale,
+                            // ✅ تعديل مظهر الأيقونة ليكون جذاب وشفاف قليلاً
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary.withOpacity(0.85), // لون داكن شفاف قليلاً
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Color(comment.color).withOpacity(0.8), width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))
+                                ]
                               ),
+                              child: Icon(Icons.comment_rounded, color: Color(comment.color).withOpacity(0.9), size: 24),
                             ),
                           ),
                         ),
@@ -564,7 +568,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   // --- منطق التعليقات ---
 
-  void _addComment(TapDownDetails details, BuildContext context, Rect pageRect, int pageNumber) {
+  void _addComment(TapUpDetails details, BuildContext context, Rect pageRect, int pageNumber) {
     if (!_isDrawingMode || _selectedTool != 3) return;
     
     final renderBox = context.findRenderObject() as RenderBox;
@@ -593,17 +597,18 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(LucideIcons.messageSquare, color: Color(comment.color)),
+            Icon(Icons.comment_rounded, color: Color(comment.color)),
             const SizedBox(width: 8),
-            Text(isNew ? "إضافة تعليق" : "تعديل التعليق", style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+            Text(isNew ? "إضافة تعليق" : "التعليق", style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
           ],
         ),
         content: TextField(
           controller: controller,
           maxLines: 5,
+          enabled: _isDrawingMode, // لا يمكن التعديل إذا كان القلم مغلقاً
           style: TextStyle(color: AppColors.textPrimary),
           decoration: InputDecoration(
-            hintText: "اكتب ملاحظاتك هنا...",
+            hintText: _isDrawingMode ? "اكتب ملاحظاتك هنا..." : "لا يوجد نص...",
             hintStyle: TextStyle(color: AppColors.textSecondary),
             filled: true,
             fillColor: AppColors.backgroundPrimary,
@@ -611,7 +616,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ),
         ),
         actions: [
-          if (!isNew)
+          if (!isNew && _isDrawingMode) // يظهر زر الحذف فقط في وضع القلم
             TextButton(
               onPressed: () {
                 setState(() => _pageComments[pageNumber]?.remove(comment));
@@ -621,22 +626,23 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("إلغاء", style: TextStyle(color: Colors.grey)),
+            child: Text(_isDrawingMode ? "إلغاء" : "إغلاق", style: const TextStyle(color: Colors.grey)),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow, foregroundColor: Colors.black),
-            onPressed: () {
-              setState(() {
-                comment.text = controller.text;
-                if (isNew && comment.text.trim().isNotEmpty) {
-                  if (_pageComments[pageNumber] == null) _pageComments[pageNumber] = [];
-                  _pageComments[pageNumber]!.add(comment);
-                }
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
+          if (_isDrawingMode) // يظهر زر الحفظ فقط في وضع التعديل
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow, foregroundColor: Colors.black),
+              onPressed: () {
+                setState(() {
+                  comment.text = controller.text;
+                  if (isNew && comment.text.trim().isNotEmpty) {
+                    if (_pageComments[pageNumber] == null) _pageComments[pageNumber] = [];
+                    _pageComments[pageNumber]!.add(comment);
+                  }
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
         ]
       )
     );
@@ -701,7 +707,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 const SizedBox(width: 8),
                 _toolIcon(LucideIcons.eraser, 2),
                 const SizedBox(width: 8),
-                // ✅ أداة التعليقات الجديدة
                 _toolIcon(LucideIcons.messageSquare, 3), 
 
                 const SizedBox(width: 12),
@@ -727,7 +732,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ),
           ),
           
-          if (_selectedTool != 3) // إخفاء شريط الحجم لو أداة التعليق مفعلة
+          if (_selectedTool != 3) 
             const SizedBox(height: 8),
           if (_selectedTool != 3)
             _sizeSlider(),
