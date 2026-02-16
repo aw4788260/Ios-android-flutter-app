@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:encrypt/encrypt.dart' as encrypt; 
 import '../utils/encryption_helper.dart';
+import 'file_crypto_service.dart'; // ✅ استدعاء خدمة التشفير الجديدة
 
 class LocalProxyService {
   static final LocalProxyService _instance = LocalProxyService._internal();
@@ -198,18 +199,32 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
 
     final encryptedLength = await file.length();
     
-    final int CHUNK_SIZE = EncryptionHelper.CHUNK_SIZE; 
-    
-    const int IV_LENGTH = 12;
-    const int TAG_LENGTH = 16;
-    final int ENCRYPTED_CHUNK_SIZE = IV_LENGTH + CHUNK_SIZE + TAG_LENGTH; 
+    // ✅ التعرف على إصدار التشفير (القديم V1 مقابل الجديد V2)
+    bool isV2 = decodedPath.endsWith('_v2.enc') || decodedPath.endsWith('.pdf.enc');
+    int originalFileSize;
 
-    final int totalChunks = (encryptedLength / ENCRYPTED_CHUNK_SIZE).ceil();
-    if (totalChunks == 0) return Response.ok('');
-
-    final int plainChunkSize = CHUNK_SIZE;
-    final int overhead = ENCRYPTED_CHUNK_SIZE - plainChunkSize; 
-    final int originalFileSize = ((totalChunks - 1) * plainChunkSize) + max(0, (encryptedLength - ((totalChunks - 1) * ENCRYPTED_CHUNK_SIZE)) - overhead);
+    if (isV2) {
+       // --- نظام ChaCha20 الجديد ---
+       final int CHUNK_SIZE = FileCryptoService.CHUNK_SIZE; // 32KB
+       final int NONCE_LENGTH = FileCryptoService.NONCE_LENGTH; // 12 bytes
+       final int ENCRYPTED_CHUNK_SIZE = NONCE_LENGTH + CHUNK_SIZE;
+       
+       int numChunks = (encryptedLength / ENCRYPTED_CHUNK_SIZE).ceil();
+       originalFileSize = encryptedLength - (numChunks * NONCE_LENGTH);
+    } else {
+       // --- النظام القديم AES ---
+       final int CHUNK_SIZE = EncryptionHelper.CHUNK_SIZE; 
+       const int IV_LENGTH = 12;
+       const int TAG_LENGTH = 16;
+       final int ENCRYPTED_CHUNK_SIZE = IV_LENGTH + CHUNK_SIZE + TAG_LENGTH; 
+       
+       final int totalChunks = (encryptedLength / ENCRYPTED_CHUNK_SIZE).ceil();
+       if (totalChunks == 0) return Response.ok('');
+       
+       final int plainChunkSize = CHUNK_SIZE;
+       final int overhead = ENCRYPTED_CHUNK_SIZE - plainChunkSize; 
+       originalFileSize = ((totalChunks - 1) * plainChunkSize) + max(0, (encryptedLength - ((totalChunks - 1) * ENCRYPTED_CHUNK_SIZE)) - overhead);
+    }
 
     final rangeHeader = request.headers['range'];
     int start = 0;
@@ -227,7 +242,7 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
     
     final contentLength = end - start + 1;
 
-    print("🔍 [PROXY_REQ] $isolateName | Range: $start-$end | Processing: ${requestStopwatch.elapsedMilliseconds}ms");
+    print("🔍 [PROXY_REQ] $isolateName | Range: $start-$end | V2: $isV2 | Processing: ${requestStopwatch.elapsedMilliseconds}ms");
 
     final Map<String, Object> headers = {
         'Content-Type': contentType, 
@@ -246,7 +261,9 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
 
     return Response(
       206, 
-      body: _createDecryptedStream(file, start, end, encrypter, isolateName),
+      body: isV2 
+          ? _createDecryptedStreamV2(file, start, end, isolateName)
+          : _createDecryptedStream(file, start, end, encrypter, isolateName),
       headers: headers,
     );
 
@@ -256,6 +273,45 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
   }
 }
 
+// ✅ دالة جديدة لمعالجة وتشغيل الفيديوهات بنظام ChaCha20 (V2) السريع
+Stream<List<int>> _createDecryptedStreamV2(File file, int reqStart, int reqEnd, String isolateName) async* {
+  final streamStopwatch = Stopwatch()..start(); 
+  final int requiredLength = reqEnd - reqStart + 1;
+  int totalSent = 0;
+  
+  try {
+    const int MAX_READ_SIZE = 512 * 1024; // فك التشفير في كتل 512 كيلوبايت للحفاظ على الرام
+    int currentOffset = reqStart;
+    
+    while (currentOffset <= reqEnd) {
+      if (totalSent >= requiredLength) break;
+      
+      int readLen = min(MAX_READ_SIZE, reqEnd - currentOffset + 1);
+      
+      // نستخدم الدالة من FileCryptoService التي تعالج الكتل المعقدة تلقائياً
+      Uint8List data = await FileCryptoService.readAndDecryptRange(file, currentOffset, readLen);
+      
+      if (data.isEmpty) break;
+      
+      yield data;
+      totalSent += data.length;
+      currentOffset += data.length;
+    }
+    print("✅ [PROXY_V2_DONE] $isolateName | Total sent: $totalSent bytes | Time: ${streamStopwatch.elapsedMilliseconds}ms");
+  } catch(e) {
+      print("Stream V2 Error: $e");
+  } finally {
+    // إرسال بايتات فارغة إذا انقطع الاتصال فجأة لمنع تعليق المشغل
+    if (totalSent < requiredLength) {
+        int missingBytes = requiredLength - totalSent;
+        if (missingBytes > 0 && missingBytes < 1024 * 1024) { 
+           yield Uint8List(missingBytes);
+        }
+    }
+  }
+}
+
+// دالة التشغيل القديمة للملفات المحملة مسبقاً بنظام AES (V1)
 Stream<List<int>> _createDecryptedStream(File file, int reqStart, int reqEnd, encrypt.Encrypter encrypter, String isolateName) async* {
   final streamStopwatch = Stopwatch()..start(); 
   RandomAccessFile? raf;
