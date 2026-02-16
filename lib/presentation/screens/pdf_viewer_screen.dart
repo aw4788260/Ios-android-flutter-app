@@ -519,43 +519,48 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
                     // طبقة أيقونات التعليقات المضافة مسبقاً
                     if (_isOffline)
-                      ...comments.map((comment) => Positioned(
-                        left: (comment.dx * pageRect.width) - (20 * comment.scale), 
-                        top: (comment.dy * pageRect.height) - (20 * comment.scale),
-                        // ✅ تم إزالة IgnorePointer لتعمل النقرة حتى لو كان القلم مغلقاً
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque, // ✅ لمنع الحدث من الوصول لطبقة الرسم الخلفية
-                          onScaleStart: _isDrawingMode ? (_) {} : null, // ✅ استلام الحدث بقوة
-                          onScaleEnd: _isDrawingMode ? (_) {} : null,
-                          onScaleUpdate: _isDrawingMode ? (details) {
-                            setState(() {
-                              if (details.pointerCount == 1) { // سحب وتحريك 
-                                comment.dx += details.focalPointDelta.dx / pageRect.width;
-                                comment.dy += details.focalPointDelta.dy / pageRect.height;
-                              } else if (details.pointerCount == 2) { // تكبير وتصغير
-                                comment.scale = (comment.scale * details.scale).clamp(0.5, 3.0);
-                              }
-                            });
-                          } : null,
-                          onTap: () => _showCommentDialog(page.pageNumber, comment),
-                          child: Transform.scale(
-                            scale: comment.scale,
-                            // ✅ تعديل مظهر الأيقونة ليكون جذاب وشفاف قليلاً
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.backgroundSecondary.withOpacity(0.85), // لون داكن شفاف قليلاً
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Color(comment.color).withOpacity(0.8), width: 1.5),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))
-                                ]
+                      ...comments.map((comment) {
+                        // استخراج اللون الأساسي والشفافية
+                        Color solidColor = Color(comment.color).withOpacity(1.0);
+                        double currentOpacity = Color(comment.color).opacity;
+
+                        return Positioned(
+                          left: (comment.dx * pageRect.width) - (20 * comment.scale), 
+                          top: (comment.dy * pageRect.height) - (20 * comment.scale),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque, 
+                            onScaleStart: _isDrawingMode ? (_) {} : null, 
+                            onScaleEnd: _isDrawingMode ? (_) {} : null,
+                            onScaleUpdate: _isDrawingMode ? (details) {
+                              setState(() {
+                                if (details.pointerCount == 1) { // ✅ سحب وتحريك فقط (تم إلغاء التكبير بالأصابع)
+                                  comment.dx += details.focalPointDelta.dx / pageRect.width;
+                                  comment.dy += details.focalPointDelta.dy / pageRect.height;
+                                } 
+                              });
+                            } : null,
+                            onTap: () => _showCommentDialog(page.pageNumber, comment),
+                            child: Transform.scale(
+                              scale: comment.scale,
+                              child: Opacity(
+                                opacity: currentOpacity, // ✅ تطبيق الشفافية المحددة
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.backgroundSecondary.withOpacity(0.85), 
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: solidColor, width: 1.5),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))
+                                    ]
+                                  ),
+                                  child: Icon(Icons.comment_rounded, color: solidColor, size: 24),
+                                ),
                               ),
-                              child: Icon(Icons.comment_rounded, color: Color(comment.color).withOpacity(0.9), size: 24),
                             ),
                           ),
-                        ),
-                      )),
+                        );
+                      }),
                   ],
                 );
               },
@@ -580,8 +585,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       text: '',
       dx: relativePoint.dx,
       dy: relativePoint.dy,
-      color: _selectedColor.value,
+      color: _selectedColor.value, // يبدأ باللون المختار مع شفافية كاملة
     );
+    // تعيين الحجم الافتراضي إذا لم يكن مهيأ
+    newComment.scale = 1.0; 
     
     _showCommentDialog(pageNumber, newComment, isNew: true);
   }
@@ -592,58 +599,109 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     showDialog(
       context: context,
       barrierDismissible: !isNew,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.backgroundSecondary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.comment_rounded, color: Color(comment.color)),
-            const SizedBox(width: 8),
-            Text(isNew ? "إضافة تعليق" : "التعليق", style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
-          ],
-        ),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          enabled: _isDrawingMode, // لا يمكن التعديل إذا كان القلم مغلقاً
-          style: TextStyle(color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: _isDrawingMode ? "اكتب ملاحظاتك هنا..." : "لا يوجد نص...",
-            hintStyle: TextStyle(color: AppColors.textSecondary),
-            filled: true,
-            fillColor: AppColors.backgroundPrimary,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-          ),
-        ),
-        actions: [
-          if (!isNew && _isDrawingMode) // يظهر زر الحذف فقط في وضع القلم
-            TextButton(
-              onPressed: () {
-                setState(() => _pageComments[pageNumber]?.remove(comment));
-                Navigator.pop(ctx);
-              },
-              child: const Text("حذف", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+      builder: (ctx) => StatefulBuilder( // ✅ استخدام StatefulBuilder لتحديث أشرطة التحكم فوراً
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppColors.backgroundSecondary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.comment_rounded, color: Color(comment.color).withOpacity(1.0)),
+                const SizedBox(width: 8),
+                Text(isNew ? "إضافة تعليق" : "التعليق", style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+              ],
             ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(_isDrawingMode ? "إلغاء" : "إغلاق", style: const TextStyle(color: Colors.grey)),
-          ),
-          if (_isDrawingMode) // يظهر زر الحفظ فقط في وضع التعديل
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow, foregroundColor: Colors.black),
-              onPressed: () {
-                setState(() {
-                  comment.text = controller.text;
-                  if (isNew && comment.text.trim().isNotEmpty) {
-                    if (_pageComments[pageNumber] == null) _pageComments[pageNumber] = [];
-                    _pageComments[pageNumber]!.add(comment);
-                  }
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    maxLines: 4,
+                    enabled: _isDrawingMode, // لا يمكن التعديل إذا كان القلم مغلقاً
+                    style: TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: _isDrawingMode ? "اكتب ملاحظاتك هنا..." : "لا يوجد نص...",
+                      hintStyle: TextStyle(color: AppColors.textSecondary),
+                      filled: true,
+                      fillColor: AppColors.backgroundPrimary,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  if (_isDrawingMode) ...[
+                    const SizedBox(height: 20),
+                    // ✅ شريط التحكم في حجم التعليق
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text("حجم الأيقونة: ${(comment.scale).toStringAsFixed(1)}", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ),
+                    Slider(
+                      value: comment.scale,
+                      min: 0.5,
+                      max: 4.0,
+                      activeColor: AppColors.accentYellow,
+                      inactiveColor: AppColors.accentYellow.withOpacity(0.3),
+                      onChanged: (val) {
+                        setDialogState(() => comment.scale = val);
+                        setState(() {}); // تحديث الشاشة الرئيسية لرؤية التغيير فوراً
+                      }
+                    ),
+                    const SizedBox(height: 10),
+                    // ✅ شريط التحكم في الشفافية
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text("الشفافية: ${(Color(comment.color).opacity * 100).toInt()}%", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ),
+                    Slider(
+                      value: Color(comment.color).opacity,
+                      min: 0.1,
+                      max: 1.0,
+                      activeColor: AppColors.accentYellow,
+                      inactiveColor: AppColors.accentYellow.withOpacity(0.3),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          // تغيير قيمة الألفا للون وحفظه
+                          Color baseColor = Color(comment.color);
+                          comment.color = baseColor.withOpacity(val).value;
+                        });
+                        setState(() {}); // تحديث الشاشة الرئيسية لرؤية التغيير فوراً
+                      }
+                    ),
+                  ]
+                ],
+              ),
             ),
-        ]
+            actions: [
+              if (!isNew && _isDrawingMode) // يظهر زر الحذف فقط في وضع القلم
+                TextButton(
+                  onPressed: () {
+                    setState(() => _pageComments[pageNumber]?.remove(comment));
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text("حذف", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(_isDrawingMode ? "إلغاء" : "إغلاق", style: const TextStyle(color: Colors.grey)),
+              ),
+              if (_isDrawingMode) // يظهر زر الحفظ فقط في وضع التعديل
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentYellow, foregroundColor: Colors.black),
+                  onPressed: () {
+                    setState(() {
+                      comment.text = controller.text;
+                      if (isNew && comment.text.trim().isNotEmpty) {
+                        if (_pageComments[pageNumber] == null) _pageComments[pageNumber] = [];
+                        _pageComments[pageNumber]!.add(comment);
+                      }
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text("حفظ", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+            ]
+          );
+        }
       )
     );
   }
