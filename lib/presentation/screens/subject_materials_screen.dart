@@ -675,7 +675,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     );
   }
 
-  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان وإظهار نافذة التأكيد
+  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
     if (isCompleted) {
       // 1. إذا كان الامتحان محلول مسبقاً، اذهب للنتيجة مباشرة
@@ -698,13 +698,20 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
             backgroundColor: AppColors.error));
       }
     } else if (isExpired) {
-      // ✅ 2. إذا كان الامتحان منتهي الصلاحية، لا تظهر نافذة التأكيد
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text("عذراً، لقد انتهى وقت هذا الامتحان ولا يمكن بدءه الآن."),
-          backgroundColor: AppColors.error));
+      // ✅ 2. إذا كان الامتحان منتهي الصلاحية، يفتح مباشرة لرؤية نموذج الإجابة بدون نافذة تأكيد
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ExamViewScreen(
+            examId: exam['id'].toString(),
+            examTitle: exam['title'] ?? 'Exam',
+            isCompleted: isCompleted,
+          ),
+        ),
+      ).then((_) => _fetchContent());
     } else {
       // 3. إذا كان الامتحان "غير محلول" (Unsolved) ومتاحاً
-      // يتم إظهار نافذة التأكيد قبل بدء التايمر للجميع (طالب أو معلم)
+      // يتم إظهار نافذة التأكيد قبل بدء التايمر
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
