@@ -34,7 +34,28 @@ class FileCryptoService {
     _key = SecretKey(keyBytes);
   }
 
-  /// ✅ تشفير الملف بنظام الأجزاء (Chunks)
+  /// ✅ دالة جديدة: تشفير جزء من البيانات فوراً أثناء التحميل المباشر (تستخدم للفيديوهات V2)
+  static Future<Uint8List> encryptChunkOnTheFly(List<int> data) async {
+    await init();
+    // توليد Nonce فريد لهذه الكتلة
+    final nonce = List<int>.generate(NONCE_LENGTH, (i) => Random.secure().nextInt(256));
+    
+    // تشفير البيانات
+    final secretBox = await _algorithm.encrypt(
+      data,
+      secretKey: _key!,
+      nonce: nonce,
+    );
+    
+    // دمج الـ Nonce مع البيانات المشفرة
+    final builder = BytesBuilder(copy: false);
+    builder.add(nonce);
+    builder.add(secretBox.cipherText);
+    
+    return builder.toBytes();
+  }
+
+  /// ✅ تشفير الملف بالكامل بنظام الأجزاء (Chunks)
   /// هذا التنسيق يسمح لنا بالذهاب إلى أي مكان في الملف وفك تشفير جزء صغير منه فوراً
   static Future<void> encryptFileChunked(String inputPath, String outputPath) async {
     await init();
