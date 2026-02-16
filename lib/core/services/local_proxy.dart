@@ -9,7 +9,10 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:encrypt/encrypt.dart' as encrypt; 
 import 'package:cryptography/cryptography.dart' as crypto; // ✅ ضروري لتشفير ChaCha20 محلياً
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // ✅ استدعاء التخزين الآمن
+
 import '../utils/encryption_helper.dart';
+import 'file_crypto_service.dart'; // ✅ استدعاء خدمة ChaCha20
 
 class LocalProxyService {
   static final LocalProxyService _instance = LocalProxyService._internal();
@@ -52,22 +55,32 @@ class LocalProxyService {
     _readyCompleter = Completer<void>();
 
     try {
+      // ✅ 1. تهيئة كلا الخدمتين لضمان وجود المفاتيح قبل قراءتها
       await EncryptionHelper.init();
-      // هذا المفتاح مشفر Base64 وسنرسله للـ Isolate ليستخدمه للـ AES والـ ChaCha20
-      String keyBase64 = EncryptionHelper.key.base64;
+      await FileCryptoService.init();
+
+      // ✅ 2. جلب كلا المفتاحين (AES و ChaCha20)
+      String aesKeyBase64 = EncryptionHelper.key.base64;
       
-      // ✅ 1. توليد توكن عشوائي آمن عند بدء التشغيل
+      final storage = const FlutterSecureStorage();
+      String chachaKeyBase64 = (await storage.read(key: 'docs_chacha_key')) ?? '';
+
+      if (chachaKeyBase64.isEmpty) {
+        throw Exception("CRITICAL: ChaCha20 key is missing!");
+      }
+      
+      // ✅ 3. توليد توكن عشوائي آمن عند بدء التشغيل
       final random = Random.secure();
       final values = List<int>.generate(32, (i) => random.nextInt(256));
       _authToken = values.map((e) => e.toRadixString(16).padLeft(2, '0')).join();
       print('🔒 [SECURITY] Proxy Auth Token Generated');
 
-      // 2. Start Video Server (Port 0 = Random)
+      // 4. Start Video Server (Port 0 = Random)
       _videoReceivePort = ReceivePort();
       _videoServerIsolate = await Isolate.spawn(
         _proxyServerEntryPoint, 
-        // ✅ تمرير التوكن والمفتاح للـ Isolate
-        _ProxyInitData(_videoReceivePort!.sendPort, keyBase64, "VideoIsolate", _authToken)
+        // ✅ تمرير التوكن وكلا المفتاحين للـ Isolate
+        _ProxyInitData(_videoReceivePort!.sendPort, aesKeyBase64, chachaKeyBase64, "VideoIsolate", _authToken)
       );
       
       // Wait for ready message with port number
@@ -81,12 +94,12 @@ class LocalProxyService {
         }
       }
 
-      // 3. Start Audio Server (Port 0 = Random)
+      // 5. Start Audio Server (Port 0 = Random)
       _audioReceivePort = ReceivePort();
       _audioServerIsolate = await Isolate.spawn(
         _proxyServerEntryPoint, 
-        // ✅ تمرير التوكن والمفتاح للـ Isolate
-        _ProxyInitData(_audioReceivePort!.sendPort, keyBase64, "AudioIsolate", _authToken)
+        // ✅ تمرير التوكن وكلا المفتاحين للـ Isolate
+        _ProxyInitData(_audioReceivePort!.sendPort, aesKeyBase64, chachaKeyBase64, "AudioIsolate", _authToken)
       );
 
       // Wait for ready message with port number
@@ -133,19 +146,22 @@ class LocalProxyService {
 
 class _ProxyInitData {
   final SendPort sendPort;
-  final String keyBase64;
+  final String aesKeyBase64; // مفتاح AES
+  final String chachaKeyBase64; // ✅ مفتاح ChaCha20
   final String name;
-  final String authToken; // ✅ إضافة حقل التوكن
+  final String authToken;
 
-  _ProxyInitData(this.sendPort, this.keyBase64, this.name, this.authToken);
+  _ProxyInitData(this.sendPort, this.aesKeyBase64, this.chachaKeyBase64, this.name, this.authToken);
 }
 
 void _proxyServerEntryPoint(_ProxyInitData initData) async {
    try {
-     // ✅ تجهيز المفاتيح في المسار الخلفي بدون الحاجة لـ SecureStorage
-     final aesKey = encrypt.Key.fromBase64(initData.keyBase64);
+     // ✅ 1. تجهيز مفتاح AES للملفات القديمة
+     final aesKey = encrypt.Key.fromBase64(initData.aesKeyBase64);
      final encrypter = encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.gcm));
-     final List<int> chachaKeyBytes = base64Decode(initData.keyBase64);
+     
+     // ✅ 2. تجهيز مفتاح ChaCha20 للملفات الجديدة باستخدام المفتاح الخاص به
+     final List<int> chachaKeyBytes = base64Decode(initData.chachaKeyBase64);
      
      final router = Router();
      
@@ -186,7 +202,6 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, Li
     final pathParam = request.url.queryParameters['path'];
     if (pathParam == null) return Response.notFound('Path missing');
 
-    // 🔥 تم التعديل: إزالة Uri.decodeComponent لأن shelf تقوم بفك التشفير تلقائياً
     final decodedPath = pathParam; 
     
     final file = File(decodedPath);
@@ -253,7 +268,7 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, Li
         'Content-Type': contentType, 
         'Content-Length': contentLength.toString(),
         'Accept-Ranges': 'bytes',
-        'Access-Control-Allow-Origin': '*', // يمكن تقييدها أكثر إذا لزم الأمر
+        'Access-Control-Allow-Origin': '*', 
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Connection': 'keep-alive',
     };
@@ -267,8 +282,8 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, Li
     return Response(
       206, 
       body: isV2 
-          ? _createDecryptedStreamV2(file, start, end, chachaKeyBytes, isolateName) // ✅ نمرر المفتاح مباشرة
-          : _createDecryptedStream(file, start, end, encrypter, isolateName),
+          ? _createDecryptedStreamV2(file, start, end, chachaKeyBytes, isolateName) // ✅ التشفير الجديد (ChaCha20)
+          : _createDecryptedStream(file, start, end, encrypter, isolateName),       // التشفير القديم (AES)
       headers: headers,
     );
 
