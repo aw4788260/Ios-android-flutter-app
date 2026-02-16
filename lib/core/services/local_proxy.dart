@@ -3,12 +3,13 @@ import 'dart:async';
 import 'dart:isolate'; 
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:encrypt/encrypt.dart' as encrypt; 
+import 'package:cryptography/cryptography.dart' as crypto; // ✅ ضروري لتشفير ChaCha20 محلياً
 import '../utils/encryption_helper.dart';
-import 'file_crypto_service.dart'; // ✅ استدعاء خدمة التشفير الجديدة
 
 class LocalProxyService {
   static final LocalProxyService _instance = LocalProxyService._internal();
@@ -52,6 +53,7 @@ class LocalProxyService {
 
     try {
       await EncryptionHelper.init();
+      // هذا المفتاح مشفر Base64 وسنرسله للـ Isolate ليستخدمه للـ AES والـ ChaCha20
       String keyBase64 = EncryptionHelper.key.base64;
       
       // ✅ 1. توليد توكن عشوائي آمن عند بدء التشغيل
@@ -64,7 +66,7 @@ class LocalProxyService {
       _videoReceivePort = ReceivePort();
       _videoServerIsolate = await Isolate.spawn(
         _proxyServerEntryPoint, 
-        // ✅ تمرير التوكن للـ Isolate
+        // ✅ تمرير التوكن والمفتاح للـ Isolate
         _ProxyInitData(_videoReceivePort!.sendPort, keyBase64, "VideoIsolate", _authToken)
       );
       
@@ -83,7 +85,7 @@ class LocalProxyService {
       _audioReceivePort = ReceivePort();
       _audioServerIsolate = await Isolate.spawn(
         _proxyServerEntryPoint, 
-        // ✅ تمرير التوكن للـ Isolate
+        // ✅ تمرير التوكن والمفتاح للـ Isolate
         _ProxyInitData(_audioReceivePort!.sendPort, keyBase64, "AudioIsolate", _authToken)
       );
 
@@ -140,13 +142,16 @@ class _ProxyInitData {
 
 void _proxyServerEntryPoint(_ProxyInitData initData) async {
    try {
-     final key = encrypt.Key.fromBase64(initData.keyBase64);
-     final encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.gcm));
+     // ✅ تجهيز المفاتيح في المسار الخلفي بدون الحاجة لـ SecureStorage
+     final aesKey = encrypt.Key.fromBase64(initData.keyBase64);
+     final encrypter = encrypt.Encrypter(encrypt.AES(aesKey, mode: encrypt.AESMode.gcm));
+     final List<int> chachaKeyBytes = base64Decode(initData.keyBase64);
      
      final router = Router();
-     // ✅ تمرير التوكن لدالة المعالجة
-     router.get('/video', (Request req) => _handleRequest(req, encrypter, initData.name, initData.authToken));
-     router.head('/video', (Request req) => _handleRequest(req, encrypter, initData.name, initData.authToken));
+     
+     // ✅ نمرر كلا المفتاحين (للقديم والجديد) لدالة المعالجة
+     router.get('/video', (Request req) => _handleRequest(req, encrypter, chachaKeyBytes, initData.name, initData.authToken));
+     router.head('/video', (Request req) => _handleRequest(req, encrypter, chachaKeyBytes, initData.name, initData.authToken));
      
      // Use port 0 to let the system choose an available port
      final server = await shelf_io.serve(
@@ -167,7 +172,7 @@ void _proxyServerEntryPoint(_ProxyInitData initData) async {
    }
 }
 
-Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, String isolateName, String expectedToken) async {
+Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, List<int> chachaKeyBytes, String isolateName, String expectedToken) async {
   final requestStopwatch = Stopwatch()..start(); 
   
   try {
@@ -205,9 +210,9 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
 
     if (isV2) {
        // --- نظام ChaCha20 الجديد ---
-       final int CHUNK_SIZE = FileCryptoService.CHUNK_SIZE; // 32KB
-       final int NONCE_LENGTH = FileCryptoService.NONCE_LENGTH; // 12 bytes
-       final int ENCRYPTED_CHUNK_SIZE = NONCE_LENGTH + CHUNK_SIZE;
+       const int CHUNK_SIZE = 32 * 1024; 
+       const int NONCE_LENGTH = 12; 
+       const int ENCRYPTED_CHUNK_SIZE = NONCE_LENGTH + CHUNK_SIZE;
        
        int numChunks = (encryptedLength / ENCRYPTED_CHUNK_SIZE).ceil();
        originalFileSize = encryptedLength - (numChunks * NONCE_LENGTH);
@@ -262,7 +267,7 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
     return Response(
       206, 
       body: isV2 
-          ? _createDecryptedStreamV2(file, start, end, isolateName)
+          ? _createDecryptedStreamV2(file, start, end, chachaKeyBytes, isolateName) // ✅ نمرر المفتاح مباشرة
           : _createDecryptedStream(file, start, end, encrypter, isolateName),
       headers: headers,
     );
@@ -273,41 +278,78 @@ Future<Response> _handleRequest(Request request, encrypt.Encrypter encrypter, St
   }
 }
 
-// ✅ دالة جديدة لمعالجة وتشغيل الفيديوهات بنظام ChaCha20 (V2) السريع
-Stream<List<int>> _createDecryptedStreamV2(File file, int reqStart, int reqEnd, String isolateName) async* {
+// ✅ دالة فك التشفير V2 المستقلة داخل الـ Isolate (آمنة تماماً)
+Stream<List<int>> _createDecryptedStreamV2(File file, int reqStart, int reqEnd, List<int> chachaKeyBytes, String isolateName) async* {
   final streamStopwatch = Stopwatch()..start(); 
-  final int requiredLength = reqEnd - reqStart + 1;
+  RandomAccessFile? raf;
   int totalSent = 0;
+  final int requiredLength = reqEnd - reqStart + 1;
   
   try {
-    const int MAX_READ_SIZE = 512 * 1024; // فك التشفير في كتل 512 كيلوبايت للحفاظ على الرام
-    int currentOffset = reqStart;
+    raf = await file.open(mode: FileMode.read);
     
-    while (currentOffset <= reqEnd) {
+    // تهيئة محرك ChaCha20 محلياً في الـ Isolate بدون الاعتماد على SecureStorage
+    final algorithm = crypto.Chacha20(macAlgorithm: crypto.MacAlgorithm.empty);
+    final secretKey = crypto.SecretKey(chachaKeyBytes);
+
+    const int CHUNK_SIZE = 32 * 1024;
+    const int NONCE_LENGTH = 12;
+    const int ENCRYPTED_CHUNK_SIZE = NONCE_LENGTH + CHUNK_SIZE;
+
+    final int fileSize = await file.length();
+    int currentReadOffset = reqStart;
+    int remainingLength = requiredLength;
+    
+    while (remainingLength > 0) {
       if (totalSent >= requiredLength) break;
       
-      int readLen = min(MAX_READ_SIZE, reqEnd - currentOffset + 1);
+      // تحديد أي كتلة (Chunk) نحتاج قراءتها
+      int chunkIndex = currentReadOffset ~/ CHUNK_SIZE;
+      int chunkStartInFile = chunkIndex * ENCRYPTED_CHUNK_SIZE;
+
+      if (chunkStartInFile >= fileSize) break;
+
+      await raf.setPosition(chunkStartInFile);
+      final encryptedBlock = await raf.read(ENCRYPTED_CHUNK_SIZE);
+
+      if (encryptedBlock.isEmpty || encryptedBlock.length <= NONCE_LENGTH) break;
+
+      final nonce = encryptedBlock.sublist(0, NONCE_LENGTH);
+      final cipherText = encryptedBlock.sublist(NONCE_LENGTH);
+
+      // فك تشفير الكتلة بالكامل
+      final decryptedChunk = await algorithm.decrypt(
+        crypto.SecretBox(cipherText, nonce: nonce, mac: crypto.Mac.empty),
+        secretKey: secretKey,
+      );
+
+      // أخذ الجزء المطلوب فقط من الكتلة
+      int startInChunk = currentReadOffset % CHUNK_SIZE;
+      int availableInChunk = decryptedChunk.length - startInChunk;
+
+      if (availableInChunk <= 0) break;
+
+      int bytesToTake = min(remainingLength, availableInChunk);
+      final dataChunk = decryptedChunk.sublist(startInChunk, startInChunk + bytesToTake);
+
+      yield dataChunk;
       
-      // نستخدم الدالة من FileCryptoService التي تعالج الكتل المعقدة تلقائياً
-      Uint8List data = await FileCryptoService.readAndDecryptRange(file, currentOffset, readLen);
-      
-      if (data.isEmpty) break;
-      
-      yield data;
-      totalSent += data.length;
-      currentOffset += data.length;
+      totalSent += dataChunk.length;
+      currentReadOffset += dataChunk.length;
+      remainingLength -= dataChunk.length;
     }
-    print("✅ [PROXY_V2_DONE] $isolateName | Total sent: $totalSent bytes | Time: ${streamStopwatch.elapsedMilliseconds}ms");
+    
+    print("✅ [PROXY_V2_DONE] $isolateName | Sent: $totalSent bytes | Time: ${streamStopwatch.elapsedMilliseconds}ms");
   } catch(e) {
-      print("Stream V2 Error: $e");
+      print("❌ Stream V2 Error: $e");
   } finally {
-    // إرسال بايتات فارغة إذا انقطع الاتصال فجأة لمنع تعليق المشغل
     if (totalSent < requiredLength) {
         int missingBytes = requiredLength - totalSent;
         if (missingBytes > 0 && missingBytes < 1024 * 1024) { 
            yield Uint8List(missingBytes);
         }
     }
+    await raf?.close();
   }
 }
 
@@ -332,10 +374,6 @@ Stream<List<int>> _createDecryptedStream(File file, int reqStart, int reqEnd, en
     final fileLen = await file.length();
     
     int loopCount = 0;
-    
-    int totalReadTime = 0;
-    int totalDecryptTime = 0;
-    int chunksProcessed = 0;
 
     for (int i = startChunkIndex; i <= endChunkIndex; i++) {
       if (totalSent >= requiredLength) break;
@@ -343,8 +381,6 @@ Stream<List<int>> _createDecryptedStream(File file, int reqStart, int reqEnd, en
       if (++loopCount % 32 == 0) {
           await Future.delayed(Duration.zero);
       }
-
-      final chunkTimer = Stopwatch()..start();
 
       int seekPos = i * ENCRYPTED_CHUNK_SIZE;
       if (seekPos >= fileLen) break;
@@ -354,26 +390,19 @@ Stream<List<int>> _createDecryptedStream(File file, int reqStart, int reqEnd, en
       int bytesToRead = min(ENCRYPTED_CHUNK_SIZE, fileLen - seekPos);
       if (bytesToRead <= IV_LENGTH) break;
 
-      final readStart = chunkTimer.elapsedMicroseconds;
       Uint8List encryptedBlock = await raf.read(bytesToRead);
-      final readEnd = chunkTimer.elapsedMicroseconds;
-      totalReadTime += (readEnd - readStart);
-
       Uint8List outputBlock;
 
       try {
         if (encryptedBlock.length < IV_LENGTH) {
              outputBlock = Uint8List(0);
         } else {
-            final decryptStart = chunkTimer.elapsedMicroseconds;
             final iv = encrypt.IV(encryptedBlock.sublist(0, IV_LENGTH));
             final cipherBytes = encryptedBlock.sublist(IV_LENGTH);
             
             final decrypted = encrypter.decryptBytes(encrypt.Encrypted(cipherBytes), iv: iv);
             
             outputBlock = (decrypted is Uint8List) ? decrypted : Uint8List.fromList(decrypted);
-            final decryptEnd = chunkTimer.elapsedMicroseconds;
-            totalDecryptTime += (decryptEnd - decryptStart);
         }
 
       } catch (e) {
@@ -392,18 +421,9 @@ Stream<List<int>> _createDecryptedStream(File file, int reqStart, int reqEnd, en
           final dataChunk = outputBlock.sublist(sliceStart, sliceEnd);
           totalSent += dataChunk.length;
           yield dataChunk;
-          chunksProcessed++;
         }
       }
-      
-      if (chunksProcessed == 1 || chunksProcessed % 50 == 0) {
-          // Optional logging
-          // print("📊 [PROXY_STATS] $isolateName | Chunk #$chunksProcessed");
-      }
     }
-    
-    print("✅ [PROXY_DONE] $isolateName | Total sent: $totalSent bytes | Total Time: ${streamStopwatch.elapsedMilliseconds}ms");
-
   } catch(e) {
       print("Stream Error: $e");
   } finally {
