@@ -2,15 +2,17 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:flutter/widgets.dart'; // ✅ مهم للـ Observer
+import 'dart:isolate';
+import 'dart:convert';
+import 'package:flutter/widgets.dart'; 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:cryptography/cryptography.dart';
 
-import '../utils/encryption_helper.dart'; // للفيديو (AES)
-import 'file_crypto_service.dart'; // ✅ للملفات (ChaCha20)
 import 'notification_service.dart';
 import '../../core/services/storage_service.dart';
 import '../constants/api_constants.dart';
@@ -20,18 +22,13 @@ class DownloadManager with WidgetsBindingObserver {
   factory DownloadManager() => _instance;
 
   DownloadManager._internal() {
-    // ✅ 1. مراقبة حالة التطبيق لإلغاء التحميل عند الخروج
     WidgetsBinding.instance.addObserver(this);
-    
-    // ✅ 2. تنظيف أي إشعارات عالقة من المرة السابقة عند فتح التطبيق
     NotificationService().cancelAll();
   }
 
-  // ✅ التعامل مع إغلاق التطبيق
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
-      // التطبيق يتم إغلاقه كلياً (Swipe away or Kill)
       cancelAllDownloads();
     }
   }
@@ -43,13 +40,8 @@ class DownloadManager with WidgetsBindingObserver {
   ));
 
   static final Set<String> _activeDownloads = {};
-  
-  // خريطة لتخزين عناوين الدروس الجاري تحميلها لعرضها في الواجهة
   final Map<String, String> activeTitles = {}; 
-
-  // خريطة لتخزين توكن الإلغاء لكل درس
   static final Map<String, CancelToken> _cancelTokens = {}; 
-  
   static final ValueNotifier<Map<String, double>> downloadingProgress = ValueNotifier({});
   final String _baseUrl = ApiConstants.baseUrl;
   Timer? _keepAliveTimer;
@@ -85,18 +77,15 @@ class DownloadManager with WidgetsBindingObserver {
         : "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
   }
 
-  // ✅ دالة لإلغاء كل التحميلات دفعة واحدة (تستخدم عند الخروج)
   Future<void> cancelAllDownloads() async {
     final List<String> allIds = List.from(_cancelTokens.keys);
     for (var id in allIds) {
       await cancelDownload(id);
     }
-    // تنظيف شامل
     await NotificationService().cancelAll();
     _stopBackgroundService();
   }
 
-  // ✅ دالة إلغاء تحميل محدد
   Future<void> cancelDownload(String lessonId) async {
     if (_cancelTokens.containsKey(lessonId)) {
       try {
@@ -114,14 +103,11 @@ class DownloadManager with WidgetsBindingObserver {
     prog.remove(lessonId);
     downloadingProgress.value = prog;
 
-    // ✅ حذف الإشعار فوراً
     await NotificationService().cancelNotification(lessonId.hashCode);
     
     if (_activeDownloads.isEmpty) {
       _stopBackgroundService();
     }
-    
-    debugPrint("🛑 Download Cancelled: $lessonId");
   }
   
   void _startBackgroundService() async {
@@ -199,24 +185,30 @@ class DownloadManager with WidgetsBindingObserver {
     );
 
     try {
-      await EncryptionHelper.init();
+      // ✅ جلب مفتاح التشفير ChaCha20 من التخزين الآمن وتمريره للـ Isolates
+      final storage = const FlutterSecureStorage();
+      String? storedKey = await storage.read(key: 'docs_chacha_key');
+      if (storedKey == null) {
+        final rand = Random.secure();
+        final kb = List<int>.generate(32, (_) => rand.nextInt(256));
+        storedKey = base64Encode(kb);
+        await storage.write(key: 'docs_chacha_key', value: storedKey);
+      }
+      final List<int> chachaKeyBytes = base64Decode(storedKey);
+
       var box = await StorageService.openBox('auth_box');
-      
-      // ✅ استخراج التوكن والبصمة
       final deviceId = box.get('device_id');
       final token = box.get('jwt_token');
       const String appSecret = String.fromEnvironment('APP_SECRET');
 
-      // ✅ بناء الهيدرز الموحدة
       final Map<String, dynamic> requestHeaders = {
         'Authorization': 'Bearer $token',
         'x-device-id': deviceId,
         'x-app-secret': appSecret,
       };
 
-      if (token == null) throw Exception("User auth missing (Token not found)");
+      if (token == null) throw Exception("User auth missing");
 
-      // Links Preparation
       String? finalVideoUrl = downloadUrl;
       String? finalAudioUrl = audioUrl;
 
@@ -227,7 +219,7 @@ class DownloadManager with WidgetsBindingObserver {
            final res = await _dio.get(
             '$_baseUrl/api/secure/get-video-id',
             queryParameters: {'lessonId': lessonId},
-            options: Options(headers: requestHeaders), // ✅ استخدام الهيدرز الجديدة
+            options: Options(headers: requestHeaders), 
             cancelToken: cancelToken,
           );
           if (res.statusCode == 200 && res.data['url'] != null) {
@@ -236,7 +228,7 @@ class DownloadManager with WidgetsBindingObserver {
         }
       }
       
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(path: finalVideoUrl!), type: DioExceptionType.cancel);
       if (finalVideoUrl == null) throw Exception("Link not found");
 
       if (!isPdf && (duration.isEmpty || duration == "--:--")) {
@@ -244,7 +236,6 @@ class DownloadManager with WidgetsBindingObserver {
         if (ext.isNotEmpty) duration = ext;
       }
 
-      // Paths
       final appDir = await getApplicationDocumentsDirectory();
       final safeCourse = courseName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
       final safeSubject = subjectName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
@@ -253,21 +244,22 @@ class DownloadManager with WidgetsBindingObserver {
       final dir = Directory('${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter');
       if (!await dir.exists()) await dir.create(recursive: true);
 
-      final String videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
+      // ✅ التشفير الجديد ChaCha20 V2 لجميع الملفات
+      final String videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_${quality}_v2.enc";
       final String videoSavePath = '${dir.path}/$videoFileName';
       
       String? audioSavePath;
       if (finalAudioUrl != null) {
-        audioSavePath = '${dir.path}/aud_${lessonId}_hq.enc';
+        audioSavePath = '${dir.path}/aud_${lessonId}_hq_v2.enc';
       }
 
-      // Execution
       if (isPdf) {
-        // ✅ تحميل PDF وتشفيره بنظام الأجزاء لتمكين فك التشفير عند الطلب
-        await _downloadAndEncryptPdfNew(
+        // 📄 تحميل وتشفير الـ PDF عبر Isolate للحفاظ على استجابة الواجهة
+        await _runPdfDownloadAndEncrypt(
           url: finalVideoUrl,
           savePath: videoSavePath,
-          headers: requestHeaders, // ✅ تمرير الهيدرز
+          headers: requestHeaders,
+          keyBytes: chachaKeyBytes,
           cancelToken: cancelToken,
           onProgress: (p) {
              if (cancelToken.isCancelled) return;
@@ -275,29 +267,23 @@ class DownloadManager with WidgetsBindingObserver {
              prog[lessonId] = p;
              downloadingProgress.value = prog; 
              onProgress(p);
-             
              int percent = (p * 100).toInt();
              if (percent % 5 == 0) {
                notifService.showProgressNotification(
-                 id: notificationId, 
-                 title: "Downloading PDF...",
-                 body: "$percent%",
+                 id: notificationId, title: "Downloading PDF...", body: "$percent%",
                  progress: percent, maxProgress: 100
                );
              }
           }
         );
       } else {
-        // 🎥 تحميل فيديو (AES)
+        // 🎥 تحميل وتشفير الفيديو (والصوت إن وجد) باستخدام Isolates قوية وسريعة
         double vidProg = 0.0;
         double audProg = 0.0;
 
         void updateAggregatedProgress() {
           if (cancelToken.isCancelled) return;
-          double total = (finalAudioUrl != null) 
-              ? (vidProg * 0.80) + (audProg * 0.20)
-              : vidProg;
-              
+          double total = (finalAudioUrl != null) ? (vidProg * 0.80) + (audProg * 0.20) : vidProg;
           var prog = Map<String, double>.from(downloadingProgress.value);
           prog[lessonId] = total;
           downloadingProgress.value = prog; 
@@ -306,9 +292,7 @@ class DownloadManager with WidgetsBindingObserver {
           int percent = (total * 100).toInt();
           if (percent % 2 == 0) { 
             notifService.showProgressNotification(
-              id: notificationId, 
-              title: "Downloading: $videoTitle",
-              body: "$percent%",
+              id: notificationId, title: "Downloading: $videoTitle", body: "$percent%",
               progress: percent, maxProgress: 100,
             );
           }
@@ -316,19 +300,21 @@ class DownloadManager with WidgetsBindingObserver {
 
         final List<Future> tasks = [];
         
-        tasks.add(_downloadFileSmartly(
+        tasks.add(_runVideoDownloadIsolate(
           url: finalVideoUrl,
           savePath: videoSavePath,
-          headers: requestHeaders, // ✅ تمرير الهيدرز
+          headers: requestHeaders,
+          keyBytes: chachaKeyBytes,
           cancelToken: cancelToken,
           onProgress: (p) { vidProg = p; updateAggregatedProgress(); }
         ));
 
         if (finalAudioUrl != null && audioSavePath != null) {
-          tasks.add(_downloadFileSmartly(
+          tasks.add(_runVideoDownloadIsolate(
             url: finalAudioUrl,
             savePath: audioSavePath,
-            headers: requestHeaders, // ✅ تمرير الهيدرز
+            headers: requestHeaders,
+            keyBytes: chachaKeyBytes,
             cancelToken: cancelToken,
             onProgress: (p) { audProg = p; updateAggregatedProgress(); }
           ));
@@ -337,7 +323,7 @@ class DownloadManager with WidgetsBindingObserver {
         await Future.wait(tasks);
       }
 
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(path: finalVideoUrl), type: DioExceptionType.cancel);
 
       int totalSizeBytes = await File(videoSavePath).length();
       if (audioSavePath != null && await File(audioSavePath).exists()) {
@@ -345,8 +331,6 @@ class DownloadManager with WidgetsBindingObserver {
       }
 
       var downloadsBox = await StorageService.openBox('downloads_box');
-      
-      // ✅ التعديل هنا: استخدام مفتاح فريد يعتمد على النوع لتجنب التضارب
       String uniqueStorageKey = isPdf ? 'pdf_$lessonId' : 'vid_$lessonId';
 
       await downloadsBox.put(uniqueStorageKey, { 
@@ -365,7 +349,6 @@ class DownloadManager with WidgetsBindingObserver {
       });
 
       await notifService.cancelNotification(notificationId);
-      
       await notifService.showCompletionNotification(
         id: DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
         title: videoTitle,
@@ -376,9 +359,7 @@ class DownloadManager with WidgetsBindingObserver {
       onComplete();
 
     } catch (e, stack) {
-      // ✅ حذف الإشعار في حالة الخطأ أو الإلغاء
       await notifService.cancelNotification(notificationId);
-      
       bool isCancelled = (e is DioException && e.type == DioExceptionType.cancel);
       
       if (!isCancelled) {
@@ -399,21 +380,17 @@ class DownloadManager with WidgetsBindingObserver {
         final safeChapter = chapterName.replaceAll(RegExp(r'[^\w\s\u0600-\u06FF]+'), '');
         final dirPath = '${appDir.path}/offline_content/$safeCourse/$safeSubject/$safeChapter';
         
-        final videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_$quality.enc";
-        final audioFileName = 'aud_${lessonId}_hq.enc';
+        final videoFileName = isPdf ? "$lessonId.pdf.enc" : "vid_${lessonId}_${quality}_v2.enc";
+        final audioFileName = 'aud_${lessonId}_hq_v2.enc';
         
         final videoFile = File('$dirPath/$videoFileName');
         if (await videoFile.exists()) await videoFile.delete();
         
         final audioFile = File('$dirPath/$audioFileName');
         if (await audioFile.exists()) await audioFile.delete();
-        
-      } catch (cleanupError) {
-        print("Cleanup Error: $cleanupError");
-      }
+      } catch (_) {}
 
     } finally {
-      // Final Cleanup
       _activeDownloads.remove(lessonId);
       _cancelTokens.remove(lessonId); 
       activeTitles.remove(lessonId); 
@@ -428,13 +405,16 @@ class DownloadManager with WidgetsBindingObserver {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 📄 New PDF Downloader (ChaCha20) - تحميل ثم تشفير بالأجزاء
-  // ---------------------------------------------------------------------------
-  Future<void> _downloadAndEncryptPdfNew({
+  // ===========================================================================
+  // ⚡ إدارة الـ Isolates والتحميل والتشفير في الخلفية (Zero UI Blocking)
+  // ===========================================================================
+
+  /// تحميل ملف PDF الخام على الـ Main Thread ثم نقل التشفير الثقيل لـ Isolate
+  Future<void> _runPdfDownloadAndEncrypt({
     required String url,
     required String savePath,
     required Map<String, dynamic> headers,
+    required List<int> keyBytes,
     required Function(double) onProgress,
     required CancelToken cancelToken,
   }) async {
@@ -442,24 +422,50 @@ class DownloadManager with WidgetsBindingObserver {
     final tempPath = '${tempDir.path}/downloading_${DateTime.now().millisecondsSinceEpoch}.tmp';
     
     try {
-      // 1. تحميل الملف الخام (سريع)
+      // 1. تحميل الملف الخام (سريع جداً لا يؤثر على الواجهة)
       await _dio.download(
-        url,
-        tempPath,
+        url, tempPath,
         options: Options(headers: headers),
         cancelToken: cancelToken,
         onReceiveProgress: (rec, total) {
-          if (total != -1) onProgress(rec / total);
+           if (total != -1) onProgress((rec / total) * 0.90); // نعطي 90% للتحميل و 10% للتشفير
         },
       );
+      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(path: url), type: DioExceptionType.cancel);
 
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+      // 2. تشغيل التشفير في مسار معالج منفصل Isolate (لمنع تجمد الواجهة)
+      final ReceivePort port = ReceivePort();
+      final isolate = await Isolate.spawn(_pdfEncryptIsolateEntryPoint, {
+        'inputPath': tempPath,
+        'outputPath': savePath,
+        'keyBytes': keyBytes,
+        'sendPort': port.sendPort,
+      });
 
-      // 2. التعديل الجوهري: التشفير بنظام الأجزاء (encryptFileChunked) بدلاً من التشفير المستمر
-      // هذا يسمح بفك التشفير عند الطلب لاحقاً دون تحميل الملف كاملاً في الذاكرة
-      await FileCryptoService.encryptFileChunked(tempPath, savePath);
+      final completer = Completer<void>();
+      
+      // إذا ألغى الطالب التحميل، نقتل الـ Isolate فوراً!
+      final cancelSub = cancelToken.whenCancel.then((_) {
+         isolate.kill(priority: Isolate.immediate);
+         if (!completer.isCompleted) completer.completeError(DioException(requestOptions: RequestOptions(path: url), type: DioExceptionType.cancel));
+      });
 
-      // 3. حذف الملف الخام
+      port.listen((message) {
+         if (message == 'done') {
+            port.close();
+            isolate.kill();
+            onProgress(1.0);
+            if (!completer.isCompleted) completer.complete();
+         } else if (message is String && message.startsWith('error:')) {
+            port.close();
+            isolate.kill();
+            if (!completer.isCompleted) completer.completeError(Exception(message));
+         }
+      });
+
+      await completer.future;
+
+      // 3. مسح الملف الخام بعد نجاح التشفير
       final tempFile = File(tempPath);
       if (await tempFile.exists()) await tempFile.delete();
 
@@ -472,181 +478,268 @@ class DownloadManager with WidgetsBindingObserver {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // 🎥 Video Downloader (Legacy AES) - يعمل كما هو بدون تغيير
-  // ---------------------------------------------------------------------------
-
-  Future<void> _downloadFileSmartly({
+  /// تحميل وتشفير الفيديوهات (HLS أو MP4) بالكامل داخل Isolate مستقل
+  Future<void> _runVideoDownloadIsolate({
     required String url,
     required String savePath,
     required Map<String, dynamic> headers,
-    required Function(double) onProgress,
+    required List<int> keyBytes,
     required CancelToken cancelToken,
+    required Function(double) onProgress,
   }) async {
-    if (url.contains('.m3u8') || url.contains('.m3u')) {
-      final saveFile = File(savePath);
-      final sink = await saveFile.open(mode: FileMode.write);
-      List<int> buffer = [];
-      try {
-         await _downloadHls(url, sink, buffer, onProgress, cancelToken);
-         if (buffer.isNotEmpty) {
-           final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
-           await sink.writeFrom(enc);
-         }
-      } finally {
-        await sink.close();
+    final ReceivePort port = ReceivePort();
+    
+    // إنشاء المسار المستقل (Thread)
+    final isolate = await Isolate.spawn(_videoDownloadIsolateEntryPoint, {
+       'sendPort': port.sendPort,
+       'url': url,
+       'savePath': savePath,
+       'headers': headers,
+       'keyBytes': keyBytes,
+    });
+
+    final completer = Completer<void>();
+
+    // نظام القتل الفوري (Instant Kill) في حال ضغط المستخدم على إلغاء
+    final cancelSub = cancelToken.whenCancel.then((_) {
+       isolate.kill(priority: Isolate.immediate);
+       if (!completer.isCompleted) {
+         completer.completeError(DioException(requestOptions: RequestOptions(path: url), type: DioExceptionType.cancel));
+       }
+    });
+
+    // استقبال التقدم أو رسائل الانتهاء/الخطأ من المسار المنفصل
+    port.listen((message) {
+       if (message is double) {
+          onProgress(message);
+       } else if (message == 'done') {
+          port.close();
+          isolate.kill();
+          if (!completer.isCompleted) completer.complete();
+       } else if (message is String && message.startsWith('error:')) {
+          port.close();
+          isolate.kill();
+          if (!completer.isCompleted) completer.completeError(Exception(message));
+       }
+    });
+
+    await completer.future;
+  }
+}
+
+// ===========================================================================
+// 🛡️ Isolates Entry Points (تجنب وضع أي أكواد متعلقة بالواجهة هنا)
+// ===========================================================================
+
+/// دالة مسار التشفير لملفات الـ PDF (تعمل في الخلفية)
+void _pdfEncryptIsolateEntryPoint(Map<String, dynamic> args) async {
+   final String inputPath = args['inputPath'];
+   final String outputPath = args['outputPath'];
+   final List<int> keyBytes = args['keyBytes'];
+   final SendPort sendPort = args['sendPort'];
+   
+   try {
+      final inFile = File(inputPath);
+      final outFile = File(outputPath);
+      final rafRead = await inFile.open(mode: FileMode.read);
+      final iosWrite = outFile.openWrite();
+      
+      final algorithm = Chacha20(macAlgorithm: MacAlgorithm.empty);
+      final secretKey = SecretKey(keyBytes);
+      const CHUNK_SIZE = 32 * 1024;
+      const NONCE_LENGTH = 12;
+
+      final int fileLength = await inFile.length();
+      int currentPos = 0;
+
+      while (currentPos < fileLength) {
+         final chunk = await rafRead.read(CHUNK_SIZE);
+         final nonce = List<int>.generate(NONCE_LENGTH, (i) => Random.secure().nextInt(256));
+         final secretBox = await algorithm.encrypt(chunk, secretKey: secretKey, nonce: nonce);
+         
+         iosWrite.add(nonce);
+         iosWrite.add(secretBox.cipherText);
+         currentPos += chunk.length;
       }
-      return;
-    }
+      await rafRead.close();
+      await iosWrite.close();
+      sendPort.send('done');
+   } catch(e) {
+      sendPort.send('error: $e');
+   }
+}
 
-    int totalBytes = 0;
-    try {
-      final headRes = await _dio.head(url, options: Options(headers: headers), cancelToken: cancelToken);
-      totalBytes = int.parse(headRes.headers.value(Headers.contentLengthHeader) ?? '0');
-    } catch (_) {}
+/// دالة مسار التحميل والتشفير المباشر للفيديوهات (تعمل في الخلفية)
+void _videoDownloadIsolateEntryPoint(Map<String, dynamic> args) async {
+   final SendPort sendPort = args['sendPort'];
+   try {
+     final String url = args['url'];
+     final String savePath = args['savePath'];
+     final Map<String, dynamic> rawHeaders = args['headers'];
+     final List<int> keyBytes = args['keyBytes'];
 
-    const int chunkSize = 1 * 1024 * 1024; 
-    int downloadedBytes = 0;
-    final saveFile = File(savePath);
-    final sink = await saveFile.open(mode: FileMode.write);
-    List<int> buffer = [];
+     // تحويل الـ Headers لتتوافق مع Dio داخل الـ Isolate
+     final Map<String, String> headers = rawHeaders.map((key, value) => MapEntry(key, value.toString()));
 
-    try {
-      if (totalBytes <= 0) {
-         await _downloadStreamBasic(url, sink, buffer, onProgress, headers, cancelToken);
-         if (buffer.isNotEmpty) {
-           final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
-           await sink.writeFrom(enc);
+     final algorithm = Chacha20(macAlgorithm: MacAlgorithm.empty);
+     final secretKey = SecretKey(keyBytes);
+     const int CHUNK_SIZE = 32 * 1024;
+     const int NONCE_LENGTH = 12;
+
+     // دالة مساعدة لتشفير الكتل فورياً
+     Future<Uint8List> encryptData(List<int> data) async {
+        final nonce = List<int>.generate(NONCE_LENGTH, (i) => Random.secure().nextInt(256));
+        final box = await algorithm.encrypt(data, secretKey: secretKey, nonce: nonce);
+        final builder = BytesBuilder(copy: false);
+        builder.add(nonce);
+        builder.add(box.cipherText);
+        return builder.toBytes();
+     }
+
+     final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 60), receiveTimeout: const Duration(seconds: 60)));
+     
+     // 1. نظام HLS (m3u8)
+     if (url.contains('.m3u8') || url.contains('.m3u')) {
+         final response = await dio.get(url, options: Options(headers: headers));
+         final content = response.data.toString();
+         final baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+         List<String> tsUrls = [];
+         
+         for (var line in content.split('\n')) {
+           line = line.trim();
+           if (line.isNotEmpty && !line.startsWith('#')) {
+             tsUrls.add(line.startsWith('http') ? line : baseUrl + line);
+           }
          }
+         
+         if (tsUrls.isEmpty) throw Exception("No TS segments found");
+         
+         final file = File(savePath);
+         final sink = await file.open(mode: FileMode.write);
+         List<int> buffer = [];
+         int total = tsUrls.length;
+         int done = 0;
+         const int batchSize = 8;
+         
+         for (int i = 0; i < total; i += batchSize) {
+            int end = min(i + batchSize, total);
+            List<String> batchUrls = tsUrls.sublist(i, end);
+            List<Future<List<int>?>> futures = batchUrls.map((u) async {
+               try {
+                 final rs = await dio.get<List<int>>(u, options: Options(headers: headers, responseType: ResponseType.bytes, receiveTimeout: const Duration(seconds: 20)));
+                 return rs.data;
+               } catch (e) { return null; }
+            }).toList();
+            
+            List<List<int>?> results = await Future.wait(futures);
+            for (var data in results) {
+               if (data != null) {
+                  buffer.addAll(data);
+                  while (buffer.length >= CHUNK_SIZE) {
+                     final block = buffer.sublist(0, CHUNK_SIZE);
+                     buffer.removeRange(0, CHUNK_SIZE);
+                     final enc = await encryptData(block);
+                     await sink.writeFrom(enc);
+                  }
+               }
+               done++;
+               sendPort.send(done / total);
+            }
+         }
+         if (buffer.isNotEmpty) {
+             final enc = await encryptData(buffer);
+             await sink.writeFrom(enc);
+         }
+         await sink.close();
+         sendPort.send('done');
          return;
-      }
+     }
 
-      while (downloadedBytes < totalBytes) {
-        if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
+     // 2. نظام MP4 المباشر (Chunked/Streamed)
+     int totalBytes = 0;
+     try {
+       final headRes = await dio.head(url, options: Options(headers: headers));
+       totalBytes = int.parse(headRes.headers.value(Headers.contentLengthHeader) ?? '0');
+     } catch (_) {}
 
+     final file = File(savePath);
+     final sink = await file.open(mode: FileMode.write);
+     List<int> buffer = [];
+
+     // إذا لم يدعم السيرفر تحديد الحجم، نقوم بالتحميل المباشر الكامل
+     if (totalBytes <= 0) {
+        final res = await dio.get(url, options: Options(responseType: ResponseType.stream, headers: headers));
+        int received = 0;
+        int total = int.parse(res.headers.value(Headers.contentLengthHeader) ?? '-1');
+        Stream<Uint8List> stream = res.data.stream;
+        
+        await for (final chunk in stream) {
+           buffer.addAll(chunk);
+           while (buffer.length >= CHUNK_SIZE) {
+              final block = buffer.sublist(0, CHUNK_SIZE);
+              buffer.removeRange(0, CHUNK_SIZE);
+              final enc = await encryptData(block);
+              await sink.writeFrom(enc);
+           }
+           received += chunk.length;
+           if (total != -1) sendPort.send(received / total);
+        }
+        if (buffer.isNotEmpty) {
+           final enc = await encryptData(buffer);
+           await sink.writeFrom(enc);
+        }
+        await sink.close();
+        sendPort.send('done');
+        return;
+     }
+
+     // نظام تقسيم التحميل لضمان استقراره (1 ميجا لكل طلب)
+     const int reqChunkSize = 1 * 1024 * 1024; 
+     int downloadedBytes = 0;
+     
+     while (downloadedBytes < totalBytes) {
         int start = downloadedBytes;
-        int end = min(start + chunkSize - 1, totalBytes - 1);
+        int end = min(start + reqChunkSize - 1, totalBytes - 1);
         
         bool chunkSuccess = false;
-        int retries = 5; 
-
+        int retries = 5;
+        
         while (retries > 0 && !chunkSuccess) {
-          if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
-          try {
-            await _downloadChunkAndEncrypt(
-              url: url, start: start, end: end, headers: headers, sink: sink, buffer: buffer,
-              cancelToken: cancelToken,
-            );
-            chunkSuccess = true;
-            downloadedBytes += (end - start + 1);
-            onProgress(downloadedBytes / totalBytes);
-          } catch (e) {
-            if (e is DioException && e.type == DioExceptionType.cancel) throw e;
-            retries--;
-            if (retries == 0) throw Exception("Failed chunk");
-            await Future.delayed(const Duration(seconds: 2)); 
-          }
+           try {
+              final res = await dio.get(url, options: Options(
+                 responseType: ResponseType.stream,
+                 headers: {...headers, 'Range': 'bytes=$start-$end'}
+              ));
+              
+              Stream<Uint8List> stream = res.data.stream;
+              await for (final chunk in stream) {
+                 buffer.addAll(chunk);
+                 while (buffer.length >= CHUNK_SIZE) {
+                    final block = buffer.sublist(0, CHUNK_SIZE);
+                    buffer.removeRange(0, CHUNK_SIZE);
+                    final enc = await encryptData(block);
+                    await sink.writeFrom(enc);
+                 }
+              }
+              chunkSuccess = true;
+              downloadedBytes += (end - start + 1);
+              sendPort.send(downloadedBytes / totalBytes);
+           } catch (e) {
+              retries--;
+              if (retries == 0) throw Exception("Failed to download chunk after retries");
+              await Future.delayed(const Duration(seconds: 2));
+           }
         }
-      }
-
-      if (buffer.isNotEmpty) {
-        final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(buffer));
+     }
+     
+     if (buffer.isNotEmpty) {
+        final enc = await encryptData(buffer);
         await sink.writeFrom(enc);
-        buffer.clear();
-      }
-
-    } finally {
-      await sink.close();
-    }
-  }
-
-  Future<void> _downloadChunkAndEncrypt({
-    required String url, required int start, required int end, required Map<String, dynamic> headers,
-    required RandomAccessFile sink, required List<int> buffer, required CancelToken cancelToken,
-  }) async {
-    final response = await _dio.get(
-      url,
-      options: Options(
-        responseType: ResponseType.stream,
-        headers: {...headers, 'Range': 'bytes=$start-$end'},
-      ),
-      cancelToken: cancelToken,
-    );
-
-    Stream<Uint8List> stream = response.data.stream;
-    await for (final chunk in stream) {
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
-      buffer.addAll(chunk);
-      while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
-        final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
-        buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-        final encrypted = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
-        await sink.writeFrom(encrypted);
-      }
-    }
-  }
-
-  Future<void> _downloadStreamBasic(String url, RandomAccessFile sink, List<int> buffer, Function(double) onProgress, Map<String, dynamic> headers, CancelToken cancelToken) async {
-    final response = await _dio.get(url, options: Options(responseType: ResponseType.stream, headers: headers), cancelToken: cancelToken);
-    int total = int.parse(response.headers.value(Headers.contentLengthHeader) ?? '-1');
-    int received = 0;
-    Stream<Uint8List> stream = response.data.stream;
-    await for (final chunk in stream) {
-      if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
-      buffer.addAll(chunk);
-      while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
-        final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
-        buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-        final encrypted = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
-        await sink.writeFrom(encrypted);
-      }
-      received += chunk.length;
-      if (total != -1) onProgress(received / total);
-    }
-  }
-
-  Future<void> _downloadHls(String m3u8Url, RandomAccessFile sink, List<int> buffer, Function(double) onProgress, CancelToken cancelToken) async {
-      final response = await _dio.get(m3u8Url, cancelToken: cancelToken);
-      final content = response.data.toString();
-      final baseUrl = m3u8Url.substring(0, m3u8Url.lastIndexOf('/') + 1);
-      List<String> tsUrls = [];
-      for (var line in content.split('\n')) {
-        line = line.trim();
-        if (line.isNotEmpty && !line.startsWith('#')) tsUrls.add(line.startsWith('http') ? line : baseUrl + line);
-      }
-      if (tsUrls.isEmpty) throw Exception("No TS segments");
-      
-      int total = tsUrls.length;
-      int done = 0;
-      int batchSize = 8; 
-
-      for (int i = 0; i < total; i += batchSize) {
-        if (cancelToken.isCancelled) throw DioException(requestOptions: RequestOptions(), type: DioExceptionType.cancel);
-        
-        int end = min(i + batchSize, total);
-        List<String> batchUrls = tsUrls.sublist(i, end);
-        List<Future<List<int>?>> futures = batchUrls.map((url) async {
-          try {
-            final rs = await _dio.get<List<int>>(url, options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(seconds: 15)), cancelToken: cancelToken);
-            return rs.data;
-          } catch (e) { return null; }
-        }).toList();
-
-        List<List<int>?> results = await Future.wait(futures);
-        
-        for (var data in results) {
-          if (data != null) {
-            buffer.addAll(data); 
-            while (buffer.length >= EncryptionHelper.CHUNK_SIZE) {
-              final block = buffer.sublist(0, EncryptionHelper.CHUNK_SIZE);
-              buffer.removeRange(0, EncryptionHelper.CHUNK_SIZE);
-              final enc = EncryptionHelper.encryptBlock(Uint8List.fromList(block));
-              await sink.writeFrom(enc);
-            }
-          }
-          done++;
-          onProgress(done / total);
-        }
-      }
-  }
+     }
+     await sink.close();
+     sendPort.send('done');
+     
+   } catch (e) {
+     sendPort.send('error: $e');
+   }
 }
