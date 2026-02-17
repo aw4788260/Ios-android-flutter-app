@@ -7,7 +7,7 @@ class TeacherService {
   final Dio _dio = Dio();
   // ⚠️ تأكد من أن هذا الرابط صحيح ويعمل
   final String baseUrl = ApiConstants.apiUrl;
-  
+
   // يفضل تعريف Secret التطبيق هنا أو جلبه من البيئة لضمان المرور من حماية السيرفر
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
 
@@ -20,7 +20,7 @@ class TeacherService {
     final Map<String, dynamic> headers = {
       'Authorization': 'Bearer $token',
       'x-device-id': deviceId,
-      'x-app-secret': _appSecret, 
+      'x-app-secret': _appSecret,
     };
 
     if (!isUpload) {
@@ -40,10 +40,10 @@ class TeacherService {
       final options = await _getHeaders();
       // إرسال طلب GET لجلب البيانات
       final response = await _dio.get(
-        '$baseUrl/teacher/update-profile', 
+        '$baseUrl/teacher/update-profile',
         options: options,
       );
-      
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         return response.data['data'];
       } else {
@@ -51,7 +51,7 @@ class TeacherService {
       }
     } catch (e) {
       if (e is DioException) {
-         throw Exception(e.response?.data['error'] ?? "فشل الاتصال بالسيرفر");
+        throw Exception(e.response?.data['error'] ?? "فشل الاتصال بالسيرفر");
       }
       throw Exception("خطأ غير متوقع: $e");
     }
@@ -62,18 +62,18 @@ class TeacherService {
     try {
       final options = await _getHeaders(isUpload: true);
       String fileName = file.path.split('/').last;
-      
+
       FormData formData = FormData.fromMap({
         "file": await MultipartFile.fromFile(file.path, filename: fileName),
       });
 
       // استخدام الـ API الجديد المخصص للصور الشخصية
       final response = await _dio.post(
-        '$baseUrl/user/upload-avatar', 
+        '$baseUrl/user/upload-avatar',
         data: formData,
         options: options,
       );
-      
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         return response.data['url'];
       } else {
@@ -105,7 +105,7 @@ class TeacherService {
       );
     } catch (e) {
       if (e is DioException) {
-         throw Exception(e.response?.data['error'] ?? "فشل تحديث البيانات");
+        throw Exception(e.response?.data['error'] ?? "فشل تحديث البيانات");
       }
       throw Exception("خطأ غير متوقع: $e");
     }
@@ -116,24 +116,21 @@ class TeacherService {
   // ==========================================================
   Future<dynamic> manageContent({
     required String action, // 'create', 'update', 'delete'
-    required String type,   // 'courses', 'subjects', 'chapters', 'videos', 'pdfs'
+    required String type, // 'courses', 'subjects', 'chapters', 'videos', 'pdfs'
     required Map<String, dynamic> data,
   }) async {
     try {
       final options = await _getHeaders();
       final response = await _dio.post(
         '$baseUrl/teacher/content',
-        data: {
-          'action': action,
-          'type': type,
-          'data': data
-        },
+        data: {'action': action, 'type': type, 'data': data},
         options: options,
       );
       return response.data;
     } catch (e) {
       if (e is DioException) {
-         throw Exception(e.response?.data['error'] ?? "حدث خطأ في الاتصال بالسيرفر");
+        throw Exception(
+            e.response?.data['error'] ?? "حدث خطأ في الاتصال بالسيرفر");
       }
       throw Exception("فشل تنفيذ العملية: $e");
     }
@@ -142,11 +139,12 @@ class TeacherService {
   // ==========================================================
   // 2️⃣ رفع الملفات العامة (للمحتوى)
   // ==========================================================
-  Future<String> uploadFile(File file, {Function(int sent, int total)? onProgress}) async {
+  Future<String> uploadFile(File file,
+      {Function(int sent, int total)? onProgress}) async {
     try {
       final options = await _getHeaders(isUpload: true);
       String fileName = file.path.split('/').last;
-      
+
       FormData formData = FormData.fromMap({
         "file": await MultipartFile.fromFile(file.path, filename: fileName),
       });
@@ -161,7 +159,7 @@ class TeacherService {
           }
         },
       );
-      
+
       if (response.statusCode == 200 && response.data['success'] == true) {
         return response.data['url'];
       } else {
@@ -175,7 +173,7 @@ class TeacherService {
   // ==========================================================
   // 3️⃣ إدارة الطلبات والطلاب
   // ==========================================================
-  
+
   // جلب الطلبات المعلقة
   // ✅ دالة جلب الطلبات (تم التعديل لدعم الحالات والصفحات)
   Future<List<dynamic>> getRequests({String status = 'pending', int page = 1}) async {
@@ -201,7 +199,8 @@ class TeacherService {
   }
 
   // قبول أو رفض طلب اشتراك
-  Future<void> handleRequest(String requestId, bool approve, {String? reason}) async {
+  Future<void> handleRequest(String requestId, bool approve,
+      {String? reason}) async {
     final options = await _getHeaders();
     await _dio.post(
       '$baseUrl/teacher/students',
@@ -229,7 +228,8 @@ class TeacherService {
   }
 
   // منح أو سحب صلاحية
-  Future<void> toggleAccess(String studentId, String type, String itemId, bool allow) async {
+  Future<void> toggleAccess(
+      String studentId, String type, String itemId, bool allow) async {
     final options = await _getHeaders();
     await _dio.post(
       '$baseUrl/teacher/students',
@@ -237,7 +237,7 @@ class TeacherService {
         'action': 'manage_access',
         'payload': {
           'studentId': studentId,
-          'type': type, 
+          'type': type,
           'itemId': itemId,
           'allow': allow
         }
@@ -260,7 +260,7 @@ class TeacherService {
   // ==========================================================
   // 4️⃣ إدارة فريق العمل
   // ==========================================================
-  
+
   // جلب أعضاء الفريق
   Future<List<dynamic>> getTeamMembers() async {
     final options = await _getHeaders();
@@ -284,7 +284,8 @@ class TeacherService {
   }
 
   // إدارة العضو
-  Future<void> manageTeamMember({required String action, required String userId}) async {
+  Future<void> manageTeamMember(
+      {required String action, required String userId}) async {
     final options = await _getHeaders();
     await _dio.post(
       '$baseUrl/teacher/team',
@@ -299,20 +300,17 @@ class TeacherService {
   // ==========================================================
   // 5️⃣ الامتحانات (إنشاء - تعديل - حذف - إحصائيات)
   // ==========================================================
-  
+
   // إنشاء أو تحديث امتحان
   Future<void> createExam(Map<String, dynamic> examData) async {
     final options = await _getHeaders();
-    
+
     // تحديد نوع العملية بناءً على وجود المعرف
     String action = examData.containsKey('examId') ? 'update' : 'create';
 
     await _dio.post(
       '$baseUrl/teacher/exams',
-      data: {
-        'action': action,
-        'payload': examData
-      },
+      data: {'action': action, 'payload': examData},
       options: options,
     );
   }
@@ -320,7 +318,7 @@ class TeacherService {
   // ✅ حذف امتحان
   Future<void> deleteExam(String examId) async {
     final options = await _getHeaders();
-    
+
     await _dio.post(
       '$baseUrl/teacher/exams',
       data: {
@@ -356,7 +354,7 @@ class TeacherService {
   // ==========================================================
   // 6️⃣ الإحصائيات المالية (NEW)
   // ==========================================================
-  
+
   // جلب الإحصائيات المالية والطلاب
   Future<Map<String, dynamic>> getFinancialStats() async {
     try {
@@ -368,7 +366,8 @@ class TeacherService {
       return response.data;
     } catch (e) {
       if (e is DioException) {
-         throw Exception(e.response?.data['error'] ?? "فشل جلب الإحصائيات المالية");
+        throw Exception(
+            e.response?.data['error'] ?? "فشل جلب الإحصائيات المالية");
       }
       throw Exception('فشل جلب الإحصائيات المالية: $e');
     }
