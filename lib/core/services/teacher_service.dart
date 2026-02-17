@@ -177,14 +177,27 @@ class TeacherService {
   // ==========================================================
   
   // جلب الطلبات المعلقة
-  Future<List<dynamic>> getPendingRequests() async {
+  // ✅ دالة جلب الطلبات (تم التعديل لدعم الحالات والصفحات)
+  Future<List<dynamic>> getRequests({String status = 'pending', int page = 1}) async {
     final options = await _getHeaders();
     final response = await _dio.get(
       '$baseUrl/teacher/students',
-      queryParameters: {'mode': 'requests'},
+      queryParameters: {
+        'mode': 'requests',
+        'status': status,
+        'page': page,
+        'limit': 10 // تحديد إرجاع 10 فقط في كل مرة
+      },
       options: options,
     );
-    return response.data;
+    
+    // التوافق مع تعديل الباك إند (إرجاع {data, count})
+    if (response.data is Map<String, dynamic> && response.data.containsKey('data')) {
+      return response.data['data'] as List<dynamic>;
+    } else if (response.data is List) {
+      return response.data; 
+    }
+    return [];
   }
 
   // قبول أو رفض طلب اشتراك
