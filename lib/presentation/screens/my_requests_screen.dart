@@ -164,6 +164,11 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     final String? userNote = req['user_note'];
     final bool hasNote = userNote != null && userNote.trim().isNotEmpty;
     
+    // ✅ استخراج الأسعار وتحديد وجود خصم
+    final num originalPrice = req['total_price'] ?? 0;
+    final num? actualPaidPrice = req['actual_paid_price'];
+    final bool hasDiscount = req['has_discount'] == true || (actualPaidPrice != null && actualPaidPrice < originalPrice);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
@@ -207,10 +212,33 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text(
-            "${req['total_price']} EGP", 
-            style: TextStyle(color: AppColors.accentYellow, fontSize: 14, fontWeight: FontWeight.bold),
-          ),
+          
+          // ✅ عرض السعر مع الخصم إذا وجد
+          if (hasDiscount)
+            Row(
+              children: [
+                Text(
+                  "$originalPrice EGP", 
+                  style: TextStyle(
+                    color: AppColors.textSecondary, 
+                    fontSize: 12, 
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: AppColors.error,
+                    decorationThickness: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "$actualPaidPrice EGP", 
+                  style: TextStyle(color: AppColors.accentYellow, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            )
+          else
+            Text(
+              "$originalPrice EGP", 
+              style: TextStyle(color: AppColors.accentYellow, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
 
           // ✅ عرض الملاحظة هنا
           if (hasNote)
