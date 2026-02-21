@@ -312,7 +312,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (Platform.isAndroid) {
           serverFreeMode = false;
         }
-        await box.put('free_mode_v2', serverFreeMode);
+        await box.put('free_mode', serverFreeMode);
       }
     } catch (_) {
     } finally {
@@ -357,7 +357,7 @@ class _SplashScreenState extends State<SplashScreen>
         if (Platform.isAndroid) {
           serverFreeMode = false;
         }
-        await box.put('free_mode_v2', serverFreeMode);
+        await box.put('free_mode', serverFreeMode);
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
         // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ
