@@ -307,12 +307,12 @@ class _SplashScreenState extends State<SplashScreen>
         AppState().updateFromInitData(response.data);
 
         // ✅ حفظ حالة الوضع المجاني للزائر (الاسم القديم)
-        bool serverFreeMode = response.data['freeMode'] ?? false;
+        // 🔒 المنطق: إذا كان أندرويد -> دايماً false، لو آيفون -> خد من السيرفر
+        bool serverFreeMode = response.data['freeModeV2'] ?? false;
         if (Platform.isAndroid) {
-          await box.put('free_mode', false);
-        } else {
-          await box.put('free_mode', serverFreeMode);
+          serverFreeMode = false;
         }
+        await box.put('free_mode', serverFreeMode);
       }
     } catch (_) {
     } finally {
@@ -352,12 +352,12 @@ class _SplashScreenState extends State<SplashScreen>
         AppState().updateFromInitData(response.data);
 
         // ✅ حفظ حالة الوضع المجاني باستخدام الاسم القديم (freeMode)
-        bool serverFreeMode = response.data['freeMode'] ?? false;
+        // 🔒 المنطق: إذا كان أندرويد -> دايماً false، لو آيفون -> خد من السيرفر
+        bool serverFreeMode = response.data['freeModeV2'] ?? false;
         if (Platform.isAndroid) {
-          await box.put('free_mode', false);
-        } else {
-          await box.put('free_mode', serverFreeMode);
+          serverFreeMode = false;
         }
+        await box.put('free_mode', serverFreeMode);
 
         // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
         // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ

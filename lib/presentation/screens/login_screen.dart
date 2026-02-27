@@ -188,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
         AppState().updateFromInitData(response.data);
 
         // ✅ [تعديل] معالجة الوضع المجاني للضيف
-        bool serverFreeMode = response.data['freeMode'] ?? false;
+        bool serverFreeMode = response.data['freeModeV2'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد
         if (Platform.isAndroid) {
@@ -243,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
         AppState().updateFromInitData(response.data);
 
         // ✅ [تعديل] استقبال المتغير باسم freeMode القديم وحفظه
-        bool serverFreeMode = response.data['freeMode'] ?? false;
+        bool serverFreeMode = response.data['freeModeV2'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد دائماً
         if (Platform.isAndroid) {
