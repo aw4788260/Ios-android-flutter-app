@@ -199,7 +199,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
-      // ✅ التعديل (الدمج): إيقاف الصوت والفيديو معاً فوراً وإظهار الدائرة لـ 10 ثوانٍ
+      // ✅ اكتشاف انقطاع الإنترنت وإيقاف المشغل مؤقتاً لـ 10 ثوانٍ
       _player.stream.error.listen((error) {
         final errorString = error.toString().toLowerCase();
 
@@ -216,8 +216,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               _lastKnownPosition = _player.state.position;
             }
 
-            // 🛑 الإيقاف الفوري الإجباري للمشغل لمنع الصوت من الاستمرار بينما الصورة متوقفة
-            _player.pause();
+            // 🛑 الإيقاف الفوري للمشغل لمنع الصوت من الاستمرار بينما الصورة متوقفة
+            if (!_isVideoLoading) {
+               _player.pause();
+            }
 
             // إظهار دائرة التحميل بدلاً من الخطأ المباشر
             setState(() {
@@ -245,13 +247,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       });
 
-      // ✅ التعديل: التعامل مع حالة الـ Buffering لضمان توقف الصوت مع الصورة
+      // ✅ التعديل لحل مشكلة الدائرة اللانهائية (التفريق بين التحميل الأولي وانقطاع النت)
       _player.stream.buffering.listen((buffering) {
         if (buffering) {
-           // أثناء التحميل الطبيعي أو نقص البيانات، نظهر الدائرة ونوقف المشغل لمنع استمرار الصوت
-           if (mounted && !_isDisposing) {
-             _player.pause(); // 🛑 إيقاف قسري يضمن عدم هروب الصوت عن الصورة
-             if (!_isVideoLoading && !_isError) {
+           // 🛑 نوقف المشغل فقط إذا لم يكن هذا هو التحميل الأولي (أي أنه قطع في المنتصف)
+           if (mounted && !_isDisposing && !_isVideoLoading) {
+             _player.pause(); // إيقاف قسري يضمن عدم هروب الصوت عن الصورة
+             if (!_isError) {
                setState(() => _isVideoLoading = true);
              }
            }
@@ -584,7 +586,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  // ✅ التعديل (تحديد الأولوية: 480 ⬅️ 360 ⬅️ 720 ⬅️ أعلى جودة متاحة)
+  // ✅ تحديد الأولوية: 480 ⬅️ 360 ⬅️ 720 ⬅️ أعلى جودة متاحة
   void _parseQualities() {
     if (widget.streams.isEmpty) {
       setState(() {
@@ -658,8 +660,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  // ✅ التعديل (حل مشكلة أبعاد الشاشة والمربع الأسود عند الخروج): 
-  // فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
+  // ✅ فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
   Future<void> _resetSystemChrome() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: SystemUiOverlay.values);
@@ -804,9 +805,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                               
                           setState(() {
                             _isError = false;
-                            _isVideoLoading = true;
+                            _isVideoLoading = true; // إظهار الدائرة عند بدء الإعادة
                           });
                           
+                          // تمرير مكان التوقف ليعمل الفيديو من نفس النقطة
                           _playVideo(widget.streams[_currentQuality]!, startAt: targetPos);
                         },
                         style: ElevatedButton.styleFrom(
