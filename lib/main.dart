@@ -13,12 +13,62 @@ import 'package:audio_session/audio_session.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:secure_display/secure_display.dart';
 
+// ✅ استيراد حزمة الخلفية
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+
 import 'core/services/notification_service.dart';
 import 'core/services/app_state.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> snackbarKey =
     GlobalKey<ScaffoldMessengerState>();
+
+// ✅ دالة تهيئة خدمة الخلفية
+Future<void> initializeBackgroundService() async {
+  final service = FlutterBackgroundService();
+
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onIosBackgroundServiceStart, // الدالة التي ستعمل في الخلفية
+      autoStart: false, // ⚠️ مهم جداً: لا تبدأها تلقائياً لتجنب الحظر، ستبدأ مع التحميل
+      isForegroundMode: true,
+      autoStartOnBoot: false,
+      notificationChannelId: 'downloads_channel', 
+      initialNotificationTitle: 'مــــداد',
+      initialNotificationContent: 'Initializing Service...',
+      foregroundServiceType: AndroidForegroundType.dataSync, // ✅ تحديد النوع هنا أيضاً
+    ),
+    iosConfiguration: IosConfiguration(
+      autoStart: false,
+      onForeground: onIosBackgroundServiceStart,
+      onBackground: onIosBackgroundServiceStart, // أو دالة منفصلة للـ iOS
+    ),
+  );
+}
+
+// ✅ دالة التشغيل الفعلية (يجب أن تكون خارج أي Class أو Top Level)
+@pragma('vm:entry-point')
+void onIosBackgroundServiceStart(ServiceInstance service) async {
+  if (service is AndroidServiceInstance) {
+    service.on('setAsForeground').listen((event) {
+      service.setAsForegroundService();
+    });
+
+    service.on('setAsBackground').listen((event) {
+      service.setAsBackgroundService();
+    });
+  }
+
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+
+  service.on('keepAlive').listen((event) {
+     // يمكنك وضع كود هنا إذا أردت استلام إشارات من الواجهة الأمامية
+  });
+}
+
 
 void main() async {
   runZonedGuarded<Future<void>>(() async {
@@ -31,7 +81,9 @@ void main() async {
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
     await NotificationService().init();
-    // await initializeService();
+    
+    // ✅ استدعاء التهيئة هنا
+    await initializeBackgroundService();
 
     // Hive
     await Hive.initFlutter();
@@ -104,5 +156,3 @@ Future<void> _enableSecureMode() async {
     debugPrint("Security Mode Error: $e");
   }
 }
-
-
