@@ -199,7 +199,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
-      // ✅ التعديل (الدمج): إظهار الدائرة لـ 10 ثوانٍ قبل إظهار زر إعادة المحاولة
+      // ✅ التعديل: إيقاف الصوت والفيديو معاً فوراً عند اكتشاف خطأ الشبكة، ثم بدء مهلة الـ 10 ثوانٍ
       _player.stream.error.listen((error) {
         final errorString = error.toString().toLowerCase();
 
@@ -216,6 +216,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               _lastKnownPosition = _player.state.position;
             }
 
+            // 🛑 الإيقاف الفوري الإجباري للمشغل لمنع الصوت من الاستمرار بينما الصورة متوقفة
+            _player.pause();
+
             // إظهار دائرة التحميل بدلاً من الخطأ المباشر
             setState(() {
               _isVideoLoading = true;
@@ -231,7 +234,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                   _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
                   _isVideoLoading = false;
                 });
-                _player.pause();
               }
             });
           }
@@ -243,8 +245,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       });
 
+      // ✅ التعديل: التعامل مع حالة الـ Buffering لضمان توقف الصوت مع الصورة
       _player.stream.buffering.listen((buffering) {
-        if (!buffering) {
+        if (buffering) {
+           // أثناء التحميل الطبيعي أو نقص البيانات، نظهر الدائرة ونوقف المشغل لمنع استمرار الصوت
+           if (mounted && !_isDisposing) {
+             _player.pause(); // 🛑 إيقاف قسري يضمن عدم هروب الصوت عن الصورة
+             if (!_isVideoLoading && !_isError) {
+               setState(() => _isVideoLoading = true);
+             }
+           }
+        } else {
           // ✅ إذا نجح المشغل في التحميل وعاد الإنترنت، نلغي مؤقت الخطأ
           _networkTimeoutTimer?.cancel();
           
@@ -261,14 +272,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             if (_isOfflineMode) {
               _startCountdown();
             } else {
-              _player.play();
+              _player.play(); // استئناف التشغيل المتزامن للصوت والصورة
             }
           }
-        } else {
-           // أثناء التحميل الطبيعي، نظهر الدائرة
-           if (mounted && !_isVideoLoading && !_isError) {
-             setState(() => _isVideoLoading = true);
-           }
         }
       });
 
