@@ -195,8 +195,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
+      // ✅ التعديل الأول (حل مشكلة الاتصال): اكتشاف انقطاع الإنترنت وإبلاغ المستخدم
       _player.stream.error.listen((error) {
-        if (!error.toString().contains("Failed to open")) {
+        final errorString = error.toString().toLowerCase();
+
+        if (errorString.contains('tcp') ||
+            errorString.contains('timeout') ||
+            errorString.contains('ffurl_read') ||
+            errorString.contains('resolve hostname') ||
+            errorString.contains('route to host') ||
+            errorString.contains('decoding audio')) {
+          
+          if (mounted && !_isDisposing) {
+            setState(() {
+              _isError = true;
+              _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
+              _isVideoLoading = false;
+            });
+            _player.pause(); // إيقاف المشغل لمنع التخبط
+          }
+        }
+
+        if (!errorString.contains("failed to open")) {
           FirebaseCrashlytics.instance
               .recordError(error, null, reason: 'MediaKit Stream Error');
         }
@@ -237,7 +257,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       if (mounted) {
         setState(() {
           _isError = true;
-          _errorMessage = "Init Failed: $e";
+          _errorMessage = "فشل في تهيئة المشغل: $e";
           _isVideoLoading = false;
         });
       }
@@ -347,7 +367,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       if (mounted && !_isDisposing) {
         setState(() {
           _isError = true;
-          _errorMessage = "Failed to load video.";
+          _errorMessage = "فشل في تحميل الفيديو.";
           _isVideoLoading = false;
         });
       }
@@ -402,7 +422,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
           children: [
             const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text("Settings",
+                child: Text("الإعدادات",
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -410,7 +430,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             const Divider(color: Colors.white24),
             ListTile(
               leading: const Icon(LucideIcons.monitor, color: Colors.white),
-              title: Text("Quality: $_currentQuality",
+              title: Text("الجودة: $_currentQuality",
                   style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -419,7 +439,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             ),
             ListTile(
               leading: const Icon(LucideIcons.gauge, color: Colors.white),
-              title: Text("Speed: ${_currentSpeed}x",
+              title: Text("السرعة: ${_currentSpeed}x",
                   style: const TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -532,7 +552,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (widget.streams.isEmpty) {
       setState(() {
         _isError = true;
-        _errorMessage = "No video sources available";
+        _errorMessage = "لا يوجد مصادر متاحة لهذا الفيديو.";
         _isVideoLoading = false;
       });
       return;
@@ -595,10 +615,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
+  // ✅ التعديل الثاني (حل مشكلة أبعاد الشاشة والمربع الأسود عند الخروج): 
+  // فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
   Future<void> _resetSystemChrome() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: SystemUiOverlay.values);
-    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+    await Future.delayed(const Duration(milliseconds: 250)); // مهلة الرسم
   }
 
   Future<void> _safeExit() async {
@@ -612,8 +637,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       _countdownTimer?.cancel();
       await _player.stop();
       await _player.dispose();
-      await _resetSystemChrome();
       await WakelockPlus.disable();
+      
+      // التأكد من استدعاء إرجاع الأبعاد بشكل صحيح ومزامنتها قبل الخروج
+      await _resetSystemChrome(); 
     } catch (e) {
       debugPrint("⚠️ SafeExit Error: $e");
     } finally {
@@ -708,36 +735,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                       CircularProgressIndicator(color: AppColors.accentYellow))
             else if (_isError)
               Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, color: AppColors.error, size: 48),
-                    const SizedBox(height: 16),
-                    Text(_errorMessage,
-                        style: const TextStyle(color: Colors.white),
-                        textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        FirebaseCrashlytics.instance
-                            .log("🔄 User clicked Retry");
-                        setState(() => _isError = false);
-                        _playVideo(widget.streams[_currentQuality]!);
-                      },
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.accentYellow),
-                      child: const Text("Retry",
-                          style: TextStyle(color: Colors.black)),
-                    )
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.wifi_off_rounded, color: AppColors.error, size: 64),
+                      const SizedBox(height: 16),
+                      Text(_errorMessage,
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh, color: Colors.black),
+                        onPressed: () {
+                          FirebaseCrashlytics.instance
+                              .log("🔄 User clicked Retry on network error");
+                          setState(() => _isError = false);
+                          _playVideo(widget.streams[_currentQuality]!);
+                        },
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentYellow,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+                        label: const Text("إعادة المحاولة",
+                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                      )
+                    ],
+                  ),
                 ),
               )
             else
               Center(
-                child: MaterialVideoControlsTheme(
-                  normal: controlsTheme,
-                  fullscreen: controlsTheme,
-                  child: Video(controller: _controller, fit: BoxFit.contain),
+                // ✅ التعديل الثالث (حل مشكلة انهيار شريط التقديم Null Check):
+                // نمنع لمس المشغل والشريط بالكامل إذا كان هناك خطأ أو يتم إغلاق الشاشة
+                child: IgnorePointer(
+                  ignoring: _isDisposing || _isError,
+                  child: MaterialVideoControlsTheme(
+                    normal: controlsTheme,
+                    fullscreen: controlsTheme,
+                    child: Video(controller: _controller, fit: BoxFit.contain),
+                  ),
                 ),
               ),
 
