@@ -43,6 +43,9 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
   Alignment _watermarkAlignment = Alignment.topRight;
   String _userIdText = "";
 
+  // ✅ متغير لحالة الإغلاق لمنع أخطاء اللمس
+  bool _isDisposing = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,7 +93,6 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
   Future<void> _initializeProtection() async {
     try {
       // منع Screenshot & Screen Recording
-      // ✅ تم التصحيح هنا: استخدام FlutterWindowManagerPlus بدلاً من FlutterWindowManager
       await FlutterWindowManagerPlus.addFlags(
           FlutterWindowManagerPlus.FLAG_SECURE);
 
@@ -184,7 +186,7 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
 
   void _startWatermarkAnimation() {
     _watermarkTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) {
+      if (mounted && !_isDisposing) {
         setState(() {
           final random = Random();
           double x = (random.nextDouble() * 1.8) - 0.9;
@@ -193,6 +195,34 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
         });
       }
     });
+  }
+
+  // ✅ التعديل لحل مشكلة أبعاد الشاشة والرجوع الآمن
+  Future<void> _safeExit() async {
+    if (_isDisposing) return;
+
+    if (mounted) setState(() => _isDisposing = true);
+
+    try {
+      _watermarkTimer?.cancel();
+      _controller.pause();
+      
+      await WakelockPlus.disable();
+
+      // استعادة وضع النظام الطبيعي مع فرض الوضع الطولي (Portrait)
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+          overlays: SystemUiOverlay.values);
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      
+      // ✅ المهلة الزمنية لكي يتمكن الأندرويد من إعادة رسم الشاشة قبل الخروج
+      await Future.delayed(const Duration(milliseconds: 250));
+    } catch (e) {
+      debugPrint("⚠️ SafeExit Error: $e");
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -206,152 +236,164 @@ class _YoutubePlayerScreenState extends State<YoutubePlayerScreen>
     WidgetsBinding.instance.removeObserver(this); // ✅ إزالة المراقب
     _recordingSubscription?.cancel();
     _protectionService.stopMonitoring();
-    WakelockPlus.disable(); // ✅ إيقاف Wakelock
-
     _watermarkTimer?.cancel();
+    
+    // تأكد من الإغلاق الآمن في حال تم تدمير الـ Widget بشكل غير متوقع
+    if (!_isDisposing) {
+      WakelockPlus.disable();
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+          overlays: SystemUiOverlay.values);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
+
     _controller.removeListener(_playerListener);
     _controller.dispose();
-
-    // استعادة وضع النظام الطبيعي
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: SystemUiOverlay.values);
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
 
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // استخدام PopScope لمنع الرجوع في حالة التحذير الأمني إذا أردت، أو تركها للتحكم اليدوي
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // 1. مشغل الفيديو
-          Center(
-            child: YoutubePlayer(
-              controller: _controller,
-              showVideoProgressIndicator: true,
-              progressIndicatorColor: AppColors.accentYellow,
-              progressColors: ProgressBarColors(
-                playedColor: AppColors.accentYellow,
-                handleColor: AppColors.accentYellow,
-              ),
-              bottomActions: [
-                const CurrentPosition(),
-                const SizedBox(width: 10),
-                const ProgressBar(isExpanded: true),
-                const SizedBox(width: 10),
-                const RemainingDuration(),
-                const PlaybackSpeedButton(),
-              ],
-            ),
-          ),
-
-          // 2. العلامة المائية المتحركة
-          AnimatedAlign(
-            duration: const Duration(seconds: 2),
-            curve: Curves.easeInOut,
-            alignment: _watermarkAlignment,
-            child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _userIdText,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
+    // ✅ استخدام PopScope لمنع الرجوع الافتراضي واستخدام _safeExit
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        await _safeExit();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            // 1. مشغل الفيديو
+            Center(
+              // ✅ التعديل لحل مشكلة انهيار اللمس (Null Check Operator)
+              child: IgnorePointer(
+                ignoring: _isDisposing,
+                child: YoutubePlayer(
+                  controller: _controller,
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: AppColors.accentYellow,
+                  progressColors: ProgressBarColors(
+                    playedColor: AppColors.accentYellow,
+                    handleColor: AppColors.accentYellow,
                   ),
+                  bottomActions: [
+                    const CurrentPosition(),
+                    const SizedBox(width: 10),
+                    const ProgressBar(isExpanded: true),
+                    const SizedBox(width: 10),
+                    const RemainingDuration(),
+                    const PlaybackSpeedButton(),
+                  ],
                 ),
               ),
             ),
-          ),
 
-          // 3. زر الرجوع والعنوان
-          Positioned(
-            top: 20,
-            left: 20,
-            child: SafeArea(
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(LucideIcons.arrowLeft,
-                          color: Colors.white, size: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            // 2. العلامة المائية المتحركة
+            if (!_isDisposing)
+              AnimatedAlign(
+                duration: const Duration(seconds: 2),
+                curve: Curves.easeInOut,
+                alignment: _watermarkAlignment,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(4),
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      widget.title,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 4. ✅ شاشة التحذير الحمراء عند اكتشاف التسجيل (فوق كل شيء)
-          if (_isRecordingDetected)
-            Container(
-              color: Colors.red.shade900,
-              width: double.infinity,
-              height: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.block, color: Colors.white, size: 80),
-                  const SizedBox(height: 24),
-                  const Text(
-                    "SECURITY ALERT",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
+                      _userIdText,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 2.0),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    "Screen Recording Detected.\nPlayback has been disabled.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context); // الخروج من الشاشة
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.red.shade900,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 12),
+                        fontSize: 11,
+                      ),
                     ),
-                    child: const Text("CLOSE PLAYER",
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                  )
-                ],
+                  ),
+                ),
+              ),
+
+            // 3. زر الرجوع والعنوان
+            Positioned(
+              top: 20,
+              left: 20,
+              child: SafeArea(
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _safeExit(), // ✅ استدعاء الرجوع الآمن
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(LucideIcons.arrowLeft,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        widget.title,
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-        ],
+
+            // 4. ✅ شاشة التحذير الحمراء عند اكتشاف التسجيل (فوق كل شيء)
+            if (_isRecordingDetected)
+              Container(
+                color: Colors.red.shade900,
+                width: double.infinity,
+                height: double.infinity,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.block, color: Colors.white, size: 80),
+                    const SizedBox(height: 24),
+                    const Text(
+                      "SECURITY ALERT",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.0),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Screen Recording Detected.\nPlayback has been disabled.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () => _safeExit(), // ✅ استدعاء الرجوع الآمن
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.red.shade900,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 12),
+                      ),
+                      child: const Text("CLOSE PLAYER",
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
