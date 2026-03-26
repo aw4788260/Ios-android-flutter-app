@@ -61,6 +61,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   int _stabilizingCountdown = 0;
   Timer? _countdownTimer;
+  
+  // ✅ متغيرات جديدة لإدارة مهلة الـ 10 ثوانٍ وحفظ مكان التوقف
+  Timer? _networkTimeoutTimer;
+  Duration _lastKnownPosition = Duration.zero;
 
   bool _isDisposing = false;
 
@@ -195,7 +199,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
-      // ✅ التعديل الأول (حل مشكلة الاتصال): اكتشاف انقطاع الإنترنت وإبلاغ المستخدم
+      // ✅ التعديل (الدمج): إظهار الدائرة لـ 10 ثوانٍ قبل إظهار زر إعادة المحاولة
       _player.stream.error.listen((error) {
         final errorString = error.toString().toLowerCase();
 
@@ -206,13 +210,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             errorString.contains('route to host') ||
             errorString.contains('decoding audio')) {
           
-          if (mounted && !_isDisposing) {
+          if (mounted && !_isDisposing && !_isError) {
+            // ✅ حفظ مكان التوقف الحالي بدقة قبل أن يضيع من المشغل
+            if (_player.state.position > Duration.zero) {
+              _lastKnownPosition = _player.state.position;
+            }
+
+            // إظهار دائرة التحميل بدلاً من الخطأ المباشر
             setState(() {
-              _isError = true;
-              _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
-              _isVideoLoading = false;
+              _isVideoLoading = true;
             });
-            _player.pause(); // إيقاف المشغل لمنع التخبط
+
+            // بدء العداد لمدة 10 ثوانٍ
+            _networkTimeoutTimer?.cancel();
+            _networkTimeoutTimer = Timer(const Duration(seconds: 10), () {
+              if (mounted && !_isDisposing) {
+                // إذا مرت 10 ثوانٍ ولم يعد الاتصال، أظهر واجهة الخطأ
+                setState(() {
+                  _isError = true;
+                  _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
+                  _isVideoLoading = false;
+                });
+                _player.pause();
+              }
+            });
           }
         }
 
@@ -222,10 +243,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       });
 
-      // ✅ 4. منع التشغيل التلقائي عند انتهاء التحميل إذا كان هناك تسجيل
       _player.stream.buffering.listen((buffering) {
-        if (!buffering && _isVideoLoading) {
-          if (mounted) {
+        if (!buffering) {
+          // ✅ إذا نجح المشغل في التحميل وعاد الإنترنت، نلغي مؤقت الخطأ
+          _networkTimeoutTimer?.cancel();
+          
+          if (mounted && _isVideoLoading) {
             setState(() => _isVideoLoading = false);
 
             // 🛑 حارس الأمان: لا تشغل إذا تم اكتشاف تسجيل
@@ -241,6 +264,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               _player.play();
             }
           }
+        } else {
+           // أثناء التحميل الطبيعي، نظهر الدائرة
+           if (mounted && !_isVideoLoading && !_isError) {
+             setState(() => _isVideoLoading = true);
+           }
         }
       });
 
@@ -275,6 +303,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _playVideo(String url, {Duration? startAt}) async {
     if (_isDisposing) return;
+
+    _networkTimeoutTimer?.cancel(); // إلغاء أي مؤقت خطأ سابق
 
     setState(() {
       _isVideoLoading = true;
@@ -615,7 +645,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  // ✅ التعديل الثاني (حل مشكلة أبعاد الشاشة والمربع الأسود عند الخروج): 
+  // ✅ التعديل (حل مشكلة أبعاد الشاشة والمربع الأسود عند الخروج): 
   // فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
   Future<void> _resetSystemChrome() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
@@ -632,6 +662,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (mounted) setState(() => _isDisposing = true);
 
     try {
+      _networkTimeoutTimer?.cancel(); // إغلاق المؤقت
       _seekDebounceTimer?.cancel();
       _watermarkTimer?.cancel();
       _countdownTimer?.cancel();
@@ -653,6 +684,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     _recordingSubscription?.cancel();
     _protectionService.stopMonitoring();
+    _networkTimeoutTimer?.cancel();
 
     if (!_isDisposing) _safeExit();
     super.dispose();
@@ -751,8 +783,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                         onPressed: () {
                           FirebaseCrashlytics.instance
                               .log("🔄 User clicked Retry on network error");
-                          setState(() => _isError = false);
-                          _playVideo(widget.streams[_currentQuality]!);
+                              
+                          // ✅ استخدام مكان التوقف الذي تم حفظه قبل ظهور الخطأ، وإلا المكان الحالي
+                          final targetPos = _lastKnownPosition > Duration.zero 
+                              ? _lastKnownPosition 
+                              : _player.state.position;
+                              
+                          setState(() {
+                            _isError = false;
+                            _isVideoLoading = true; // إظهار الدائرة عند بدء الإعادة
+                          });
+                          
+                          // تمرير مكان التوقف ليعمل الفيديو من نفس النقطة
+                          _playVideo(widget.streams[_currentQuality]!, startAt: targetPos);
                         },
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accentYellow,
@@ -766,8 +809,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               )
             else
               Center(
-                // ✅ التعديل الثالث (حل مشكلة انهيار شريط التقديم Null Check):
-                // نمنع لمس المشغل والشريط بالكامل إذا كان هناك خطأ أو يتم إغلاق الشاشة
+                // ✅ منع اللمس لتفادي أخطاء Null Check على شريط التقديم عند الخروج
                 child: IgnorePointer(
                   ignoring: _isDisposing || _isError,
                   child: MaterialVideoControlsTheme(
