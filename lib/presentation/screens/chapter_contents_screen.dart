@@ -152,7 +152,9 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   // ===========================================================================
 
   void _showPlayerSelectionDialog(Map<String, dynamic> video) {
-    final bool hasYoutubeId = video['youtube_video_id'] != null && video['youtube_video_id'].toString().isNotEmpty;
+    // الكود الجديد الذي حل المشكلة
+final bool hasYoutubeId = video['hasId'] == true || 
+    (video['youtube_video_id'] != null && video['youtube_video_id'].toString().isNotEmpty);
     
     // ✅ تحويل الـ Map إلى الـ Model
     final settings = PlayerSettings.fromJson(widget.playerSettings);
