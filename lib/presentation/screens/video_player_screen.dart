@@ -584,7 +584,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  void _parseQualities() {
+ void _parseQualities() {
     if (widget.streams.isEmpty) {
       setState(() {
         _isError = true;
@@ -595,15 +595,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     _sortedQualities = widget.streams.keys.toList();
+    
+    // الترتيب هنا تصاعدي (من الأقل إلى الأعلى، مثلاً: 240, 360, 480, 720, 1080)
     _sortedQualities.sort((a, b) {
       int valA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       int valB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       return valA.compareTo(valB);
     });
 
-    _currentQuality = _sortedQualities.contains("480p")
-        ? "480p"
-        : (_sortedQualities.isNotEmpty ? _sortedQualities.first : "");
+    // تحديد الأولوية المطلوبة: 480 ثم 360 ثم 720
+    if (_sortedQualities.contains("480p")) {
+      _currentQuality = "480p";
+    } else if (_sortedQualities.contains("360p")) {
+      _currentQuality = "360p";
+    } else if (_sortedQualities.contains("720p")) {
+      _currentQuality = "720p";
+    } else {
+      // ✅ التعديل الجديد: إذا لم يجد أي جودة من السابق، يختار أعلى جودة متاحة (العنصر الأخير في القائمة المرتبة)
+      _currentQuality = _sortedQualities.isNotEmpty ? _sortedQualities.last : "";
+    }
 
     if (_currentQuality.isNotEmpty) {
       _playVideo(widget.streams[_currentQuality]!);
