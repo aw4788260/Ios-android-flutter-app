@@ -812,6 +812,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         courseTitle: courseTitle,
                         subjectTitle: widget.subjectTitle,
                         subjectId: widget.subjectId,
+                        // ✅ التعديل هنا: تم تمرير إعدادات المشغلات إلى الشاشة التالية
+                        playerSettings: _content?['player_settings'], 
                       )),
             ).then((updatedChapter) {
               if (updatedChapter != null && updatedChapter is Map) {
