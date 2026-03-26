@@ -11,13 +11,14 @@ import 'youtube_player_screen.dart';
 import 'pdf_viewer_screen.dart';
 import 'teacher/manage_content_screen.dart';
 import '../../core/constants/api_constants.dart';
+// ✅ تم استيراد موديل الإعدادات
+import '../../data/models/player_settings_model.dart'; 
 
 class ChapterContentsScreen extends StatefulWidget {
   final Map<String, dynamic> chapter;
   final String courseTitle;
   final String subjectTitle;
   final String subjectId;
-  // ✅ استقبال إعدادات المشغلات من الشاشة السابقة
   final Map<String, dynamic>? playerSettings;
 
   const ChapterContentsScreen({
@@ -108,34 +109,16 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   // ---------------------------------------------------------------------------
 
   bool _isVideoDownloadEnabled() {
-    final settings = widget.playerSettings ?? {};
-    return settings['downloads']?['video_enabled'] ?? true;
+    final settings = PlayerSettings.fromJson(widget.playerSettings);
+    return settings.downloads.videoEnabled;
   }
 
   bool _isPdfDownloadEnabled() {
-    final settings = widget.playerSettings ?? {};
-    return settings['downloads']?['pdf_enabled'] ?? true;
+    final settings = PlayerSettings.fromJson(widget.playerSettings);
+    return settings.downloads.pdfEnabled;
   }
 
-  List<Map<String, dynamic>> _getEnabledPlayers(bool hasYoutubeId) {
-    final settings = widget.playerSettings ?? {};
-    
-    // إعدادات افتراضية في حال لم تكن موجودة
-    final p1 = settings['player_1'] ?? {'enabled': true, 'name': 'First Player', 'description': 'High Performance', 'order': 1};
-    final p2 = settings['player_2'] ?? {'enabled': true, 'name': 'Third Player', 'description': 'Backup Player', 'order': 2};
-    final p3 = settings['player_3'] ?? {'enabled': false, 'name': 'Second Player (YouTube)', 'description': 'Multiple Qualities', 'order': 3};
-
-    List<Map<String, dynamic>> players = [];
-    
-    if (p1['enabled'] == true) players.add({'id': 'player_1', ...p1});
-    if (p2['enabled'] == true) players.add({'id': 'player_2', ...p2});
-    if (p3['enabled'] == true && hasYoutubeId) players.add({'id': 'youtube', ...p3});
-
-    // الترتيب تصاعدياً بناءً على order
-    players.sort((a, b) => (a['order'] ?? 99).compareTo(b['order'] ?? 99));
-    
-    return players;
-  }
+  // تم الاستغناء عن دالة _getEnabledPlayers لأننا نعتمد على الموديل
 
   // ---------------------------------------------------------------------------
   // 🟢 دوال مساعدة لحساب الحجم وتنسيقه
@@ -170,7 +153,12 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
 
   void _showPlayerSelectionDialog(Map<String, dynamic> video) {
     final bool hasYoutubeId = video['youtube_video_id'] != null && video['youtube_video_id'].toString().isNotEmpty;
-    final players = _getEnabledPlayers(hasYoutubeId);
+    
+    // ✅ تحويل الـ Map إلى الـ Model
+    final settings = PlayerSettings.fromJson(widget.playerSettings);
+    
+    // ✅ جلب المشغلات المفعلة والمرتبة باستخدام دالتك الذكية في الموديل
+    final players = settings.getSortedEnabledPlayers(hasYoutubeId);
 
     showModalBottomSheet(
       context: context,
@@ -200,25 +188,26 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                    child: Text("No active players available.", style: TextStyle(color: Colors.white54)),
                  ),
               ...players.map((player) {
-                // تحديد الأيقونة بناءً على نوع المشغل
+                // ✅ تحديد الأيقونة بناءً على الـ ID 
                 IconData icon = LucideIcons.playCircle;
-                if (player['id'] == 'player_1') icon = LucideIcons.rocket;
-                if (player['id'] == 'player_2') icon = LucideIcons.server;
-                if (player['id'] == 'youtube') icon = LucideIcons.youtube;
+                if (player.id == 'player_1') icon = LucideIcons.rocket;
+                if (player.id == 'player_2') icon = LucideIcons.server;
+                if (player.id == 'player_3') icon = LucideIcons.youtube;
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
                   child: _buildOptionTile(
                     icon: icon,
-                    title: player['name'] ?? 'Player',
-                    subtitle: player['description'] ?? '',
+                    title: player.name,
+                    subtitle: player.description,
                     onTap: () {
                       Navigator.pop(context);
-                      if (player['id'] == 'player_1') {
+                      // ✅ توجيه المستخدم بناءً على الـ ID 
+                      if (player.id == 'player_1') {
                         _fetchAndPlayWithExplode(video);
-                      } else if (player['id'] == 'player_2') {
+                      } else if (player.id == 'player_2') {
                         _fetchAndPlayVideo(video, useYoutube: false);
-                      } else if (player['id'] == 'youtube') {
+                      } else if (player.id == 'player_3') {
                         _fetchAndPlayVideo(video, useYoutube: true);
                       }
                     },
@@ -335,7 +324,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             'x-device-id': deviceId,
             'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
-          // ✅ زيادة مهلة الاتصال لـ 3 دقائق 
           receiveTimeout: const Duration(minutes: 3),
           sendTimeout: const Duration(minutes: 3),
         ),
@@ -428,7 +416,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
             'x-device-id': deviceId,
             'x-app-secret': const String.fromEnvironment('APP_SECRET'),
           },
-          // ✅ زيادة مهلة الاتصال لـ 3 دقائق 
           receiveTimeout: const Duration(minutes: 3),
           sendTimeout: const Duration(minutes: 3),
         ),
@@ -951,7 +938,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                               return _buildStatusButton("PROCESSING...",
                                   AppColors.accentYellow, LucideIcons.loader);
                             } else {
-                              // ✅ التحقق من إعدادات زر التحميل
+                              // ✅ إخفاء زر التحميل بناءً على الإعدادات
                               if (!_isVideoDownloadEnabled()) {
                                 return _buildStatusButton("DOWNLOAD DISABLED",
                                     AppColors.textSecondary, LucideIcons.lock);
@@ -1087,12 +1074,14 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                             bool isDownloaded = box.containsKey(storageKey);
                             bool isDownloading = progresses.containsKey(pdfId);
 
-                            if (isDownloaded)
+                            if (isDownloaded) {
                               return _buildStatusButton("SAVED",
                                   AppColors.success, LucideIcons.checkCircle);
-                            else if (isDownloading)
+                            }
+                            else if (isDownloading) {
                               return _buildStatusButton("PROCESSING...",
                                   AppColors.accentYellow, LucideIcons.loader);
+                            }
                             else {
                               // ✅ التحقق من إعدادات زر تحميل الـ PDF
                               if (!_isPdfDownloadEnabled()) {
