@@ -199,7 +199,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
-      // ✅ التعديل: إيقاف الصوت والفيديو معاً فوراً عند اكتشاف خطأ الشبكة، ثم بدء مهلة الـ 10 ثوانٍ
+      // ✅ التعديل (الدمج): إيقاف الصوت والفيديو معاً فوراً وإظهار الدائرة لـ 10 ثوانٍ
       _player.stream.error.listen((error) {
         final errorString = error.toString().toLowerCase();
 
@@ -584,7 +584,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
- void _parseQualities() {
+  // ✅ التعديل (تحديد الأولوية: 480 ⬅️ 360 ⬅️ 720 ⬅️ أعلى جودة متاحة)
+  void _parseQualities() {
     if (widget.streams.isEmpty) {
       setState(() {
         _isError = true;
@@ -595,15 +596,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     _sortedQualities = widget.streams.keys.toList();
-    
-    // الترتيب هنا تصاعدي (من الأقل إلى الأعلى، مثلاً: 240, 360, 480, 720, 1080)
     _sortedQualities.sort((a, b) {
       int valA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       int valB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       return valA.compareTo(valB);
     });
 
-    // تحديد الأولوية المطلوبة: 480 ثم 360 ثم 720
     if (_sortedQualities.contains("480p")) {
       _currentQuality = "480p";
     } else if (_sortedQualities.contains("360p")) {
@@ -611,7 +609,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     } else if (_sortedQualities.contains("720p")) {
       _currentQuality = "720p";
     } else {
-      // ✅ التعديل الجديد: إذا لم يجد أي جودة من السابق، يختار أعلى جودة متاحة (العنصر الأخير في القائمة المرتبة)
       _currentQuality = _sortedQualities.isNotEmpty ? _sortedQualities.last : "";
     }
 
@@ -794,23 +791,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                           style: const TextStyle(color: Colors.white, fontSize: 16),
                           textAlign: TextAlign.center),
                       const SizedBox(height: 24),
+                      // ✅ زر إعادة المحاولة يستكمل من نفس النقطة المحفوظة
                       ElevatedButton.icon(
                         icon: const Icon(Icons.refresh, color: Colors.black),
                         onPressed: () {
                           FirebaseCrashlytics.instance
                               .log("🔄 User clicked Retry on network error");
                               
-                          // ✅ استخدام مكان التوقف الذي تم حفظه قبل ظهور الخطأ، وإلا المكان الحالي
                           final targetPos = _lastKnownPosition > Duration.zero 
                               ? _lastKnownPosition 
                               : _player.state.position;
                               
                           setState(() {
                             _isError = false;
-                            _isVideoLoading = true; // إظهار الدائرة عند بدء الإعادة
+                            _isVideoLoading = true;
                           });
                           
-                          // تمرير مكان التوقف ليعمل الفيديو من نفس النقطة
                           _playVideo(widget.streams[_currentQuality]!, startAt: targetPos);
                         },
                         style: ElevatedButton.styleFrom(
