@@ -30,26 +30,26 @@ Future<void> initializeBackgroundService() async {
 
   await service.configure(
     androidConfiguration: AndroidConfiguration(
-      onStart: onIosBackgroundServiceStart, // الدالة التي ستعمل في الخلفية
+      onStart: onStartBackgroundService, // الدالة التي ستعمل في الخلفية
       autoStart: false, // ⚠️ مهم جداً: لا تبدأها تلقائياً لتجنب الحظر، ستبدأ مع التحميل
       isForegroundMode: true,
       autoStartOnBoot: false,
       notificationChannelId: 'downloads_channel', 
       initialNotificationTitle: 'مــــداد',
       initialNotificationContent: 'Initializing Service...',
-      foregroundServiceType: AndroidForegroundType.dataSync, // ✅ تحديد النوع هنا أيضاً
+      // تم إزالة foregroundServiceType من هنا لأن النظام سيعتمد على ما كتبناه في AndroidManifest.xml
     ),
     iosConfiguration: IosConfiguration(
       autoStart: false,
-      onForeground: onIosBackgroundServiceStart,
-      onBackground: onIosBackgroundServiceStart, // أو دالة منفصلة للـ iOS
+      onForeground: onStartBackgroundService,
+      onBackground: onIosBackground, // تم استخدام دالة مخصصة لـ iOS ترجع bool
     ),
   );
 }
 
 // ✅ دالة التشغيل الفعلية (يجب أن تكون خارج أي Class أو Top Level)
 @pragma('vm:entry-point')
-void onIosBackgroundServiceStart(ServiceInstance service) async {
+void onStartBackgroundService(ServiceInstance service) async {
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
       service.setAsForegroundService();
@@ -69,6 +69,12 @@ void onIosBackgroundServiceStart(ServiceInstance service) async {
   });
 }
 
+// ✅ دالة مخصصة للعمل في الخلفية في نظام iOS (يجب أن تُرجع قيمة boolean)
+@pragma('vm:entry-point')
+Future<bool> onIosBackground(ServiceInstance service) async {
+  // أعد true لإخبار نظام iOS أن العملية في الخلفية تمت بنجاح
+  return true;
+}
 
 void main() async {
   runZonedGuarded<Future<void>>(() async {
