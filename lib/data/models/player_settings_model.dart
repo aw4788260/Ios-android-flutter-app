@@ -16,7 +16,7 @@ class PlayerSettings {
     return PlayerSettings(
       player1: PlayerConfig.fromJson(json['player_1'], 'player_1', 1),
       player2: PlayerConfig.fromJson(json['player_2'], 'player_2', 2),
-      player3: PlayerConfig.fromJson(json['player_3'], 'youtube', 3),
+      player3: PlayerConfig.fromJson(json['player_3'], 'player_3', 3),
       downloads: DownloadSettings.fromJson(json['downloads']),
     );
   }
@@ -25,7 +25,7 @@ class PlayerSettings {
     return PlayerSettings(
       player1: PlayerConfig(id: 'player_1', enabled: true, name: "المشغل الأساسي", description: "سريع ومستقر", order: 1),
       player2: PlayerConfig(id: 'player_2', enabled: true, name: "سيرفر احتياطي", description: "استخدمه في حال التقطيع", order: 2),
-      player3: PlayerConfig(id: 'youtube', enabled: false, name: "مشغل يوتيوب", description: "جودة تلقائية", order: 3),
+      player3: PlayerConfig(id: 'player_3', enabled: false, name: "مشغل احتياطي ٢", description: "جودة تلقائية", order: 3),
       downloads: DownloadSettings(videoEnabled: true, pdfEnabled: true),
     );
   }
