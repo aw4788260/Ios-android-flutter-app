@@ -53,6 +53,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isError = false;
   String _errorMessage = "";
   bool _isInitialized = false;
+  
+  // ✅ متغير لحفظ مكان توقف الفيديو عند انقطاع الشبكة
+  Duration _errorPosition = Duration.zero;
 
   bool _isVideoLoading = true;
   bool _isOfflineMode = false;
@@ -61,10 +64,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   int _stabilizingCountdown = 0;
   Timer? _countdownTimer;
-  
-  // ✅ متغيرات جديدة لإدارة مهلة الـ 10 ثوانٍ وحفظ مكان التوقف
-  Timer? _networkTimeoutTimer;
-  Duration _lastKnownPosition = Duration.zero;
 
   bool _isDisposing = false;
 
@@ -199,7 +198,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
 
-      // ✅ اكتشاف انقطاع الإنترنت وإيقاف المشغل مؤقتاً لـ 10 ثوانٍ
+      // ✅ التعديل الأول (حل مشكلة الاتصال): اكتشاف انقطاع الإنترنت وإبلاغ المستخدم وحفظ مكان التوقف
       _player.stream.error.listen((error) {
         final errorString = error.toString().toLowerCase();
 
@@ -210,34 +209,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             errorString.contains('route to host') ||
             errorString.contains('decoding audio')) {
           
-          if (mounted && !_isDisposing && !_isError) {
-            // ✅ حفظ مكان التوقف الحالي بدقة قبل أن يضيع من المشغل
-            if (_player.state.position > Duration.zero) {
-              _lastKnownPosition = _player.state.position;
-            }
-
-            // 🛑 الإيقاف الفوري للمشغل لمنع الصوت من الاستمرار بينما الصورة متوقفة
-            if (!_isVideoLoading) {
-               _player.pause();
-            }
-
-            // إظهار دائرة التحميل بدلاً من الخطأ المباشر
+          if (mounted && !_isDisposing) {
+            final currentPos = _player.state.position; // حفظ مكان التوقف بدقة
             setState(() {
-              _isVideoLoading = true;
+              _isError = true;
+              _errorPosition = currentPos;
+              _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
+              _isVideoLoading = false;
             });
-
-            // بدء العداد لمدة 10 ثوانٍ
-            _networkTimeoutTimer?.cancel();
-            _networkTimeoutTimer = Timer(const Duration(seconds: 10), () {
-              if (mounted && !_isDisposing) {
-                // إذا مرت 10 ثوانٍ ولم يعد الاتصال، أظهر واجهة الخطأ
-                setState(() {
-                  _isError = true;
-                  _errorMessage = "حدثت مشكلة في الاتصال بالشبكة.\nيرجى التأكد من استقرار الإنترنت وإعادة المحاولة.";
-                  _isVideoLoading = false;
-                });
-              }
-            });
+            _player.pause(); // إيقاف المشغل لمنع التخبط
           }
         }
 
@@ -247,21 +227,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         }
       });
 
-      // ✅ التعديل لحل مشكلة الدائرة اللانهائية (التفريق بين التحميل الأولي وانقطاع النت)
+      // ✅ 4. منع التشغيل التلقائي عند انتهاء التحميل إذا كان هناك تسجيل
       _player.stream.buffering.listen((buffering) {
-        if (buffering) {
-           // 🛑 نوقف المشغل فقط إذا لم يكن هذا هو التحميل الأولي (أي أنه قطع في المنتصف)
-           if (mounted && !_isDisposing && !_isVideoLoading) {
-             _player.pause(); // إيقاف قسري يضمن عدم هروب الصوت عن الصورة
-             if (!_isError) {
-               setState(() => _isVideoLoading = true);
-             }
-           }
-        } else {
-          // ✅ إذا نجح المشغل في التحميل وعاد الإنترنت، نلغي مؤقت الخطأ
-          _networkTimeoutTimer?.cancel();
-          
-          if (mounted && _isVideoLoading) {
+        if (!buffering && _isVideoLoading) {
+          if (mounted) {
             setState(() => _isVideoLoading = false);
 
             // 🛑 حارس الأمان: لا تشغل إذا تم اكتشاف تسجيل
@@ -274,7 +243,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             if (_isOfflineMode) {
               _startCountdown();
             } else {
-              _player.play(); // استئناف التشغيل المتزامن للصوت والصورة
+              _player.play();
             }
           }
         }
@@ -311,8 +280,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   Future<void> _playVideo(String url, {Duration? startAt}) async {
     if (_isDisposing) return;
-
-    _networkTimeoutTimer?.cancel(); // إلغاء أي مؤقت خطأ سابق
 
     setState(() {
       _isVideoLoading = true;
@@ -586,7 +553,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  // ✅ تحديد الأولوية: 480 ⬅️ 360 ⬅️ 720 ⬅️ أعلى جودة متاحة
   void _parseQualities() {
     if (widget.streams.isEmpty) {
       setState(() {
@@ -598,20 +564,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     }
 
     _sortedQualities = widget.streams.keys.toList();
+    // ترتيب الجودات تصاعدياً (مثلاً 360p ثم 480p ثم 720p)
     _sortedQualities.sort((a, b) {
       int valA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       int valB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       return valA.compareTo(valB);
     });
 
+    // اختيار الجودة الأولية: 480p ثم 360p ثم 720p ثم أعلى جودة متاحة
     if (_sortedQualities.contains("480p")) {
       _currentQuality = "480p";
     } else if (_sortedQualities.contains("360p")) {
       _currentQuality = "360p";
     } else if (_sortedQualities.contains("720p")) {
       _currentQuality = "720p";
+    } else if (_sortedQualities.isNotEmpty) {
+      _currentQuality = _sortedQualities.last; // آخر عنصر في الترتيب التصاعدي هو الأعلى
     } else {
-      _currentQuality = _sortedQualities.isNotEmpty ? _sortedQualities.last : "";
+      _currentQuality = "";
     }
 
     if (_currentQuality.isNotEmpty) {
@@ -660,7 +630,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     });
   }
 
-  // ✅ فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
+  // ✅ التعديل الثاني (حل مشكلة أبعاد الشاشة والمربع الأسود عند الخروج): 
+  // فرض العودة للوضع الطولي وإعطاء النظام مهلة لإعادة رسم الواجهة قبل الرجوع
   Future<void> _resetSystemChrome() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
         overlays: SystemUiOverlay.values);
@@ -676,7 +647,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     if (mounted) setState(() => _isDisposing = true);
 
     try {
-      _networkTimeoutTimer?.cancel(); // إغلاق المؤقت
       _seekDebounceTimer?.cancel();
       _watermarkTimer?.cancel();
       _countdownTimer?.cancel();
@@ -698,7 +668,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     _recordingSubscription?.cancel();
     _protectionService.stopMonitoring();
-    _networkTimeoutTimer?.cancel();
 
     if (!_isDisposing) _safeExit();
     super.dispose();
@@ -792,24 +761,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                           style: const TextStyle(color: Colors.white, fontSize: 16),
                           textAlign: TextAlign.center),
                       const SizedBox(height: 24),
-                      // ✅ زر إعادة المحاولة يستكمل من نفس النقطة المحفوظة
                       ElevatedButton.icon(
                         icon: const Icon(Icons.refresh, color: Colors.black),
                         onPressed: () {
                           FirebaseCrashlytics.instance
                               .log("🔄 User clicked Retry on network error");
-                              
-                          final targetPos = _lastKnownPosition > Duration.zero 
-                              ? _lastKnownPosition 
-                              : _player.state.position;
-                              
-                          setState(() {
-                            _isError = false;
-                            _isVideoLoading = true; // إظهار الدائرة عند بدء الإعادة
-                          });
-                          
-                          // تمرير مكان التوقف ليعمل الفيديو من نفس النقطة
-                          _playVideo(widget.streams[_currentQuality]!, startAt: targetPos);
+                          setState(() => _isError = false);
+                          // ✅ تمرير وقت التوقف (errorPosition) ليعود لنفس الدقيقة
+                          _playVideo(widget.streams[_currentQuality]!, startAt: _errorPosition);
                         },
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accentYellow,
@@ -823,7 +782,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
               )
             else
               Center(
-                // ✅ منع اللمس لتفادي أخطاء Null Check على شريط التقديم عند الخروج
+                // ✅ التعديل الثالث (حل مشكلة انهيار شريط التقديم Null Check):
+                // نمنع لمس المشغل والشريط بالكامل إذا كان هناك خطأ أو يتم إغلاق الشاشة
                 child: IgnorePointer(
                   ignoring: _isDisposing || _isError,
                   child: MaterialVideoControlsTheme(
