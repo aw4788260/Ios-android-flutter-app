@@ -118,8 +118,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     return settings.downloads.pdfEnabled;
   }
 
-  // تم الاستغناء عن دالة _getEnabledPlayers لأننا نعتمد على الموديل
-
   // ---------------------------------------------------------------------------
   // 🟢 دوال مساعدة لحساب الحجم وتنسيقه
   // ---------------------------------------------------------------------------
@@ -152,9 +150,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
   // ===========================================================================
 
   void _showPlayerSelectionDialog(Map<String, dynamic> video) {
-    // الكود الجديد الذي حل المشكلة
-final bool hasYoutubeId = video['hasId'] == true || 
-    (video['youtube_video_id'] != null && video['youtube_video_id'].toString().isNotEmpty);
+    final bool hasYoutubeId = video['hasId'] == true || 
+        (video['youtube_video_id'] != null && video['youtube_video_id'].toString().isNotEmpty);
     
     // ✅ تحويل الـ Map إلى الـ Model
     final settings = PlayerSettings.fromJson(widget.playerSettings);
@@ -393,7 +390,7 @@ final bool hasYoutubeId = video['hasId'] == true ||
   }
 
   // ===========================================================================
-  // 2. منطق التحميل (Download Logic)
+  // 2. منطق التحميل (Download Logic) - مع دعم الـ Fallback
   // ===========================================================================
 
   Future<void> _prepareVideoDownload(String videoId, String videoTitle, String duration) async {
@@ -409,8 +406,53 @@ final bool hasYoutubeId = video['hasId'] == true ||
       final token = box.get('jwt_token');
       final deviceId = box.get('device_id');
 
-      final res = await Dio().get(
-        '$_baseUrl/api/secure/get-stream-proxy',
+      // 1. المحاولة الأولى عبر السيرفر الأساسي (get-stream-proxy)
+      try {
+        final res = await Dio().get(
+          '$_baseUrl/api/secure/get-stream-proxy',
+          queryParameters: {'lessonId': videoId},
+          options: Options(
+            headers: {
+              'Authorization': 'Bearer $token',
+              'x-device-id': deviceId,
+              'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            },
+            receiveTimeout: const Duration(minutes: 3),
+            sendTimeout: const Duration(minutes: 3),
+          ),
+        );
+
+        if (res.statusCode == 200) {
+          final data = res.data;
+          List<dynamic> rawQualities = data['availableQualities'] ?? [];
+          var videoOptions = rawQualities.where((q) => q['type'] != 'audio_only').toList();
+
+          if (videoOptions.isNotEmpty) {
+            String? bestAudioUrl;
+            int audioSize = 0; 
+            try {
+              final audioObj = rawQualities.firstWhere(
+                  (q) => q['type'] == 'audio_only',
+                  orElse: () => null);
+              if (audioObj != null) {
+                bestAudioUrl = audioObj['url'];
+                audioSize = _getFileSizeFromUrl(bestAudioUrl);
+              }
+            } catch (_) {}
+
+            if (mounted) Navigator.pop(context); // إغلاق نافذة التحميل
+            _showQualitySelectionDialog(videoId, videoTitle, videoOptions, duration, bestAudioUrl, audioSize);
+            return; // الخروج من الدالة بنجاح
+          }
+        }
+      } catch (primaryError) {
+        FirebaseCrashlytics.instance.log("⚠️ Primary proxy failed for download. Proceeding to fallback.");
+      }
+
+      // 2. المحاولة الاحتياطية (Fallback) عبر سيرفر المانيفست (get-video-id)
+      FirebaseCrashlytics.instance.log("🔄 Trying Fallback Manifest API for download...");
+      final fallbackRes = await Dio().get(
+        '$_baseUrl/api/secure/get-video-id',
         queryParameters: {'lessonId': videoId},
         options: Options(
           headers: {
@@ -423,44 +465,30 @@ final bool hasYoutubeId = video['hasId'] == true ||
         ),
       );
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // إغلاق نافذة التحميل بعد انتهاء المحاولات
 
-      if (res.statusCode == 200) {
-        final data = res.data;
+      if (fallbackRes.statusCode == 200) {
+        final data = fallbackRes.data;
         List<dynamic> rawQualities = data['availableQualities'] ?? [];
 
         if (rawQualities.isNotEmpty) {
-          String? bestAudioUrl;
-          int audioSize = 0; 
-
-          try {
-            final audioObj = rawQualities.firstWhere(
-                (q) => q['type'] == 'audio_only',
-                orElse: () => null);
-            if (audioObj != null) {
-              bestAudioUrl = audioObj['url'];
-              audioSize = _getFileSizeFromUrl(bestAudioUrl);
-            }
-          } catch (_) {}
-
-          var videoOptions = rawQualities.where((q) => q['type'] != 'audio_only').toList();
-
-          if (videoOptions.isNotEmpty) {
-            _showQualitySelectionDialog(videoId, videoTitle, videoOptions, duration, bestAudioUrl, audioSize);
-          } else {
-            FirebaseCrashlytics.instance.log("⚠️ No video-only streams found for download.");
-            _showErrorSnackBar("No compatible video streams found.");
-          }
+          // تمرير الـ Manifest مباشرة، لا يحتاج لرابط صوت منفصل
+          _showQualitySelectionDialog(videoId, videoTitle, rawQualities, duration, null, 0);
+        } else if (data['url'] != null) {
+          // في حال رجع رابط واحد فقط
+          _showQualitySelectionDialog(videoId, videoTitle, [
+            {'quality': 'Auto', 'url': data['url'], 'type': 'video_audio'}
+          ], duration, null, 0);
         } else {
-          _showErrorSnackBar("No download links available");
+          _showErrorSnackBar("No compatible video streams found.");
         }
       } else {
-        _showErrorSnackBar("Server Error: ${res.statusCode}");
+        _showErrorSnackBar("Server Error: ${fallbackRes.statusCode}");
       }
     } catch (e, stack) {
-      if (mounted) Navigator.pop(context);
-      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Prepare Download Failed');
-      _showErrorSnackBar("Failed to fetch download info");
+      if (mounted) Navigator.pop(context); // إغلاق النافذة في حالة الفشل التام
+      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'Both Download APIs Failed');
+      _showErrorSnackBar("Failed to fetch download info. Please check internet.");
     }
   }
 
@@ -519,6 +547,7 @@ final bool hasYoutubeId = video['hasId'] == true ||
                         trailing: const Icon(LucideIcons.chevronRight, color: Colors.black54, size: 16), 
                         onTap: () {
                           Navigator.pop(context);
+                          // إذا كان مانيفست، targetAudio سيكون null بشكل صحيح لأن نوعه video_audio
                           String? targetAudio = (q['type'] == 'video_only') ? audioUrl : null;
                           _startVideoDownload(videoId, title, q['url'], targetAudio, "${q['quality']}p", duration);
                         },
