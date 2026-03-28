@@ -133,8 +133,9 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     }
   }
 
-  String _formatBytes(int bytes, int decimals) {
-    if (bytes <= 0) return "Unknown Size";
+ String _formatBytes(int bytes, int decimals) {
+    if (bytes <= 0) return ""; // إرجاع نص فارغ تماماً بدلاً من Unknown Size
+    
     const suffixes = ["B", "KB", "MB", "GB", "TB"];
     var i = 0;
     double size = bytes.toDouble();
@@ -540,14 +541,16 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                           "${q['quality']}p",
                           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold), 
                         ),
-                        subtitle: Text(
-                          sizeText,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
+                        // ✅ التحقق: إذا كان الحجم فارغاً نعطي subtitle قيمة null ليختفي تماماً
+                        subtitle: sizeText.isNotEmpty
+                            ? Text(
+                                sizeText,
+                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              )
+                            : null,
                         trailing: const Icon(LucideIcons.chevronRight, color: Colors.black54, size: 16), 
                         onTap: () {
                           Navigator.pop(context);
-                          // إذا كان مانيفست، targetAudio سيكون null بشكل صحيح لأن نوعه video_audio
                           String? targetAudio = (q['type'] == 'video_only') ? audioUrl : null;
                           _startVideoDownload(videoId, title, q['url'], targetAudio, "${q['quality']}p", duration);
                         },
