@@ -30,8 +30,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       var box = await Hive.openBox('auth_box');
       String? token = box.get('jwt_token');
       String? userId = box.get('user_id');
+      String? deviceId = box.get('device_id'); // ✅ استخراج معرف الجهاز
 
-      if (token == null || userId == null) {
+      // ✅ التحقق من وجود جميع بيانات المصادقة بما فيها معرف الجهاز
+      if (token == null || userId == null || deviceId == null) {
         if (mounted) {
           setState(() {
             _errorMessage = "الرجاء تسجيل الدخول لعرض الإشعارات.";
@@ -46,6 +48,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         options: Options(headers: {
           'Authorization': 'Bearer $token',
           'x-user-id': userId,
+          'x-device-id': deviceId, // ✅ إرسال معرف الجهاز في الهيدر
           'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
@@ -96,7 +99,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ استكشاف وضع الثيم الحالي (مظلم أم مضيء) لضبط الألوان تلقائياً
+    // استكشاف وضع الثيم الحالي (مظلم أم مضيء) لضبط الألوان تلقائياً
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     
     // الألوان المتكيفة
