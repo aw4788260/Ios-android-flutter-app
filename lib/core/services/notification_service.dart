@@ -1,9 +1,14 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'; // ✅ إضافة استيراد Material لـ MaterialPageRoute
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 // ✅ استيراد مكتبات فايربيز و Hive
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+
+// ✅ استيراد المفتاح الخاص بالتوجيه وشاشة الإشعارات
+import '../../main.dart';
+import '../../presentation/screens/notifications_screen.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -34,7 +39,12 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // التعامل مع الضغط على الإشعار الداخلي للتطبيق
+        // ✅ التعامل مع الضغط على الإشعار الداخلي (والتطبيق مفتوح) وتوجيهه للشاشة
+        if (navigatorKey.currentState != null) {
+          navigatorKey.currentState!.push(
+            MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+          );
+        }
       },
     );
 
