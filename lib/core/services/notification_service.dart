@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+// ✅ استيراد مكتبات فايربيز و Hive
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -30,7 +34,7 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // التعامل مع الضغط على الإشعار
+        // التعامل مع الضغط على الإشعار الداخلي للتطبيق
       },
     );
 
@@ -39,19 +43,17 @@ class NotificationService {
         flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
-
     await androidImplementation?.requestNotificationsPermission();
 
-    // 3. ✅ إنشاء قنوات الإشعارات يدوياً لتفادي RemoteServiceException
+    // 3. إنشاء قنوات الإشعارات يدوياً لتفادي RemoteServiceException
     if (androidImplementation != null) {
       // القناة الأولى: للتحميل (صامتة للـ Foreground Service)
       await androidImplementation.createNotificationChannel(
         const AndroidNotificationChannel(
-          'downloads_channel', // نفس الـ ID المستخدم في main.dart و showProgressNotification
+          'downloads_channel',
           'Active Downloads',
           description: 'Shows progress of active downloads',
-          importance:
-              Importance.low, // Low = يظهر بدون صوت (مناسب لشريط التقدم)
+          importance: Importance.low,
           playSound: false,
           showBadge: false,
         ),
@@ -63,12 +65,103 @@ class NotificationService {
           'download_completed_channel',
           'Download Completed',
           description: 'Notifies when a download finishes',
-          importance: Importance.high, // High = يظهر بصوت وتنبيه
+          importance: Importance.high,
+          playSound: true,
+        ),
+      );
+
+      // ✅ القناة الثالثة: إشعارات فايربيز (عندما يكون التطبيق مفتوحاً)
+      await androidImplementation.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'fcm_channel',
+          'General Notifications',
+          description: 'Important alerts and updates',
+          importance: Importance.max, // Max = يظهر كانبثاق (Heads-up)
           playSound: true,
         ),
       );
     }
+
+    // ✅ 4. تشغيل مستمع إشعارات فايربيز أثناء فتح التطبيق
+    _listenToForegroundMessages();
   }
+
+  // ==========================================
+  // ✅ دوال فايربيز الجديدة (FCM)
+  // ==========================================
+
+  // دالة ذكية للاشتراك في القنوات وإلغاء القديمة
+  Future<void> updateSubscriptions(List<String> newTopics) async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      var authBox = await Hive.openBox('auth_box');
+      
+      // جلب القنوات القديمة التي كان مشتركاً بها مسبقاً
+      List<String> oldTopics = authBox.get('subscribed_topics', defaultValue: <String>[]).cast<String>();
+
+      // إلغاء الاشتراك من القنوات التي لم تعد موجودة في حساب الطالب (انتهى اشتراكه فيها)
+      for (String oldTopic in oldTopics) {
+        if (!newTopics.contains(oldTopic)) {
+          await messaging.unsubscribeFromTopic(oldTopic);
+          debugPrint("Unsubscribed from FCM Topic: $oldTopic");
+        }
+      }
+
+      // الاشتراك في القنوات الجديدة
+      for (String topic in newTopics) {
+        if (!oldTopics.contains(topic)) {
+          await messaging.subscribeToTopic(topic);
+          debugPrint("Subscribed to FCM Topic: $topic");
+        }
+      }
+
+      // حفظ القائمة الجديدة للاستخدام في المرة القادمة
+      await authBox.put('subscribed_topics', newTopics);
+    } catch (e, s) {
+      FirebaseCrashlytics.instance.recordError(e, s, reason: 'Failed to update FCM subscriptions');
+    }
+  }
+
+  // مستمع الإشعارات والتطبيق مفتوح
+  void _listenToForegroundMessages() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Got a message whilst in the foreground!');
+
+      if (message.notification != null) {
+        _showForegroundFCMNotification(message);
+      }
+    });
+  }
+
+  // عرض الإشعار المنبثق برمجياً
+  Future<void> _showForegroundFCMNotification(RemoteMessage message) async {
+    const String channelId = 'fcm_channel';
+
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      channelId,
+      'General Notifications',
+      channelDescription: 'Important alerts and updates',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      icon: '@mipmap/launcher_icon', // أيقونة التطبيق
+    );
+
+    final NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await flutterLocalNotificationsPlugin.show(
+      message.notification.hashCode, // توليد ID فريد بناء على الرسالة
+      message.notification?.title,
+      message.notification?.body,
+      platformChannelSpecifics,
+    );
+  }
+
+  // ==========================================
+  // دوال الإشعارات القديمة (التحميلات)
+  // ==========================================
 
   Future<void> cancelNotification(int id) async {
     try {
@@ -94,7 +187,6 @@ class NotificationService {
     required int progress,
     required int maxProgress,
   }) async {
-    // استخدام القناة التي أنشأناها بالأعلى
     const String channelId = 'downloads_channel';
 
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
@@ -107,8 +199,8 @@ class NotificationService {
       showProgress: true,
       maxProgress: maxProgress,
       progress: progress,
-      onlyAlertOnce: true, // تحديث الشريط دون إعادة إصدار صوت/اهتزاز
-      ongoing: true, // يمنع المستخدم من حذفه أثناء التحميل
+      onlyAlertOnce: true,
+      ongoing: true,
       autoCancel: false,
       playSound: false,
     );
