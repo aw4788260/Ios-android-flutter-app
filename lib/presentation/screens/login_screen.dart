@@ -9,6 +9,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_id/android_id.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_state.dart';
+// ✅ 1. استيراد خدمة الإشعارات
+import '../../core/services/notification_service.dart';
 import 'main_wrapper.dart';
 import 'register_screen.dart';
 import '../../core/services/storage_service.dart';
@@ -51,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // ✅ دالة الحصول على معرف الجهاز الفريد (Android ID)
+  // دالة الحصول على معرف الجهاز الفريد (Android ID)
   Future<String> _getAndSaveDeviceId(Box box) async {
     String deviceId;
     try {
@@ -147,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
         AppState().updateUserData(
             {...userMap, 'profile_image': userMap['profileImage']});
 
-        // جلب البيانات الأولية وحفظ إعدادات الوضع المجاني
+        // جلب البيانات الأولية (وهنا سيتم إرسال توكن فايربيز للباك إند)
         await _fetchInitData(deviceId);
 
         if (mounted) {
@@ -174,20 +176,23 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       var box = await StorageService.openBox('auth_box');
       final deviceId = await _getAndSaveDeviceId(box);
+      
+      // ✅ 2. جلب توكن فايربيز لإرساله حتى للزوار
+      String? fcmToken = box.get('fcm_token');
 
-      // للضيف لا نرسل توكن، فقط معرف الجهاز
+      // للضيف لا نرسل توكن، فقط معرف الجهاز وتوكن فايربيز
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
         options: Options(headers: {
           'x-device-id': deviceId,
           'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          if (fcmToken != null) 'x-fcm-token': fcmToken, // ✅ إرسال التوكن
         }),
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
 
-        // ✅ [تعديل] معالجة الوضع المجاني للضيف
         bool serverFreeMode = response.data['freeModeV2'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد
@@ -196,6 +201,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         await box.put('free_mode', serverFreeMode);
+        
+        // ✅ 3. تحديث قنوات الإشعارات للزائر
+        if (response.data['myAccess'] != null && response.data['myAccess']['topics'] != null) {
+          List<String> topics = List<String>.from(response.data['myAccess']['topics']);
+          await NotificationService().updateSubscriptions(topics);
+        }
       }
 
       await box.put('is_guest', true);
@@ -226,23 +237,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _fetchInitData(String deviceId) async {
     try {
-      // ✅ جلب التوكن المحفوظ لإرساله في الهيدر
       var box = await StorageService.openBox('auth_box');
       String? token = box.get('jwt_token');
+      
+      // ✅ 4. جلب توكن فايربيز للمستخدم المسجل
+      String? fcmToken = box.get('fcm_token');
 
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
         options: Options(headers: {
-          if (token != null) 'Authorization': 'Bearer $token', // ✅ إرسال التوكن
+          if (token != null) 'Authorization': 'Bearer $token',
           'x-device-id': deviceId,
           'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+          if (fcmToken != null) 'x-fcm-token': fcmToken, // ✅ إرسال التوكن
         }),
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
 
-        // ✅ [تعديل] استقبال المتغير باسم freeMode القديم وحفظه
         bool serverFreeMode = response.data['freeModeV2'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد دائماً
@@ -251,6 +264,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         await box.put('free_mode', serverFreeMode);
+        
+        // ✅ 5. تحديث قنوات الإشعارات (Topics) بعد تسجيل الدخول
+        if (response.data['myAccess'] != null && response.data['myAccess']['topics'] != null) {
+          List<String> topics = List<String>.from(response.data['myAccess']['topics']);
+          await NotificationService().updateSubscriptions(topics);
+        }
       }
     } catch (e) {
       debugPrint("Init Data Error: $e");
