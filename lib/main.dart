@@ -21,6 +21,8 @@ import 'package:flutter_background_service_android/flutter_background_service_an
 
 import 'core/services/notification_service.dart';
 import 'core/services/app_state.dart';
+// ✅ استيراد شاشة الإشعارات ليتم التوجيه إليها
+import 'presentation/screens/notifications_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> snackbarKey =
@@ -126,6 +128,34 @@ void main() async {
     if (fcmToken != null) {
       await authBox.put('fcm_token', fcmToken); // حفظ التوكن محلياً ليرسله التطبيق للباك إند
     }
+
+    // =========================================================================
+    // ✅ إضافة كود التوجيه عند الضغط على الإشعار (Notification Click Handling)
+    // =========================================================================
+    
+    // 1. إذا كان التطبيق مغلقاً تماماً (Terminated) وتم فتحه عن طريق الضغط على الإشعار
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        // نستخدم تأخير بسيط لضمان بناء واجهة التطبيق بالكامل قبل الانتقال
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (navigatorKey.currentState != null) {
+            navigatorKey.currentState!.push(
+              MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+            );
+          }
+        });
+      }
+    });
+
+    // 2. إذا كان التطبيق يعمل في الخلفية (Background) وتم الضغط على الإشعار
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.push(
+          MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+        );
+      }
+    });
+    // =========================================================================
 
     MediaKit.ensureInitialized();
 
