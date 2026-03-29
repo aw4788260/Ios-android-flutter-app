@@ -14,6 +14,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_state.dart';
 import '../../core/services/storage_service.dart';
+// ✅ 1. استيراد خدمة الإشعارات
+import '../../core/services/notification_service.dart';
 import 'login_screen.dart';
 import 'main_wrapper.dart';
 import 'privacy_policy_screen.dart';
@@ -66,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
     _initializeApp();
   }
 
-  /// ✅ دالة لحذف الملفات المؤقتة (تنظيف المخلفات)
+  /// دالة لحذف الملفات المؤقتة (تنظيف المخلفات)
   Future<void> _cleanupTempFiles() async {
     try {
       final tempDir = await getTemporaryDirectory();
@@ -179,7 +181,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // ✅ تنظيف الملفات المؤقتة فوراً عند الفتح
+      // تنظيف الملفات المؤقتة فوراً عند الفتح
       await _cleanupTempFiles();
 
       await Hive.initFlutter();
@@ -203,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (!termsAccepted) {
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
-          // ✅ 2. التحقق الأمني قبل عرض الشروط
+          // التحقق الأمني قبل عرض الشروط
           if (!await SecurityManager.instance.checkSecurity()) return;
 
           bool userAgreed = await _showTermsDialog(box);
@@ -224,17 +226,14 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (isGuest) {
         deviceId ??= 'guest_device_${DateTime.now().millisecondsSinceEpoch}';
-        // ✅ تم تمرير box للدالة لتخزين الإعدادات
         await _initAsGuest(deviceId, box);
         return;
       }
 
       if (userId == null || deviceId == null) {
         if (mounted) {
-          // ✅ 3. التحقق الأمني قبل الانتقال لتسجيل الدخول
           if (!await SecurityManager.instance.checkSecurity()) return;
 
-          // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const LoginScreen()),
             (route) => false,
@@ -247,10 +246,8 @@ class _SplashScreenState extends State<SplashScreen>
     } catch (e, stack) {
       FirebaseCrashlytics.instance.recordError(e, stack);
       if (mounted) {
-        // ✅ 4. التحقق الأمني في حالة الخطأ وقبل الانتقال
         if (!await SecurityManager.instance.checkSecurity()) return;
 
-        // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
           (route) => false,
@@ -270,7 +267,7 @@ class _SplashScreenState extends State<SplashScreen>
           if (result.status == UpdateStatus.optional)
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // يقفل فقط
+                Navigator.pop(context); 
               },
               child: const Text("لاحقًا"),
             ),
@@ -288,9 +285,11 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
-  // ✅ تم تحديث الدالة لاستقبال Box وحفظ freeMode
   Future<void> _initAsGuest(String deviceId, Box box) async {
     try {
+      // ✅ 2. استخراج التوكن للزوار أيضاً (لإرسال إشعارات للكل حتى غير المسجلين)
+      String? fcmToken = box.get('fcm_token');
+
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
         options: Options(
@@ -298,6 +297,7 @@ class _SplashScreenState extends State<SplashScreen>
             'x-user-id': '0',
             'x-device-id': deviceId,
             'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            if (fcmToken != null) 'x-fcm-token': fcmToken, // ✅ إرسال التوكن
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
@@ -306,22 +306,24 @@ class _SplashScreenState extends State<SplashScreen>
       if (response.statusCode == 200) {
         AppState().updateFromInitData(response.data);
 
-        // ✅ حفظ حالة الوضع المجاني للزائر (الاسم القديم)
-        // 🔒 المنطق: إذا كان أندرويد -> دايماً false، لو آيفون -> خد من السيرفر
         bool serverFreeMode = response.data['freeModeV2'] ?? false;
         if (Platform.isAndroid) {
           serverFreeMode = false;
         }
         await box.put('free_mode', serverFreeMode);
+
+        // ✅ 3. تحديث قنوات الإشعارات للزائر
+        if (response.data['myAccess'] != null && response.data['myAccess']['topics'] != null) {
+          List<String> topics = List<String>.from(response.data['myAccess']['topics']);
+          await NotificationService().updateSubscriptions(topics);
+        }
       }
     } catch (_) {
     } finally {
       AppState().isGuest = true;
       if (mounted) {
-        // ✅ 5. التحقق الأمني قبل دخول الضيف
         if (!await SecurityManager.instance.checkSecurity()) return;
 
-        // 🔥 FIX: استخدام pushAndRemoveUntil لمنع العودة للشاشة
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const MainWrapper()),
           (route) => false,
@@ -332,8 +334,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initAsUser(String userId, String deviceId, Box box) async {
     try {
-      // ✅ جلب التوكن لإرساله
       String? token = box.get('jwt_token');
+      // ✅ 4. استخراج التوكن للمستخدم المسجل
+      String? fcmToken = box.get('fcm_token');
 
       final response = await _dio.get(
         '$_baseUrl/api/public/get-app-init-data',
@@ -342,29 +345,24 @@ class _SplashScreenState extends State<SplashScreen>
             if (token != null) 'Authorization': 'Bearer $token',
             'x-device-id': deviceId,
             'x-app-secret': const String.fromEnvironment('APP_SECRET'),
+            if (fcmToken != null) 'x-fcm-token': fcmToken, // ✅ إرسال التوكن
           },
           receiveTimeout: const Duration(seconds: 10),
         ),
       );
 
       if (response.statusCode == 200 && response.data['success'] == true) {
-        // ✅ 1. تحديث الحالة في الذاكرة الحية
         AppState().updateFromInitData(response.data);
 
-        // ✅ حفظ حالة الوضع المجاني باستخدام الاسم القديم (freeMode)
-        // 🔒 المنطق: إذا كان أندرويد -> دايماً false، لو آيفون -> خد من السيرفر
         bool serverFreeMode = response.data['freeModeV2'] ?? false;
         if (Platform.isAndroid) {
           serverFreeMode = false;
         }
         await box.put('free_mode', serverFreeMode);
 
-        // ✅ 2. تخزين الرد كاملاً للأوفلاين (استخدام الدالة الجديدة)
-        // تحويل البيانات صراحة لضمان التنسيق الصحيح قبل الحفظ
         await StorageService.saveFullAppInitData(
             Map<String, dynamic>.from(response.data));
 
-        // ✅ 3. تخزين بيانات الوصول السريع (العلامة المائية ومعلومات التواصل)
         if (response.data['user'] != null &&
             response.data['user']['phone'] != null) {
           await StorageService.saveUserPhone(response.data['user']['phone']);
@@ -376,7 +374,6 @@ class _SplashScreenState extends State<SplashScreen>
           );
         }
 
-        // ✅ 4. حفظ بيانات الجلسة الأساسية
         if (response.data['user'] != null) {
           final userData = response.data['user'];
 
@@ -389,11 +386,16 @@ class _SplashScreenState extends State<SplashScreen>
           }
         }
 
+        // ✅ 5. تحديث قنوات الإشعارات (Topics) للمستخدم المسجل بناءً على كورساته
+        if (response.data['myAccess'] != null && response.data['myAccess']['topics'] != null) {
+          List<String> topics = List<String>.from(response.data['myAccess']['topics']);
+          await NotificationService().updateSubscriptions(topics);
+        }
+
         bool isLoggedIn = response.data['isLoggedIn'] ?? false;
 
-        // إذا قال السيرفر أن المستخدم غير مسجل
         if (!isLoggedIn) {
-          await box.clear(); // حذف البيانات القديمة
+          await box.clear(); 
           await box.put('terms_accepted', true);
 
           if (mounted) {
@@ -419,7 +421,6 @@ class _SplashScreenState extends State<SplashScreen>
     } catch (serverError) {
       FirebaseCrashlytics.instance.log("Splash Offline Mode: $serverError");
 
-      // ✅ 5. محاولة الدخول بوضع الأوفلاين باستخدام البيانات المخزنة الكاملة
       bool offlineSuccess = await AppState().loadOfflineData();
 
       if (offlineSuccess) {
