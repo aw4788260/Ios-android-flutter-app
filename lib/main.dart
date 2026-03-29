@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+// ✅ استيراد مكتبة الإشعارات من فايربيز
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:audio_session/audio_session.dart';
@@ -23,6 +25,14 @@ import 'core/services/app_state.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> snackbarKey =
     GlobalKey<ScaffoldMessengerState>();
+
+// ✅ دالة التقاط الإشعارات عندما يكون التطبيق مغلقاً أو في الخلفية (يجب أن تكون خارج أي Class)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // يجب تهيئة فايربيز هنا أيضاً لأن هذه الدالة تعمل في بيئة معزولة
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint("Handling a background message: ${message.messageId}");
+}
 
 // ✅ دالة تهيئة خدمة الخلفية
 Future<void> initializeBackgroundService() async {
@@ -84,6 +94,9 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // ✅ ربط دالة الخلفية بفايربيز لاستقبال الإشعارات والتطبيق مغلق
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
 
     await NotificationService().init();
@@ -93,10 +106,26 @@ void main() async {
 
     // Hive
     await Hive.initFlutter();
-    await Hive.openBox('auth_box');
+    var authBox = await Hive.openBox('auth_box'); // ✅ حفظ الصندوق في متغير لاستخدامه
     await Hive.openBox('settings_box');
     await Hive.openBox('downloads_box');
     await Hive.openBox('pdf_drawings_db');
+
+    // ✅ طلب إذن الإشعارات من المستخدم وجلب التوكن وحفظه في Hive
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('User granted permission: ${settings.authorizationStatus}');
+
+    String? fcmToken = await messaging.getToken();
+    debugPrint("🔥 FCM Token: $fcmToken");
+
+    if (fcmToken != null) {
+      await authBox.put('fcm_token', fcmToken); // حفظ التوكن محلياً ليرسله التطبيق للباك إند
+    }
 
     MediaKit.ensureInitialized();
 
