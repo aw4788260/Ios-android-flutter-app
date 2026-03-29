@@ -9,6 +9,8 @@ import 'course_details_screen.dart';
 import 'my_requests_screen.dart';
 import 'teacher_profile_screen.dart';
 import 'teacher/student_requests_screen.dart';
+// ✅ 1. استيراد شاشة الإشعارات
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,8 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // جلب البيانات من مدير الحالة المركزي
   final _allCourses = AppState().allCourses;
   final _user = AppState().userData;
-   
-  // ✅ قائمة لتخزين الكورسات العشوائية
+    
+  // قائمة لتخزين الكورسات العشوائية
   List<dynamic> _randomCourses = []; 
 
   bool _isTeacher = false;
@@ -44,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _checkUserRole();
-    _generateRandomCourses(); // ✅ توليد القائمة العشوائية عند بدء الشاشة
+    _generateRandomCourses(); // توليد القائمة العشوائية عند بدء الشاشة
 
     // إعداد مؤقت السلايدر للنص التشجيعي
     _timer = Timer.periodic(const Duration(seconds: 8), (Timer timer) {
@@ -53,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         _currentSlide = 0;
       }
-       
+        
       if (_pageController.hasClients) {
         _pageController.animateToPage(
           _currentSlide,
@@ -64,14 +66,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // ✅ دالة لاختيار 5 كورسات عشوائية
+  // دالة لاختيار 5 كورسات عشوائية
   void _generateRandomCourses() {
     if (_allCourses.isNotEmpty) {
       // نأخذ نسخة من القائمة الأصلية حتى لا نعدل ترتيب البيانات الرئيسية
       var tempList = List.of(_allCourses);
-      tempList.shuffle(); // ✅ خلط القائمة عشوائياً
+      tempList.shuffle(); // خلط القائمة عشوائياً
       setState(() {
-        _randomCourses = tempList.take(5).toList(); // ✅ أخذ أول 5 عناصر بعد الخلط
+        _randomCourses = tempList.take(5).toList(); // أخذ أول 5 عناصر بعد الخلط
       });
     }
   }
@@ -95,9 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ منطق العرض: إذا كان هناك بحث نستخدم _allCourses، وإلا نستخدم _randomCourses
+    // منطق العرض: إذا كان هناك بحث نستخدم _allCourses، وإلا نستخدم _randomCourses
     List<dynamic> coursesToDisplay;
-     
+      
     if (_searchTerm.isEmpty) {
       // إذا لم يكن هناك بحث، اعرض القائمة العشوائية التي جهزناها
       coursesToDisplay = _randomCourses;
@@ -155,36 +157,66 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                       
-                      // زر الطلبات
-                      GestureDetector(
-                        onTap: () {
-                           if (_isTeacher) {
-                             Navigator.push(
-                               context, 
-                               MaterialPageRoute(builder: (_) => const StudentRequestsScreen())
-                             );
-                           } else {
-                             Navigator.push(
-                               context, 
-                               MaterialPageRoute(builder: (_) => const MyRequestsScreen())
-                             );
-                           }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.backgroundSecondary,
-                            borderRadius: BorderRadius.circular(50),
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
-                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        
+                      // ✅ 2. صف يحتوي على زر الإشعارات وزر الطلبات
+                      Row(
+                        children: [
+                          // زر الإشعارات 🔔
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context, 
+                                MaterialPageRoute(builder: (_) => const NotificationsScreen())
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary,
+                                borderRadius: BorderRadius.circular(50),
+                                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                              ),
+                              child: Icon(
+                                LucideIcons.bell,
+                                color: AppColors.accentYellow, 
+                                size: 22
+                              ),
+                            ),
                           ),
-                          child: Icon(
-                            _isTeacher ? LucideIcons.inbox : LucideIcons.clipboardList,
-                            color: AppColors.accentYellow, 
-                            size: 22
+                          const SizedBox(width: 12), // المسافة بين الأزرار
+                          
+                          // زر الطلبات 📋
+                          GestureDetector(
+                            onTap: () {
+                               if (_isTeacher) {
+                                 Navigator.push(
+                                   context, 
+                                   MaterialPageRoute(builder: (_) => const StudentRequestsScreen())
+                                 );
+                               } else {
+                                 Navigator.push(
+                                   context, 
+                                   MaterialPageRoute(builder: (_) => const MyRequestsScreen())
+                                 );
+                               }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.backgroundSecondary,
+                                borderRadius: BorderRadius.circular(50),
+                                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                              ),
+                              child: Icon(
+                                _isTeacher ? LucideIcons.inbox : LucideIcons.clipboardList,
+                                color: AppColors.accentYellow, 
+                                size: 22
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -331,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemCount: coursesToDisplay.length,
                         itemBuilder: (context, index) {
                           final course = coursesToDisplay[index];
-                           
+                            
                           return GestureDetector(
                             onTap: () {
                                Navigator.push(
@@ -383,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ],
                                   ),
                                   const SizedBox(height: 12),
-                                   
+                                    
                                   // Title
                                   Text(
                                     course.title.toUpperCase(),
