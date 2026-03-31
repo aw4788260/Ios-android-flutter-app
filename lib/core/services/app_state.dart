@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../data/models/course_model.dart';
 import '../../core/services/storage_service.dart';
 import '../constants/api_constants.dart';
+import 'download_manager.dart'; // 👈 ✅ تم استيراد مدير التحميل
 
 class AppState {
   // Singleton Pattern
@@ -112,6 +113,24 @@ class AppState {
     }
   }
 
+  // ============================================================
+  // 🔍 دالة مساعدة لاستخراج جميع المواد التي يمتلكها الطالب 
+  // (سواء كان يمتلك الكورس كاملاً أو المادة منفردة)
+  // ============================================================
+  List<String> _getAllAuthorizedSubjectIds() {
+    Set<String> authorizedSubjects = {};
+    for (var item in myLibrary) {
+      if (item['owned_subjects'] != null) {
+        for (var sub in item['owned_subjects']) {
+          if (sub['id'] != null) {
+            authorizedSubjects.add(sub['id'].toString());
+          }
+        }
+      }
+    }
+    return authorizedSubjects.toList();
+  }
+
   // تحديث البيانات القادمة من الـ API (Init Data) أو الذاكرة المحلية
   void updateFromInitData(dynamic data) {
     if (data == null) return;
@@ -158,9 +177,18 @@ class AppState {
         myLibrary = (castedData['library'] as List)
             .map((e) => _makeSafeMap(e)) // ✅ تحويل آمن لكل عنصر في المكتبة
             .toList();
+            
+        // 👈 ✅ السطر الجديد: بعد بناء المكتبة، نستخرج كل المواد المتاحة وننظف التحميلات
+        if (isStudent) {
+           List<String> allAuthSubjects = _getAllAuthorizedSubjectIds();
+           DownloadManager().validateAndCleanRevokedDownloads(allAuthSubjects);
+        }
       } else {
         // إذا كان ضيفاً، نجعل المكتبة فارغة دائماً
         myLibrary = [];
+        
+        // 👈 ✅ السطر الجديد: حذف التحميلات المحمية لأن الضيف لا يملك صلاحيات
+        DownloadManager().validateAndCleanRevokedDownloads([]);
       }
 
       if (kDebugMode) {
