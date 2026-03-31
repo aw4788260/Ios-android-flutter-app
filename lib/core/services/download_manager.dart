@@ -157,6 +157,7 @@ class DownloadManager with WidgetsBindingObserver {
     required String courseName,
     required String subjectName,
     required String chapterName,
+    required String subjectId, // 👈 ✅ تمت إضافة المعرف هنا
     String? downloadUrl,
     String? audioUrl,
     required Function(double) onProgress,
@@ -365,6 +366,7 @@ class DownloadManager with WidgetsBindingObserver {
         'title': videoTitle,
         'path': videoSavePath,
         'audioPath': audioSavePath,
+        'subjectId': subjectId, // 👈 ✅ تم الحفظ هنا
         'course': courseName,
         'subject': subjectName,
         'chapter': chapterName,
@@ -434,6 +436,53 @@ class DownloadManager with WidgetsBindingObserver {
       if (_activeDownloads.isEmpty) {
         _stopBackgroundService();
       }
+    }
+  }
+
+  // ===========================================================================
+  // 🧹 دالة تنظيف الملفات المحملة إذا فقد الطالب الصلاحية
+  // ===========================================================================
+  Future<void> validateAndCleanRevokedDownloads(List<String> authorizedSubjects) async {
+    try {
+      if (!Hive.isBoxOpen('downloads_box')) return;
+      var box = Hive.box('downloads_box');
+      List<dynamic> keysToDelete = [];
+
+      for (var key in box.keys) {
+        var data = box.get(key);
+        if (data == null) continue;
+
+        String? sId = data['subjectId'];
+
+        // تجاهل الملفات القديمة (التي حملها الطالب قبل هذا التحديث) لتجنب حذفها بالخطأ
+        if (sId == null) continue;
+
+        // التحقق: هل المادة المحملة موجودة ضمن المواد المسموح بها؟
+        if (!authorizedSubjects.contains(sId)) {
+          keysToDelete.add(key);
+        }
+      }
+
+      // مسح الملفات المرفوضة من التخزين وقاعدة البيانات
+      for (var key in keysToDelete) {
+        var data = box.get(key);
+        try {
+          if (data['path'] != null) {
+            final file = File(data['path']);
+            if (await file.exists()) await file.delete();
+          }
+          if (data['audioPath'] != null) {
+            final file = File(data['audioPath']);
+            if (await file.exists()) await file.delete();
+          }
+        } catch (e) {
+          debugPrint("Error deleting physical file: $e");
+        }
+        await box.delete(key);
+        debugPrint("🗑️ Deleted revoked file: ${data['title']}");
+      }
+    } catch (e) {
+      debugPrint("Error cleaning downloads: $e");
     }
   }
 
