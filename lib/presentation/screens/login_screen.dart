@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
 
-        bool serverFreeMode = response.data['freeModeV2'] ?? false;
+        bool serverFreeMode = response.data['freeModeV3'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد
         if (Platform.isAndroid) {
@@ -256,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200 && response.data['success'] == true) {
         AppState().updateFromInitData(response.data);
 
-        bool serverFreeMode = response.data['freeModeV2'] ?? false;
+        bool serverFreeMode = response.data['freeModeV3'] ?? false;
 
         // ⛔ إجبار الإغلاق للأندرويد دائماً
         if (Platform.isAndroid) {
