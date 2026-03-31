@@ -178,11 +178,10 @@ class AppState {
             .map((e) => _makeSafeMap(e)) // ✅ تحويل آمن لكل عنصر في المكتبة
             .toList();
             
-        // 👈 ✅ السطر الجديد: بعد بناء المكتبة، نستخرج كل المواد المتاحة وننظف التحميلات
-        if (isStudent) {
-           List<String> allAuthSubjects = _getAllAuthorizedSubjectIds();
-           DownloadManager().validateAndCleanRevokedDownloads(allAuthSubjects);
-        }
+        // 👈 ✅ السطر الجديد: بعد بناء المكتبة، نستخرج كل المواد المتاحة وننظف التحميلات (يطبق على الطالب والمعلم)
+        List<String> allAuthSubjects = _getAllAuthorizedSubjectIds();
+        DownloadManager().validateAndCleanRevokedDownloads(allAuthSubjects);
+        
       } else {
         // إذا كان ضيفاً، نجعل المكتبة فارغة دائماً
         myLibrary = [];
