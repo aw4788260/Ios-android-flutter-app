@@ -575,6 +575,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     DownloadManager().startDownload(
       lessonId: videoId,
       videoTitle: videoTitle,
+      subjectId: widget.subjectId,
       courseName: widget.courseTitle,
       subjectName: widget.subjectTitle,
       chapterName: _currentChapter['title'] ?? "Chapter",
@@ -606,6 +607,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
     DownloadManager().startDownload(
       lessonId: pdfId,
       videoTitle: pdfTitle,
+      subjectId: widget.subjectId,
       courseName: widget.courseTitle,
       subjectName: widget.subjectTitle,
       chapterName: _currentChapter['title'] ?? "Chapter",
