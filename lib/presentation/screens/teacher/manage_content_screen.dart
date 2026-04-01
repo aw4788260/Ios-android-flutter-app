@@ -40,6 +40,9 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
    
   bool _isLoading = false;
   double _uploadProgress = 0.0;
+  
+  // ✅ إضافة متغير التحكم في الإشعارات
+  bool _notifyStudents = false;
 
   bool get isEditing => widget.initialData != null;
 
@@ -50,7 +53,7 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
       _titleController.text = widget.initialData!['title'] ?? '';
       _descController.text = widget.initialData!['description'] ?? '';
       
-      // ✅ التعديل هنا: التحقق من مفتاح السعر بجميع احتمالاته (price أو fullPrice)
+      // ✅ التحقق من مفتاح السعر بجميع احتمالاته (price أو fullPrice)
       var priceValue = widget.initialData!['price'] ?? widget.initialData!['fullPrice'];
       _priceController.text = priceValue?.toString() ?? '';
 
@@ -160,10 +163,14 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
           String? videoId = _extractYoutubeId(_urlController.text);
           if (videoId == null) throw Exception("رابط الفيديو غير صحيح");
           data['youtube_video_id'] = videoId;
+          // ✅ إرسال خيار الإشعار إذا كان إضافة جديدة
+          if (!isEditing) data['notifyStudents'] = _notifyStudents;
           break;
         case ContentType.pdf:
           data['chapter_id'] = widget.parentId;
           if (finalFileUrl != null) data['file_path'] = finalFileUrl;
+          // ✅ إرسال خيار الإشعار إذا كان إضافة جديدة
+          if (!isEditing) data['notifyStudents'] = _notifyStudents;
           break;
       }
 
@@ -405,6 +412,26 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
                         subtitle: Text("Tap to select PDF", style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
                         trailing: Icon(Icons.upload_file, color: AppColors.accentYellow),
                         onTap: _pickPdfFile,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // ✅ إضافة زر التنبيه بالإشعارات عند إنشاء فيديو أو PDF جديد فقط
+                  if (!isEditing && (widget.contentType == ContentType.video || widget.contentType == ContentType.pdf)) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSecondary,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                      ),
+                      child: SwitchListTile(
+                        title: Text("إرسال إشعار للطلاب", style: TextStyle(color: AppColors.accentYellow)),
+                        subtitle: Text("تنبيه الطلاب المشتركين بإضافة هذا المحتوى", style: TextStyle(color: AppColors.textSecondary)),
+                        value: _notifyStudents,
+                        activeColor: AppColors.accentYellow,
+                        onChanged: (val) => setState(() => _notifyStudents = val),
                       ),
                     ),
                     const SizedBox(height: 10),
