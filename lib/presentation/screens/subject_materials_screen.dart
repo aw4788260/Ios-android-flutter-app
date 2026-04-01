@@ -560,16 +560,27 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         final exam = visibleExams[index];
         final bool isCompleted = exam['isCompleted'] ?? false;
         final bool isExpired = exam['isExpired'] ?? false;
+        final bool allowRetake = exam['allow_retake'] ?? false;
 
-        final Color statusColor = isCompleted
-            ? AppColors.success
-            : (isExpired ? AppColors.error : AppColors.accentOrange);
-
+        // ✅ تحديد اللون والنص والأيقونة بناءً على حالة الإعادة
+        Color statusColor = AppColors.accentOrange;
         String statusText = "UNSOLVED";
+        IconData statusIcon = LucideIcons.fileX;
+
         if (isCompleted) {
-          statusText = "COMPLETED";
+          if (allowRetake && !_isTeacher) {
+            statusColor = AppColors.accentYellow;
+            statusText = "PRACTICE";
+            statusIcon = LucideIcons.refreshCcw;
+          } else {
+            statusColor = AppColors.success;
+            statusText = "COMPLETED";
+            statusIcon = LucideIcons.checkCircle2;
+          }
         } else if (isExpired) {
+          statusColor = AppColors.error;
           statusText = "EXPIRED";
+          statusIcon = LucideIcons.clock;
         }
 
         return Container(
@@ -593,12 +604,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: statusColor.withOpacity(0.5)),
                   ),
-                  child: Icon(
-                      isCompleted
-                          ? LucideIcons.checkCircle2
-                          : (isExpired ? LucideIcons.clock : LucideIcons.fileX),
-                      color: statusColor,
-                      size: 20),
+                  child: Icon(statusIcon, color: statusColor, size: 20),
                 ),
               ),
               const SizedBox(width: 16),
@@ -704,10 +710,12 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     );
   }
 
-  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان
+  // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان والتوجيه الصحيح في حالة الإعادة
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
-    if (isCompleted) {
-      // 1. إذا كان الامتحان محلول مسبقاً، اذهب للنتيجة مباشرة
+    final bool allowRetake = exam['allow_retake'] ?? false;
+
+    // دوال مساعدة للتوجيه
+    void navigateToResult() {
       final attemptId = exam['last_attempt_id'] ??
           exam['first_attempt_id'] ??
           exam['attempt_id'];
@@ -726,8 +734,9 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
             content: Text("Error: Cannot load result."),
             backgroundColor: AppColors.error));
       }
-    } else if (isExpired) {
-      // ✅ 2. إذا كان الامتحان منتهي الصلاحية، يفتح مباشرة لرؤية نموذج الإجابة بدون نافذة تأكيد
+    }
+
+    void navigateToExamView() {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -738,6 +747,50 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           ),
         ),
       ).then((_) => _fetchContent());
+    }
+
+    if (isCompleted) {
+      if (allowRetake && !_isTeacher) {
+        // إذا كان الامتحان محلولاً، ومسموح بالإعادة، والطالب هو الذي يتصفح
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppColors.backgroundSecondary,
+            title: Text('خيارات الامتحان',
+                style: TextStyle(color: AppColors.textPrimary)),
+            content: Text(
+                'لقد أكملت هذا الامتحان من قبل. هل تود عرض نتيجتك السابقة أم إعادة الامتحان للتدريب؟',
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  navigateToResult();
+                },
+                child: Text('عرض النتيجة',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accentYellow),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  navigateToExamView();
+                },
+                child: const Text('إعادة للتدريب',
+                    style: TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // الامتحان محلول ولا يوجد إعادة (أو المدرس هو المتصفح) -> اذهب للنتيجة مباشرة
+        navigateToResult();
+      }
+    } else if (isExpired) {
+      // إذا كان الامتحان منتهي الصلاحية، يفتح مباشرة لرؤية نموذج الإجابة بدون نافذة تأكيد
+      navigateToExamView();
     } else {
       // 3. إذا كان الامتحان "غير محلول" (Unsolved) ومتاحاً
       // يتم إظهار نافذة التأكيد قبل بدء التايمر
@@ -764,17 +817,7 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                   backgroundColor: AppColors.accentYellow),
               onPressed: () {
                 Navigator.pop(ctx); // إغلاق النافذة المنبثقة
-
-                // الذهاب للامتحان وبدء الوقت
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => ExamViewScreen(
-                            examId: exam['id'].toString(),
-                            examTitle: exam['title'] ?? 'Exam',
-                            isCompleted: isCompleted,
-                          )),
-                ).then((_) => _fetchContent()); // تحديث البيانات عند العودة
+                navigateToExamView(); // الذهاب للامتحان وبدء الوقت
               },
               child: const Text('بدء الامتحان',
                   style: TextStyle(
@@ -812,7 +855,6 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
                         courseTitle: courseTitle,
                         subjectTitle: widget.subjectTitle,
                         subjectId: widget.subjectId,
-                        // ✅ التعديل هنا: تم تمرير إعدادات المشغلات إلى الشاشة التالية
                         playerSettings: _content?['player_settings'], 
                       )),
             ).then((updatedChapter) {
