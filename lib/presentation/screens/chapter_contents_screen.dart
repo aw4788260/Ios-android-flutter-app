@@ -849,7 +849,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
       itemBuilder: (context, index) {
         final video = videos[index];
         final String videoId = video['id'].toString();
-        final String duration = video['duration'] ?? "--:--";
+        final String duration = video['duration']?.toString() ?? "--:--";
 
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -893,7 +893,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
         overflow: TextOverflow.ellipsis,
       ),
       
-      // 👉 الكود الخاص بك يوضع هنا:
       const SizedBox(height: 4),
       Row(
         children: [
@@ -904,7 +903,7 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 fontWeight: FontWeight.bold,
                 color: AppColors.textSecondary.withOpacity(0.7)),
           ),
-          if (duration != "--:--") ...[
+          if (duration != "--:--" && duration != "00:00" && duration.trim().isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6.0),
               child: Icon(LucideIcons.clock, 
@@ -920,7 +919,6 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
           ]
         ],
       ),
-      // ===========================
       
     ],
   ),
