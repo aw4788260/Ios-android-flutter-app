@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../../core/constants/app_colors.dart'; // ✅ التأكد من الاستيراد الصحيح
+import '../../../core/constants/app_colors.dart'; 
 import '../../../core/services/teacher_service.dart';
 import '../../widgets/custom_text_field.dart';
 
 class CreateExamScreen extends StatefulWidget {
   final String subjectId; // معرف المادة
-  final String? examId;   // ✅ معرف الامتحان (اختياري - للتعديل)
+  final String? examId;   // معرف الامتحان (اختياري - للتعديل)
 
   const CreateExamScreen({Key? key, required this.subjectId, this.examId}) : super(key: key);
 
@@ -26,7 +26,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   bool _randomizeQuestions = true;
   bool _randomizeOptions = true; 
   
-  // ✅ 1. إضافة متغيرات الإعادة والإشعارات
+  // ✅ إضافة متغيرات الإعادة والإشعارات
   bool _allowRetake = false;
   bool _notifyStudents = false;
    
@@ -57,7 +57,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         _randomizeQuestions = data['randomizeQuestions'] ?? true;
         _randomizeOptions = data['randomizeOptions'] ?? true;
         
-        // ✅ 2. تحميل إعداد سماحية الإعادة للتدريب
+        // ✅ جلب إعداد سماحية الإعادة من السيرفر
         _allowRetake = data['allow_retake'] ?? false;
         
         if (data['start_time'] != null) {
@@ -74,7 +74,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
             
             if (q['options'] != null) {
               var sortedOptions = List.from(q['options']);
-              // الترتيب حسب sort_order القادم من الباك اند للعرض الصحيح للمعلم
               sortedOptions.sort((a, b) => (a['sort_order'] ?? 0).compareTo(b['sort_order'] ?? 0));
 
               for (int i = 0; i < sortedOptions.length; i++) {
@@ -110,7 +109,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   Future<void> _pickDateTime(bool isStart) async {
     final now = DateTime.now();
     
-    // تحديد التاريخ المبدئي للتقويم
     DateTime initialDate;
     if (isStart) {
       initialDate = _startDate ?? now;
@@ -154,7 +152,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
 
     final dateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     
-    // التحقق المنطقي من الوقت 
     if (isStart) {
       if (_endDate != null && dateTime.isAfter(_endDate!)) {
         if (mounted) {
@@ -235,7 +232,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("تم حذف الامتحان بنجاح"), backgroundColor: AppColors.success),
         );
-        Navigator.pop(context, true); // العودة وتحديث القائمة
+        Navigator.pop(context, true); 
       }
     } catch (e) {
       if (mounted) {
@@ -260,7 +257,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
       return;
     }
     
-    // تحقق أخير للتأكد قبل الإرسال
     if (_startDate!.isAfter(_endDate!)) {
        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ: وقت البداية بعد وقت النهاية!"), backgroundColor: AppColors.error));
        return;
@@ -286,13 +282,14 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         });
       }
 
+      // ✅ بناء كائن البيانات للإرسال
       final examData = {
         'title': _titleController.text,
         'subjectId': widget.subjectId,
         'duration': int.parse(_durationController.text),
         'randomizeQuestions': _randomizeQuestions, 
         'randomizeOptions': _randomizeOptions,     
-        'allow_retake': _allowRetake, // ✅ 3. إرسال إعداد السماح بالتدريب
+        'allow_retake': _allowRetake, // ✅ إرسال إعداد السماح بالتدريب
         'notifyStudents': _notifyStudents, // ✅ إرسال إعداد الإشعارات
         'start_time': _startDate!.toIso8601String(), 
         'end_time': _endDate!.toIso8601String(),
@@ -340,7 +337,6 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         backgroundColor: AppColors.backgroundSecondary,
         iconTheme: IconThemeData(color: AppColors.accentYellow),
         actions: [
-          // زر الحذف يظهر فقط عند التعديل
           if (widget.examId != null)
             IconButton(
               icon: Icon(Icons.delete_forever, color: AppColors.error),
@@ -402,7 +398,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
                           onChanged: (val) => setState(() => _randomizeOptions = val),
                         ),
                         
-                        // ✅ 4. إضافة خيار السماح بإعادة الامتحان
+                        // ✅ إضافة خيار السماح بإعادة الامتحان (التدريب)
                         Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
                         SwitchListTile(
                           title: Text("السماح بإعادة الامتحان (تدريب)", style: TextStyle(color: AppColors.textPrimary)),
@@ -412,7 +408,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
                           onChanged: (val) => setState(() => _allowRetake = val),
                         ),
 
-                        // ✅ 5. إضافة خيار إرسال الإشعار (يظهر فقط في حالة إنشاء امتحان جديد)
+                        // ✅ خيار إرسال الإشعار يظهر فقط في حالة إنشاء امتحان جديد
                         if (widget.examId == null) ...[
                           Divider(height: 1, color: AppColors.textSecondary.withOpacity(0.1)),
                           SwitchListTile(
