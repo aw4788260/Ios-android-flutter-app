@@ -880,43 +880,50 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            video['title'].toString().toUpperCase(),
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-  children: [
-    Text(
-      "VIDEO",
-      style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          color: AppColors.textSecondary.withOpacity(0.7)),
-    ),
-    if (duration != "--:--") ...[
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6.0),
-        child: Icon(LucideIcons.clock, 
-            size: 10, color: AppColors.textSecondary.withOpacity(0.5)),
-      ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
       Text(
-        duration,
+        video['title'].toString().toUpperCase(),
         style: TextStyle(
-            fontSize: 9,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
-            color: AppColors.accentYellow.withOpacity(0.9)),
+            color: AppColors.textPrimary),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-    ]
-  ],
+      
+      // 👉 الكود الخاص بك يوضع هنا:
+      const SizedBox(height: 4),
+      Row(
+        children: [
+          Text(
+            "VIDEO",
+            style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textSecondary.withOpacity(0.7)),
+          ),
+          if (duration != "--:--") ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6.0),
+              child: Icon(LucideIcons.clock, 
+                  size: 10, color: AppColors.textSecondary.withOpacity(0.5)),
+            ),
+            Text(
+              duration,
+              style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accentYellow.withOpacity(0.9)),
+            ),
+          ]
+        ],
+      ),
+      // ===========================
+      
+    ],
+  ),
 ),
 
                     if (_isTeacher)
