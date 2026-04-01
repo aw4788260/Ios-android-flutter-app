@@ -893,17 +893,31 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            "VIDEO",
-                            style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    AppColors.textSecondary.withOpacity(0.7)),
-                          ),
-                        ],
-                      ),
-                    ),
+                          Row(
+  children: [
+    Text(
+      "VIDEO",
+      style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textSecondary.withOpacity(0.7)),
+    ),
+    if (duration != "--:--") ...[
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+        child: Icon(LucideIcons.clock, 
+            size: 10, color: AppColors.textSecondary.withOpacity(0.5)),
+      ),
+      Text(
+        duration,
+        style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+            color: AppColors.accentYellow.withOpacity(0.9)),
+      ),
+    ]
+  ],
+),
 
                     if (_isTeacher)
                       IconButton(
