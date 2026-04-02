@@ -560,15 +560,17 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
         final exam = visibleExams[index];
         final bool isCompleted = exam['isCompleted'] ?? false;
         final bool isExpired = exam['isExpired'] ?? false;
-        final bool allowRetake = exam['allow_retake'] ?? false;
+        
+        // ✅ 1. التعديل هنا: قراءة المتغير بأمان تام لدعم جميع أنواع البيانات
+        final bool allowRetake = exam['allow_retake'] == true || exam['allow_retake'] == 'true' || exam['allow_retake'] == 1;
 
-        // ✅ تحديد اللون والنص والأيقونة بناءً على حالة الإعادة
         Color statusColor = AppColors.accentOrange;
         String statusText = "UNSOLVED";
         IconData statusIcon = LucideIcons.fileX;
 
         if (isCompleted) {
-          if (allowRetake && !_isTeacher) {
+          // ✅ 2. التعديل هنا: إزالة شرط (!_isTeacher) لكي يرى المعلم زر التدريب
+          if (allowRetake) {
             statusColor = AppColors.accentYellow;
             statusText = "PRACTICE";
             statusIcon = LucideIcons.refreshCcw;
@@ -712,7 +714,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
 
   // ✅ التعديل هنا: الدالة الخاصة بفتح الامتحان والتوجيه الصحيح في حالة الإعادة
   void _openExam(Map exam, bool isCompleted, bool isExpired) {
-    final bool allowRetake = exam['allow_retake'] ?? false;
+    // ✅ قراءة المتغير بأمان تام
+    final bool allowRetake = exam['allow_retake'] == true || exam['allow_retake'] == 'true' || exam['allow_retake'] == 1;
 
     // دوال مساعدة للتوجيه
     void navigateToResult() {
@@ -750,8 +753,8 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
     }
 
     if (isCompleted) {
-      if (allowRetake && !_isTeacher) {
-        // إذا كان الامتحان محلولاً، ومسموح بالإعادة، والطالب هو الذي يتصفح
+      // ✅ تم إزالة شرط (!_isTeacher) ليتمكن المعلم أيضاً من اختبار وضع الإعادة
+      if (allowRetake) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
@@ -785,14 +788,14 @@ class _SubjectMaterialsScreenState extends State<SubjectMaterialsScreen> {
           ),
         );
       } else {
-        // الامتحان محلول ولا يوجد إعادة (أو المدرس هو المتصفح) -> اذهب للنتيجة مباشرة
+        // الامتحان محلول ولا يوجد إعادة -> اذهب للنتيجة مباشرة
         navigateToResult();
       }
     } else if (isExpired) {
       // إذا كان الامتحان منتهي الصلاحية، يفتح مباشرة لرؤية نموذج الإجابة بدون نافذة تأكيد
       navigateToExamView();
     } else {
-      // 3. إذا كان الامتحان "غير محلول" (Unsolved) ومتاحاً
+      // إذا كان الامتحان "غير محلول" (Unsolved) ومتاحاً
       // يتم إظهار نافذة التأكيد قبل بدء التايمر
       showDialog(
         context: context,
