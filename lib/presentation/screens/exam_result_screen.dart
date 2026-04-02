@@ -12,7 +12,7 @@ import '../../core/constants/api_constants.dart';
 class ExamResultScreen extends StatefulWidget {
   final String attemptId;
   final String examTitle;
-  // ✅ إضافة حقل النتائج المباشرة لوضع التدريب
+  // ✅ حقل النتائج المباشرة الممررة من شاشة الامتحان (لحالة التدريب)
   final Map<String, dynamic>? practiceResults;
 
   const ExamResultScreen({
@@ -30,7 +30,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
   bool _loading = true;
   Map<String, dynamic>? _resultData;
 
-  // متغيرات الهيدرز
   String? _userId;
   String? _deviceId;
   String? _token; 
@@ -42,7 +41,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     super.initState();
     FirebaseCrashlytics.instance.log("View Result: ${widget.attemptId}");
     
-    // ✅ إذا كانت النتائج ممررة مسبقاً (وضع التدريب)، نستخدمها مباشرة
+    // ✅ التحقق: إذا كانت النتائج ممررة مسبقاً (وضع التدريب)، نستخدمها مباشرة ولا نطلبها من السيرفر
     if (widget.practiceResults != null) {
       setState(() {
         _resultData = widget.practiceResults;
@@ -76,7 +75,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
           _loading = false;
         });
 
-        // تخزين النتيجة محلياً
+        // تخزين النتيجة محلياً للرجوع إليها لاحقاً
         _cacheResultLocally(res.data);
       }
     } catch (e, stack) {
@@ -86,7 +85,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     }
   }
 
-  // دالة التخزين المحلي
   Future<void> _cacheResultLocally(Map<String, dynamic> data) async {
     try {
       var historyBox = await StorageService.openBox('exams_history_box');
@@ -96,7 +94,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     }
   }
 
-  // دالة عرض الصورة بحجم كامل مع التكبير
   void _showEnlargedImage(String imageFileId) {
     showDialog(
       context: context,
@@ -129,7 +126,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
                 ),
               ),
             ),
-
             Positioned(
               top: 40,
               right: 20,
@@ -172,7 +168,8 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
       );
     }
 
-    final scoreDetails = _resultData!['score_details'] ?? _resultData!; // دعم هيكل الرد في وضع التدريب
+    // ✅ دعم هيكل الرد الموحد (وضع التدريب يرسل الحقول مباشرة أو داخل score_details)
+    final scoreDetails = _resultData!['score_details'] ?? _resultData!; 
     final List questions = _resultData!['corrected_questions'] ?? [];
     final double percentage = (scoreDetails['percentage'] ?? 0) / 100.0;
     final bool isPractice = _resultData!['is_practice'] == true;
@@ -198,7 +195,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // 💡 رسالة توضيحية لوضع التدريب
+            // 💡 تنبيه في حالة التدريب
             if (isPractice)
               Container(
                 margin: const EdgeInsets.only(bottom: 24),
@@ -214,15 +211,15 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
                     const SizedBox(width: 12),
                     const Expanded(
                       child: Text(
-                        "هذه نتيجة تدريبية ولن يتم حفظها في سجلك الدراسي.",
-                        style: TextStyle(color: Colors.white, fontSize: 13),
+                        "هذه نتيجة تدريبية (Practice Mode). لم يتم حفظ هذه النتيجة في سجل درجاتك الدائم.",
+                        style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
                       ),
                     ),
                   ],
                 ),
               ),
 
-            // 1. بطاقة النتيجة
+            // 1. ملخص النتيجة
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -263,7 +260,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
 
             const SizedBox(height: 32),
             
-            // في وضع التدريب، قد لا نملك قائمة الأسئحة المصححة مفصلة في بعض السيناريوهات، لذا نتحقق
+            // ✅ عرض التحليل التفصيلي (الأسئلة والإجابات)
             if (questions.isNotEmpty) ...[
               Align(
                 alignment: Alignment.centerLeft,
@@ -276,7 +273,6 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
               ),
               const SizedBox(height: 16),
 
-              // 2. قائمة الأسئلة المصححة
               ...List.generate(questions.length, (index) {
                 final q = questions[index];
                 final userAnsId = q['user_answer']?['selected_option_id'];
@@ -358,7 +354,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 16),
 
-                      // الخيارات
+                      // عرض الخيارات وتحديد الصحيح منها وما اختاره الطالب
                       ...(q['options'] as List).map((opt) {
                         final bool isSelected = opt['id'] == userAnsId;
                         final bool isTheCorrectOne = opt['id'] == correctOptId;
