@@ -36,7 +36,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
   int currentIdx = 0;
   Map<String, int> userAnswers = {};
 
-  // ✅ 1. قائمة لتخزين الأسئلة التي تم وضع علامة عليها (Flagged)
+  // قائمة لتخزين الأسئلة التي تم وضع علامة عليها (Flagged)
   Set<String> flaggedQuestions = {};
 
   int timeLeft = 0;
@@ -87,7 +87,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
             _loading = false;
           });
         } else {
-          // الوضع الطبيعي (بدء امتحان)
+          // الوضع الطبيعي (بدء امتحان أو إعادة تدريب)
           int apiDuration = data['durationMinutes'] ?? 30;
 
           setState(() {
@@ -149,7 +149,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
       return;
     }
 
-    // ✅ 2. منع تسليم الامتحان إذا كانت هناك أسئلة فارغة (إلا في حالة انتهاء الوقت autoSubmit)
+    // منع تسليم الامتحان إذا كانت هناك أسئلة فارغة (إلا في حالة انتهاء الوقت autoSubmit)
     if (!autoSubmit) {
       if (userAnswers.length < _questions.length) {
         int unanswered = _questions.length - userAnswers.length;
@@ -180,9 +180,14 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
       Map<String, int> finalAnswers = {};
       userAnswers.forEach((k, v) => finalAnswers[k] = v);
 
+      // ✅ التعديل الجوهري: إضافة examId للبيانات المرسلة لدعم التصحيح اللحظي في وضع التدريب
       await Dio().post(
         '$_baseUrl/api/exams/submit-attempt',
-        data: {'attemptId': _attemptId, 'answers': finalAnswers},
+        data: {
+          'attemptId': _attemptId,
+          'answers': finalAnswers,
+          'examId': widget.examId, // مطلوب للباك أند في حالة 'temp_retake_mode'
+        },
         options: Options(headers: {
           'Authorization': 'Bearer $_token',
           'x-device-id': _deviceId,
@@ -217,11 +222,9 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.backgroundSecondary,
-        // ✅ تم تعديل لون العنوان ليناسب الوضع النهاري والليلي
         title: Text("Exit Exam?",
             style: TextStyle(
                 color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-        // ✅ تم تعديل لون المحتوى ليناسب الوضع النهاري والليلي
         content: Text(
             "Leaving the exam screen now will AUTOMATICALLY SUBMIT your current answers and you cannot return.\n\nAre you sure?",
             style: TextStyle(color: AppColors.textSecondary)),
@@ -247,7 +250,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
     }
   }
 
-  // ✅ 3. دالة لتكبير الصورة
+  // دالة لتكبير الصورة
   void _showZoomableImage(String imageUrl) {
     showDialog(
       context: context,
@@ -305,15 +308,12 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
     final options =
         (questionData['options'] as List).cast<Map<String, dynamic>>();
 
-    // التحقق مما إذا كان السؤال الحالي معلم عليه
     bool isFlagged = flaggedQuestions.contains(questionId);
 
     return PopScope(
-      canPop:
-          _isModelAnswerMode, // السماح بالخروج مباشرة فقط إذا كان نموذج إجابة
+      canPop: _isModelAnswerMode,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        // إذا حاول المستخدم الخروج أثناء الامتحان، نعرض التحذير
         await _showExitWarningDialog();
       },
       child: Scaffold(
@@ -328,7 +328,6 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // ✅ 4. زر وضع العلامة (Flag)
                     if (!_isModelAnswerMode)
                       IconButton(
                         onPressed: () {
@@ -402,7 +401,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                 ),
               ),
 
-              // ✅ 5. شريط التنقل بين الأسئلة (Horizontal Navigator)
+              // شريط التنقل بين الأسئلة
               Container(
                 height: 50,
                 width: double.infinity,
@@ -420,23 +419,19 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                     bool isAnswered = userAnswers.containsKey(qIdStr);
                     bool isMarked = flaggedQuestions.contains(qIdStr);
 
-                    // ✅ تعديل الألوان هنا لتمييز الحالات بوضوح
                     Color boxColor = AppColors.backgroundSecondary;
                     Color textColor = AppColors.textSecondary;
                     Color borderColor = Colors.white.withOpacity(0.1);
 
                     if (isCurrent) {
-                      // الحالي: أصفر بالكامل
                       boxColor = AppColors.accentYellow;
                       borderColor = AppColors.accentYellow;
-                      textColor = AppColors.backgroundPrimary; // نص غامق
+                      textColor = AppColors.backgroundPrimary;
                     } else if (isMarked) {
-                      // المعلم (Flag): برتقالي شفاف مع إطار
                       boxColor = AppColors.accentOrange.withOpacity(0.15);
                       borderColor = AppColors.accentOrange;
                       textColor = AppColors.accentOrange;
                     } else if (isAnswered) {
-                      // المجاب: أخضر
                       boxColor = AppColors.success.withOpacity(0.2);
                       borderColor = Colors.transparent;
                       textColor = AppColors.success;
@@ -481,7 +476,6 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                     children: [
                       if (imageFileId != null && imageFileId.isNotEmpty)
                         GestureDetector(
-                          // ✅ تفعيل تكبير الصورة عند الضغط
                           onTap: () {
                             final imageUrl =
                                 '$_baseUrl/api/exams/get-image?file_id=$imageFileId';
@@ -517,7 +511,6 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                                     fit: BoxFit.contain,
                                   ),
                                 ),
-                                // أيقونة صغيرة لتوضيح إمكانية التكبير
                                 Positioned(
                                   bottom: 8,
                                   right: 8,
