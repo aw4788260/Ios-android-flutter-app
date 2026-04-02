@@ -180,13 +180,13 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
       Map<String, int> finalAnswers = {};
       userAnswers.forEach((k, v) => finalAnswers[k] = v);
 
-      // ✅ التعديل الجوهري: إضافة examId للبيانات المرسلة لدعم التصحيح اللحظي في وضع التدريب
-      await Dio().post(
+      // ✅ التعديل: إرسال examId لدعم التصحيح اللحظي في وضع التدريب وحفظ الرد
+      final res = await Dio().post(
         '$_baseUrl/api/exams/submit-attempt',
         data: {
-          'attemptId': _attemptId,
+          'attemptId': _attemptId, 
           'answers': finalAnswers,
-          'examId': widget.examId, // مطلوب للباك أند في حالة 'temp_retake_mode'
+          'examId': widget.examId, // مهم جداً لوضع التدريب (temp_retake_mode)
         },
         options: Options(headers: {
           'Authorization': 'Bearer $_token',
@@ -201,7 +201,11 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => ExamResultScreen(
-                attemptId: _attemptId!, examTitle: widget.examTitle),
+              attemptId: _attemptId!, 
+              examTitle: widget.examTitle,
+              // ✅ تمرير النتائج مباشرة إذا كان في وضع التدريب لتجنب الفشل في جلبها من السيرفر
+              practiceResults: _attemptId == 'temp_retake_mode' ? res.data : null,
+            ),
           ),
         );
       }
@@ -308,12 +312,15 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
     final options =
         (questionData['options'] as List).cast<Map<String, dynamic>>();
 
+    // التحقق مما إذا كان السؤال الحالي معلم عليه
     bool isFlagged = flaggedQuestions.contains(questionId);
 
     return PopScope(
-      canPop: _isModelAnswerMode,
+      canPop:
+          _isModelAnswerMode, // السماح بالخروج مباشرة فقط إذا كان نموذج إجابة
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        // إذا حاول المستخدم الخروج أثناء الامتحان، نعرض التحذير
         await _showExitWarningDialog();
       },
       child: Scaffold(
@@ -328,6 +335,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // زر وضع العلامة (Flag)
                     if (!_isModelAnswerMode)
                       IconButton(
                         onPressed: () {
@@ -401,7 +409,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                 ),
               ),
 
-              // شريط التنقل بين الأسئلة
+              // شريط التنقل بين الأسئلة (Horizontal Navigator)
               Container(
                 height: 50,
                 width: double.infinity,
@@ -511,6 +519,7 @@ class _ExamViewScreenState extends State<ExamViewScreen> {
                                     fit: BoxFit.contain,
                                   ),
                                 ),
+                                // أيقونة صغيرة لتوضيح إمكانية التكبير
                                 Positioned(
                                   bottom: 8,
                                   right: 8,
