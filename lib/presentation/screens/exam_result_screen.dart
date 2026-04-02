@@ -12,9 +12,15 @@ import '../../core/constants/api_constants.dart';
 class ExamResultScreen extends StatefulWidget {
   final String attemptId;
   final String examTitle;
+  // ✅ إضافة حقل النتائج المباشرة لوضع التدريب
+  final Map<String, dynamic>? practiceResults;
 
-  const ExamResultScreen(
-      {super.key, required this.attemptId, required this.examTitle});
+  const ExamResultScreen({
+    super.key,
+    required this.attemptId,
+    required this.examTitle,
+    this.practiceResults,
+  });
 
   @override
   State<ExamResultScreen> createState() => _ExamResultScreenState();
@@ -27,7 +33,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
   // متغيرات الهيدرز
   String? _userId;
   String? _deviceId;
-  String? _token; // ✅ التوكن ضروري للصور والطلبات
+  String? _token; 
   final String _appSecret = const String.fromEnvironment('APP_SECRET');
   final String _baseUrl = ApiConstants.baseUrl;
 
@@ -35,7 +41,16 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
   void initState() {
     super.initState();
     FirebaseCrashlytics.instance.log("View Result: ${widget.attemptId}");
-    _fetchResults();
+    
+    // ✅ إذا كانت النتائج ممررة مسبقاً (وضع التدريب)، نستخدمها مباشرة
+    if (widget.practiceResults != null) {
+      setState(() {
+        _resultData = widget.practiceResults;
+        _loading = false;
+      });
+    } else {
+      _fetchResults();
+    }
   }
 
   Future<void> _fetchResults() async {
@@ -43,13 +58,13 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
       var box = await StorageService.openBox('auth_box');
       _userId = box.get('user_id');
       _deviceId = box.get('device_id');
-      _token = box.get('jwt_token'); // ✅ جلب التوكن
+      _token = box.get('jwt_token'); 
 
       final res = await Dio().get(
         '$_baseUrl/api/exams/get-results',
         queryParameters: {'attemptId': widget.attemptId},
         options: Options(headers: {
-          'Authorization': 'Bearer $_token', // ✅ إرسال التوكن
+          'Authorization': 'Bearer $_token', 
           'x-device-id': _deviceId,
           'x-app-secret': _appSecret,
         }),
@@ -81,23 +96,22 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     }
   }
 
-  // ✅ دالة جديدة لعرض الصورة بحجم كامل مع التكبير
+  // دالة عرض الصورة بحجم كامل مع التكبير
   void _showEnlargedImage(String imageFileId) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.transparent, // خلفية شفافة
-        insetPadding: EdgeInsets.zero, // ملء الشاشة تقريباً
+        backgroundColor: Colors.transparent, 
+        insetPadding: EdgeInsets.zero, 
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // منطقة العرض مع التكبير
             SizedBox(
               width: double.infinity,
               height: double.infinity,
               child: InteractiveViewer(
                 minScale: 1.0,
-                maxScale: 4.0, // أقصى حد للتكبير
+                maxScale: 4.0, 
                 child: CachedNetworkImage(
                   imageUrl:
                       '$_baseUrl/api/exams/get-image?file_id=$imageFileId',
@@ -111,12 +125,11 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
                           color: AppColors.accentYellow)),
                   errorWidget: (context, url, error) =>
                       const Icon(Icons.error, color: AppColors.error),
-                  fit: BoxFit.contain, // احتواء الصورة بالكامل
+                  fit: BoxFit.contain, 
                 ),
               ),
             ),
 
-            // زر الإغلاق
             Positioned(
               top: 40,
               right: 20,
@@ -159,9 +172,10 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
       );
     }
 
-    final scoreDetails = _resultData!['score_details'];
-    final questions = _resultData!['corrected_questions'] as List;
+    final scoreDetails = _resultData!['score_details'] ?? _resultData!; // دعم هيكل الرد في وضع التدريب
+    final List questions = _resultData!['corrected_questions'] ?? [];
     final double percentage = (scoreDetails['percentage'] ?? 0) / 100.0;
+    final bool isPractice = _resultData!['is_practice'] == true;
 
     Color statusColor = percentage >= 0.5 ? AppColors.success : AppColors.error;
     String statusMsg = percentage >= 0.5 ? "PASSED" : "FAILED";
@@ -169,7 +183,7 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
       appBar: AppBar(
-        title: Text("EXAM RESULTS",
+        title: Text(isPractice ? "PRACTICE RESULT" : "EXAM RESULTS",
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -184,6 +198,30 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
+            // 💡 رسالة توضيحية لوضع التدريب
+            if (isPractice)
+              Container(
+                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accentYellow.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accentYellow.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.info, color: AppColors.accentYellow, size: 20),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        "هذه نتيجة تدريبية ولن يتم حفظها في سجلك الدراسي.",
+                        style: TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // 1. بطاقة النتيجة
             Container(
               padding: const EdgeInsets.all(24),
@@ -224,158 +262,157 @@ class _ExamResultScreenState extends State<ExamResultScreen> {
             ),
 
             const SizedBox(height: 32),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text("DETAILED ANALYSIS",
-                  style: TextStyle(
-                      color: AppColors.accentYellow,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5)),
-            ),
-            const SizedBox(height: 16),
+            
+            // في وضع التدريب، قد لا نملك قائمة الأسئحة المصححة مفصلة في بعض السيناريوهات، لذا نتحقق
+            if (questions.isNotEmpty) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text("DETAILED ANALYSIS",
+                    style: TextStyle(
+                        color: AppColors.accentYellow,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5)),
+              ),
+              const SizedBox(height: 16),
 
-            // 2. قائمة الأسئلة المصححة
-            ...List.generate(questions.length, (index) {
-              final q = questions[index];
-              // حسب هيكل الباك اند الجديد
-              final userAnsId = q['user_answer']?['selected_option_id'];
-              final correctOptId = q['correct_option_id'];
-              final bool isCorrect = userAnsId == correctOptId;
+              // 2. قائمة الأسئلة المصححة
+              ...List.generate(questions.length, (index) {
+                final q = questions[index];
+                final userAnsId = q['user_answer']?['selected_option_id'];
+                final correctOptId = q['correct_option_id'];
+                final bool isCorrect = userAnsId == correctOptId;
+                final String? imageFileId = q['image_file_id'];
 
-              final String? imageFileId = q['image_file_id'];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundSecondary.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: isCorrect
+                            ? AppColors.success.withOpacity(0.3)
+                            : AppColors.error.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                              isCorrect
+                                  ? LucideIcons.checkCircle
+                                  : LucideIcons.xCircle,
+                              color:
+                                  isCorrect ? AppColors.success : AppColors.error,
+                              size: 20),
+                          const SizedBox(width: 10),
+                          Text("Question ${index + 1}",
+                              style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.backgroundSecondary.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: isCorrect
-                          ? AppColors.success.withOpacity(0.3)
-                          : AppColors.error.withOpacity(0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                            isCorrect
-                                ? LucideIcons.checkCircle
-                                : LucideIcons.xCircle,
-                            color:
-                                isCorrect ? AppColors.success : AppColors.error,
-                            size: 20),
-                        const SizedBox(width: 10),
-                        Text("Question ${index + 1}",
-                            style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ✅ عرض الصورة إن وجدت (مع إضافة GestureDetector للتكبير)
-                    if (imageFileId != null && imageFileId.isNotEmpty)
-                      GestureDetector(
-                        onTap: () => _showEnlargedImage(
-                            imageFileId), // عند الضغط، افتح الصورة المكبرة
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          height: 150,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: CachedNetworkImage(
-                              imageUrl:
-                                  '$_baseUrl/api/exams/get-image?file_id=$imageFileId',
-                              httpHeaders: {
-                                'Authorization':
-                                    'Bearer $_token', // ✅ إضافة التوكن للهيدر
-                                'x-device-id': _deviceId ?? '',
-                                'x-app-secret': _appSecret,
-                              },
-                              placeholder: (context, url) => Center(
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.accentYellow)),
-                              errorWidget: (context, url, error) => const Icon(
-                                  Icons.error,
-                                  color: AppColors.error),
-                              fit: BoxFit.contain,
+                      if (imageFileId != null && imageFileId.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => _showEnlargedImage(imageFileId),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            height: 150,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CachedNetworkImage(
+                                imageUrl:
+                                    '$_baseUrl/api/exams/get-image?file_id=$imageFileId',
+                                httpHeaders: {
+                                  'Authorization': 'Bearer $_token',
+                                  'x-device-id': _deviceId ?? '',
+                                  'x-app-secret': _appSecret,
+                                },
+                                placeholder: (context, url) => Center(
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.accentYellow)),
+                                errorWidget: (context, url, error) => const Icon(
+                                    Icons.error,
+                                    color: AppColors.error),
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
-                      ),
 
-                    Text(q['question_text'] ?? "",
-                        style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 16),
+                      Text(q['question_text'] ?? "",
+                          style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 16),
 
-                    // الخيارات
-                    ...(q['options'] as List).map((opt) {
-                      final bool isSelected = opt['id'] == userAnsId;
-                      final bool isTheCorrectOne = opt['id'] == correctOptId;
+                      // الخيارات
+                      ...(q['options'] as List).map((opt) {
+                        final bool isSelected = opt['id'] == userAnsId;
+                        final bool isTheCorrectOne = opt['id'] == correctOptId;
 
-                      Color bgColor = Colors.transparent;
-                      Color borderColor = Colors.white10;
-                      IconData? icon;
-                      Color iconColor = Colors.transparent;
+                        Color bgColor = Colors.transparent;
+                        Color borderColor = Colors.white10;
+                        IconData? icon;
+                        Color iconColor = Colors.transparent;
 
-                      if (isTheCorrectOne) {
-                        bgColor = AppColors.success.withOpacity(0.1);
-                        borderColor = AppColors.success;
-                        icon = Icons.check_circle;
-                        iconColor = AppColors.success;
-                      } else if (isSelected && !isTheCorrectOne) {
-                        bgColor = AppColors.error.withOpacity(0.1);
-                        borderColor = AppColors.error;
-                        icon = Icons.cancel;
-                        iconColor = AppColors.error;
-                      }
+                        if (isTheCorrectOne) {
+                          bgColor = AppColors.success.withOpacity(0.1);
+                          borderColor = AppColors.success;
+                          icon = Icons.check_circle;
+                          iconColor = AppColors.success;
+                        } else if (isSelected && !isTheCorrectOne) {
+                          bgColor = AppColors.error.withOpacity(0.1);
+                          borderColor = AppColors.error;
+                          icon = Icons.cancel;
+                          iconColor = AppColors.error;
+                        }
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Row(
-                          children: [
-                            if (icon != null) ...[
-                              Icon(icon, size: 16, color: iconColor),
-                              const SizedBox(width: 8),
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              if (icon != null) ...[
+                                Icon(icon, size: 16, color: iconColor),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                  child: Text(opt['option_text'],
+                                      style: TextStyle(
+                                          color: isTheCorrectOne
+                                              ? AppColors.success
+                                              : AppColors.textSecondary,
+                                          fontWeight: isTheCorrectOne
+                                              ? FontWeight.bold
+                                              : FontWeight.normal))),
                             ],
-                            Expanded(
-                                child: Text(opt['option_text'],
-                                    style: TextStyle(
-                                        color: isTheCorrectOne
-                                            ? AppColors.success
-                                            : AppColors.textSecondary,
-                                        fontWeight: isTheCorrectOne
-                                            ? FontWeight.bold
-                                            : FontWeight.normal))),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              );
-            }),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ],
         ),
       ),
