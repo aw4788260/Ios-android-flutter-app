@@ -442,6 +442,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         hintText: "01xxxxxxxxx",
                         prefixIcon: LucideIcons.phone,
                         keyboardType: TextInputType.phone,
+                        readOnly: true, // ✅ تمت الإضافة هنا لمنع التعديل
                         validator: (value) {
                           if (value == null || value.isEmpty) return null;
                           return value.length < 11
@@ -455,6 +456,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _usernameController,
                         hintText: "English letters & numbers only",
                         prefixIcon: LucideIcons.atSign,
+                        readOnly: true, // ✅ تمت الإضافة هنا لمنع التعديل
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
                               RegExp(r'[a-zA-Z0-9]')),
