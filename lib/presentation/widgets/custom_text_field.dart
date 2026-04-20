@@ -12,6 +12,7 @@ class CustomTextField extends StatefulWidget {
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final List<TextInputFormatter>? inputFormatters; // ✅ تمت الإضافة
+  final bool readOnly; // ✅ إضافة خاصية القراءة فقط
 
   const CustomTextField({
     super.key,
@@ -24,6 +25,7 @@ class CustomTextField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.validator,
     this.inputFormatters, // ✅ تمت الإضافة إلى البناء
+    this.readOnly = false, // ✅ إعطاء قيمة افتراضية false
   });
 
   @override
@@ -56,7 +58,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
         // Input Container
         Container(
           decoration: BoxDecoration(
-            color: AppColors.backgroundSecondary,
+            color: widget.readOnly // ✅ تبهيت لون الخلفية قليلاً إذا كان الحقل للقراءة فقط
+                ? AppColors.backgroundSecondary.withOpacity(0.5) 
+                : AppColors.backgroundSecondary,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: _isFocused 
@@ -71,11 +75,22 @@ class _CustomTextFieldState extends State<CustomTextField> {
             keyboardType: widget.keyboardType,
             validator: widget.validator,
             inputFormatters: widget.inputFormatters, // ✅ تمرير الخاصية هنا
+            readOnly: widget.readOnly, // ✅ تمرير الخاصية هنا لمنع التعديل
             // 🔥 تم إزالة const هنا
-            style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: TextStyle(
+              color: widget.readOnly // ✅ تبهيت لون النص للإشارة إلى عدم إمكانية التعديل
+                  ? AppColors.textSecondary 
+                  : AppColors.textPrimary, 
+              fontSize: 14
+            ),
             cursorColor: AppColors.accentYellow,
             
-            onTap: () => setState(() => _isFocused = true),
+            onTap: () {
+              // ✅ تفعيل التركيز (Focus) فقط إذا كان الحقل ليس للقراءة فقط
+              if (!widget.readOnly) {
+                setState(() => _isFocused = true);
+              }
+            },
             onTapOutside: (_) {
               setState(() => _isFocused = false);
               FocusScope.of(context).unfocus();
