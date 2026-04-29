@@ -64,7 +64,6 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 // ---- State --------------------------------------------------------
-
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -91,6 +90,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   double _penSize = 0.003;
   double _highlightSize = 0.035;
   double _eraserSize = 0.04;
+
+  // ✅ المتغيرات الجديدة لحفظ إعدادات التعليقات (الحجم والشفافية)
+  double _defaultCommentScale = 1.0;
+  double _defaultCommentOpacity = 1.0;
+
+  // ✅ المتغيرات الجديدة لميزة البحث المدمج
+  final PdfTextSearcher _textSearcher = PdfTextSearcher();
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearchMode = false;
 
   Map<int, List<DrawingLine>> _pageDrawings = {};
   Map<int, List<CommentModel>> _pageComments = {};
@@ -126,6 +134,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     super.initState();
     _sessionToken = _generateSecureToken();
     _initWatermarkText();
+    _loadToolSettings();
     _preparePdf();
   }
 
@@ -194,6 +203,36 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // -----------------------------------------------------------
   // Annotation persistence (unchanged + pageNumber stamp)
   // -----------------------------------------------------------
+
+  // --- أضف هاتين الدالتين ---
+  Future<void> _loadToolSettings() async {
+    try {
+      final box = await StorageService.openBox('pdf_settings_box');
+      if (mounted) {
+        setState(() {
+          _penSize = box.get('penSize') ?? 0.003;
+          _highlightSize = box.get('highlightSize') ?? 0.035;
+          _eraserSize = box.get('eraserSize') ?? 0.04;
+          int? colorVal = box.get('selectedColor');
+          if (colorVal != null) _selectedColor = Color(colorVal);
+          _defaultCommentScale = box.get('commentScale') ?? 1.0;
+          _defaultCommentOpacity = box.get('commentOpacity') ?? 1.0;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _saveToolSettings() async {
+    try {
+      final box = await StorageService.openBox('pdf_settings_box');
+      box.put('penSize', _penSize);
+      box.put('highlightSize', _highlightSize);
+      box.put('eraserSize', _eraserSize);
+      box.put('selectedColor', _selectedColor.value);
+      box.put('commentScale', _defaultCommentScale);
+      box.put('commentOpacity', _defaultCommentOpacity);
+    } catch (_) {}
+  }
 
   Future<void> _saveAnnotationsToHive() async {
     try {
@@ -524,9 +563,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       text: '',
       dx: relativePoint.dx,
       dy: relativePoint.dy,
-      color: _selectedColor.value,
+      // ✅ استخدام اللون مع الشفافية المحفوظة
+      color: _selectedColor.withOpacity(_defaultCommentOpacity).value, 
       pageNumber: pageNumber,
     );
+    // ✅ استخدام الحجم المحفوظ
+    newComment.scale = _defaultCommentScale;
+
     _showCommentDialog(pageNumber, newComment, isNew: true);
   }
 
@@ -640,6 +683,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         setDialogState(() => comment.scale = val);
                         setState(() {});
                       },
+                      onChangeEnd: (val) { // ✅ أضف هذا السطر للحفظ
+                        _defaultCommentScale = val;
+                        _saveToolSettings(); 
+                      },
                     ),
                     const SizedBox(height: 10),
                     Align(
@@ -661,6 +708,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                           comment.color = baseColor.withOpacity(val).value;
                         });
                         setState(() {});
+                      },
+                      onChangeEnd: (val) { // ✅ أضف هذا السطر للحفظ
+                        _defaultCommentOpacity = val;
+                        _saveToolSettings(); 
                       },
                     ),
                   ],
@@ -1084,6 +1135,8 @@ Widget _buildPageDrawer() {
                                 child: Icon(LucideIcons.pencil,
                                     color: Colors.blue, size: 12),
                               ),
+                          ],
+                        ),
                             if (isVisited && !isCurrent)
                               Padding(
                                 padding: const EdgeInsets.only(left: 2),
@@ -1372,6 +1425,7 @@ Widget _buildPageDrawer() {
         else
           _penSize = val;
       }),
+      onChangeEnd: (val) => _saveToolSettings(), // ✅ أضف هذا السطر للحفظ
     );
   }
 
@@ -1399,6 +1453,8 @@ Widget _buildPageDrawer() {
         _selectedColor = color;
         if (_selectedTool == 2) _selectedTool = 0;
       }),
+      _saveToolSettings(); // ✅ حفظ اللون عند الضغط
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         width: 24,
