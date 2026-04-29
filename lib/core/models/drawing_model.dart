@@ -1,3 +1,4 @@
+// drawing_model.dart — unchanged from original; included for reference.
 import 'dart:ui';
 
 class DrawingLine {
@@ -5,14 +6,14 @@ class DrawingLine {
   final int color;
   final double strokeWidth;
   final bool isHighlighter;
-  final bool isEraser; // ✅ إضافة خاصية الممحاة
+  final bool isEraser;
 
   DrawingLine({
     required this.points,
     required this.color,
     required this.strokeWidth,
     required this.isHighlighter,
-    this.isEraser = false, // ✅ القيمة الافتراضية
+    this.isEraser = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -20,7 +21,7 @@ class DrawingLine {
       'c': color,
       'w': strokeWidth,
       'h': isHighlighter,
-      'e': isEraser, // ✅ حفظ الخاصية
+      'e': isEraser,
       'p': points.map((e) => {'x': e.dx, 'y': e.dy}).toList(),
     };
   }
@@ -38,7 +39,7 @@ class DrawingLine {
       color: json['c'] as int,
       strokeWidth: (json['w'] as num).toDouble(),
       isHighlighter: json['h'] as bool? ?? false,
-      isEraser: json['e'] as bool? ?? false, // ✅ استرجاع الخاصية
+      isEraser: json['e'] as bool? ?? false,
     );
   }
 }
