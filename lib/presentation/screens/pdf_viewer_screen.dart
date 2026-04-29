@@ -1008,7 +1008,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  Widget _buildPageDrawer() {
+
+Widget _buildPageDrawer() {
     return Drawer(
       backgroundColor: AppColors.backgroundSecondary,
       width: 260,
@@ -1022,57 +1023,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     fontWeight: FontWeight.bold,
                     fontSize: 16)),
           ),
-
-          if (_annotatedPages.isNotEmpty) ...[
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Icon(LucideIcons.zap,
-                      color: AppColors.accentYellow, size: 14),
-                  const SizedBox(width: 6),
-                  Text("الصفحات المشروحة",
-                      style: TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
-                ],
-              ),
+          
+          // ✅ تم نقل زر "ملخص الملاحظات" إلى هنا لتوفير مساحة البار العلوي
+          if (_isOffline) ...[
+            ListTile(
+              leading: Icon(LucideIcons.fileText, color: AppColors.accentYellow, size: 18),
+              title: Text("ملخص الملاحظات والتعليقات", style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+              onTap: () {
+                Navigator.pop(context); // إغلاق القائمة
+                _showNotesSummary(); // فتح الملخص
+              },
             ),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: _annotatedPages.map((page) {
-                  return GestureDetector(
-                    onTap: () {
-                      _pdfController.goToPage(pageNumber: page);
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentYellow.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: AppColors.accentYellow.withOpacity(0.4)),
-                      ),
-                      child: Text('$page',
-                          style: TextStyle(
-                              color: AppColors.accentYellow,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 4),
+            const Divider(color: Colors.white10),
           ],
 
-          const Divider(color: Colors.white10),
+          // ✅ تم إزالة قسم "الصفحات المشروحة" بالكامل بناءً على طلبك
 
           Expanded(
             child: _totalPages == 0
@@ -1083,7 +1048,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     itemCount: _totalPages,
                     itemBuilder: (context, index) {
                       final pageNum = index + 1;
-                      final isCurrent = _pdfController.isReady ? _pdfController.pageNumber == pageNum : false;
+                      final isCurrent =
+                          _pdfController.pageNumber == pageNum;
                       final isBookmarked =
                           _bookmarkedPages.contains(pageNum);
                       final isVisited = _visitedPages.contains(pageNum);
@@ -1174,7 +1140,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
     );
   }
-
   // ✅ 4. دالة الـ PDF Params باستخدام FutureBuilder 
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
