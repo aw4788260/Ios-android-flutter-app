@@ -1242,99 +1242,91 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       },
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
+
+        final pageNum = page.pageNumber;
+
+        // ✅ التعديل الجذري: طلب التحميل وعرض واجهة فارغة مؤقتاً بدون FutureBuilder
+        if (!_pageDrawings.containsKey(pageNum)) {
+          _loadAnnotationsForPage(pageNum);
+          return []; 
+        }
+
+        final lines = _pageDrawings[pageNum] ?? [];
+        final allLines = [...lines];
+        if (_isDrawingMode &&
+            _currentLine != null &&
+            _activePage == pageNum) {
+          allLines.add(_currentLine!);
+        }
+
+        final comments = _pageComments[pageNum] ?? [];
+
         return [
           Positioned.fill(
-            child: FutureBuilder(
-              future: _loadAnnotationsForPage(page.pageNumber),
-              builder: (context, snapshot) {
-                final lines = _pageDrawings[page.pageNumber] ?? [];
-                final allLines = [...lines];
-                if (_isDrawingMode &&
-                    _currentLine != null &&
-                    _activePage == page.pageNumber) {
-                  allLines.add(_currentLine!);
-                }
+            child: Stack(
+              children: [
+                // --- Drawing layer with palm rejection (Feature 6) ---
+                _buildDrawingLayer(context, pageRect, page, allLines),
 
-                final comments = _pageComments[page.pageNumber] ?? [];
+                // --- Comment icons ---
+                if (_isOffline)
+                  ...comments.map((comment) {
+                    Color solidColor = Color(comment.color).withOpacity(1.0);
+                    double currentOpacity = Color(comment.color).opacity;
 
-                return Stack(
-                  children: [
-                    // --- Drawing layer with palm rejection (Feature 6) ---
-                    _buildDrawingLayer(context, pageRect, page, allLines),
-
-                    // --- Comment icons ---
-                    if (_isOffline)
-                      ...comments.map((comment) {
-                        Color solidColor =
-                            Color(comment.color).withOpacity(1.0);
-                        double currentOpacity = Color(comment.color).opacity;
-
-                        return Positioned(
-                          left: (comment.dx * pageRect.width) -
-                              (20 * comment.scale),
-                          top: (comment.dy * pageRect.height) -
-                              (20 * comment.scale),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onScaleStart: _isDrawingMode ? (_) {} : null,
-                            onScaleEnd: _isDrawingMode ? (_) {} : null,
-                            onScaleUpdate: _isDrawingMode
-                                ? (details) {
-                                    if (details.pointerCount == 1) {
-                                      final prevDx = comment.dx;
-                                      final prevDy = comment.dy;
-                                      setState(() {
-                                        comment.dx +=
-                                            details.focalPointDelta.dx /
-                                                pageRect.width;
-                                        comment.dy +=
-                                            details.focalPointDelta.dy /
-                                                pageRect.height;
-                                      });
-                                      // Record move for undo (debounced by gesture end).
-                                      _recordAction(
-                                          AnnotationAction.moveComment(
-                                              page.pageNumber,
-                                              comment,
-                                              prevDx,
-                                              prevDy,
-                                              comment.dx,
-                                              comment.dy));
-                                    }
-                                  }
-                                : null,
-                            onTap: () => _showCommentDialog(
-                                page.pageNumber, comment),
-                            child: Transform.scale(
-                              scale: comment.scale,
-                              child: Opacity(
-                                opacity: currentOpacity,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                      color: AppColors.backgroundSecondary
-                                          .withOpacity(0.85),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: solidColor, width: 1.5),
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.4),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2))
-                                      ]),
-                                  child: Icon(Icons.comment_rounded,
-                                      color: solidColor, size: 24),
-                                ),
-                              ),
+                    return Positioned(
+                      left: (comment.dx * pageRect.width) - (20 * comment.scale),
+                      top: (comment.dy * pageRect.height) - (20 * comment.scale),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onScaleStart: _isDrawingMode ? (_) {} : null,
+                        onScaleEnd: _isDrawingMode ? (_) {} : null,
+                        onScaleUpdate: _isDrawingMode
+                            ? (details) {
+                                if (details.pointerCount == 1) {
+                                  final prevDx = comment.dx;
+                                  final prevDy = comment.dy;
+                                  setState(() {
+                                    comment.dx += details.focalPointDelta.dx / pageRect.width;
+                                    comment.dy += details.focalPointDelta.dy / pageRect.height;
+                                  });
+                                  // Record move for undo (debounced by gesture end).
+                                  _recordAction(
+                                      AnnotationAction.moveComment(
+                                          page.pageNumber,
+                                          comment,
+                                          prevDx,
+                                          prevDy,
+                                          comment.dx,
+                                          comment.dy));
+                                }
+                              }
+                            : null,
+                        onTap: () => _showCommentDialog(page.pageNumber, comment),
+                        child: Transform.scale(
+                          scale: comment.scale,
+                          child: Opacity(
+                            opacity: currentOpacity,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                  color: AppColors.backgroundSecondary.withOpacity(0.85),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: solidColor, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black.withOpacity(0.4),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2))
+                                  ]),
+                              child: Icon(Icons.comment_rounded, color: solidColor, size: 24),
                             ),
                           ),
-                        );
-                      }),
-                  ],
-                );
-              },
+                        ),
+                      ),
+                    );
+                  }),
+              ],
             ),
           ),
         ];
