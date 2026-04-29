@@ -187,7 +187,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (mounted) {
       setState(() => _watermarkText = displayText.isNotEmpty
           ? displayText
-          : AppState().userData!['username'] ?? 'Unknown User');
+          : AppState().userData?['username'] ?? 'Unknown User'); // ✅ تمت إضافة الحماية هنا
     }
   }
 
@@ -225,48 +225,42 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Future<void> _loadAnnotationsForPage(int pageNumber) async {
-    // ✅ القفل: إذا كانت الصفحة موجودة مسبقاً، تجاهل الاستدعاء
-    if (_pageDrawings.containsKey(pageNumber)) return;
-    
-    // إعطاء قيم مبدئية فارغة فوراً لمنع التكرار (Lock)
-    _pageDrawings[pageNumber] = [];
-    _pageComments[pageNumber] = [];
+    // ✅ 1. القفل الأهم: منع إعادة التحميل لو البيانات موجودة بالفعل لمنع Infinite Loop
+    if (_pageDrawings.containsKey(pageNumber) && _pageComments.containsKey(pageNumber)) return;
 
     final box = await StorageService.openBox('pdf_drawings_db');
 
     // Load drawings
-    final dynamic data = box.get('${widget.pdfId}_$pageNumber');
-    List<DrawingLine> lines = [];
-    if (data != null) {
-      lines = (data as List<dynamic>)
-          .map((e) => DrawingLine.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+    if (!_pageDrawings.containsKey(pageNumber)) {
+      final dynamic data = box.get('${widget.pdfId}_$pageNumber');
+      List<DrawingLine> lines = [];
+      if (data != null) {
+        lines = (data as List<dynamic>)
+            .map((e) => DrawingLine.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      _pageDrawings[pageNumber] = lines;
     }
-    _pageDrawings[pageNumber] = lines;
 
-    // Load comments 
-    final dynamic commentData =
-        box.get('${widget.pdfId}_${pageNumber}_comments');
-    List<CommentModel> comments = [];
-    if (commentData != null) {
-      comments = (commentData as List<dynamic>).map((e) {
-        final c = CommentModel.fromJson(Map<String, dynamic>.from(e));
-        if (c.pageNumber == 0) c.pageNumber = pageNumber;
-        return c;
-      }).toList();
+    // Load comments
+    if (!_pageComments.containsKey(pageNumber)) {
+      final dynamic commentData =
+          box.get('${widget.pdfId}_${pageNumber}_comments');
+      List<CommentModel> comments = [];
+      if (commentData != null) {
+        comments = (commentData as List<dynamic>).map((e) {
+          final c = CommentModel.fromJson(Map<String, dynamic>.from(e));
+          if (c.pageNumber == 0) c.pageNumber = pageNumber;
+          return c;
+        }).toList();
+      }
+      _pageComments[pageNumber] = comments;
     }
-    _pageComments[pageNumber] = comments;
-
-    // Feature 8: mark page as visited.
-    if (mounted) {
-      await PdfPageMetaService.markPageVisited(
-          widget.pdfId, pageNumber, _visitedPages);
-      if (mounted) setState(() {});
-    }
+    // ✅ 2. تم إزالة setState() بالكامل من هنا ليعمل FutureBuilder بسلام.
   }
 
   // -----------------------------------------------------------
-  // Feature 1: Auto Resume helpers
+  // Feature 1 & 8: Auto Resume & Tracking helpers
   // -----------------------------------------------------------
 
   Future<void> _loadAndApplyLastPosition() async {
@@ -281,9 +275,15 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   void _onPageChanged(int page) {
-    // Called from onDocumentChanged / pdfController listener.
     if (mounted) setState(() => _activePage = page);
     PdfProgressService.saveLastPosition(widget.pdfId, page);
+
+    // ✅ 3. نقل ميزة "تتبع الصفحات المقروءة" إلى مكانها الآمن هنا
+    if (!_visitedPages.contains(page)) {
+      PdfPageMetaService.markPageVisited(widget.pdfId, page, _visitedPages).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   // -----------------------------------------------------------
@@ -388,7 +388,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // Feature 5: Undo / Redo
   // -----------------------------------------------------------
 
-  /// Record an action onto the undo stack, clear redo.
   void _recordAction(AnnotationAction action) {
     _undoStack.add(action);
     _redoStack.clear(); // New action invalidates redo history.
@@ -497,7 +496,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       );
       setState(() {
         (_pageDrawings[page.pageNumber] ??= []).add(finishedLine);
-        // Record for undo.
         _recordAction(
             AnnotationAction.addStroke(page.pageNumber, finishedLine));
         _currentLine = null;
@@ -556,7 +554,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- Text field ---
                   TextField(
                     controller: controller,
                     maxLines: 4,
@@ -575,7 +572,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     ),
                   ),
 
-                  // --- Feature 3: Tag Selector ---
                   if (_isDrawingMode) ...[
                     const SizedBox(height: 14),
                     Text("التصنيف:",
@@ -585,7 +581,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     Wrap(
                       spacing: 6,
                       children: [
-                        // "None" chip
                         _tagChip(
                           label: 'بدون',
                           color: Colors.grey,
@@ -622,7 +617,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
                   if (_isDrawingMode) ...[
                     const SizedBox(height: 20),
-                    // Scale slider
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -642,7 +636,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    // Opacity slider
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
@@ -669,13 +662,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             ),
             actions: [
-              // Delete button (only in drawing mode for existing comments).
               if (!isNew && _isDrawingMode)
                 TextButton(
                   onPressed: () {
                     setState(() {
                       _pageComments[pageNumber]?.remove(comment);
-                      // Record delete for undo.
                       _recordAction(AnnotationAction.deleteComment(
                           pageNumber, comment));
                     });
@@ -705,7 +696,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                       }
                       if (isNew && comment.text.trim().isNotEmpty) {
                         (_pageComments[pageNumber] ??= []).add(comment);
-                        // Record add for undo.
                         _recordAction(
                             AnnotationAction.addComment(pageNumber, comment));
                       }
@@ -747,11 +737,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  // -----------------------------------------------------------
-  // Helpers: annotated pages list (Feature 9)
-  // -----------------------------------------------------------
-
-  /// Returns sorted list of pages that have any drawing or comment.
   List<int> get _annotatedPages {
     final pages = <int>{};
     for (final e in _pageDrawings.entries) {
@@ -779,7 +764,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          // --- Feature 7: Review Mode hides PDF layer ---
           if (!_isReviewMode)
             _isOffline && _encryptedFile != null && _originalFileSize != null
                 ? PdfViewer.custom(
@@ -796,18 +780,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     params: _buildPdfParams(),
                   )
           else
-            // Review mode placeholder — keeps controller alive.
             Container(color: AppColors.backgroundPrimary),
 
-          // --- Watermark (always visible) ---
           _buildWatermark(),
 
-          // --- Toolbar (offline + drawing mode) ---
           if (_isDrawingMode && _isOffline)
             Positioned(
                 bottom: 40, left: 20, right: 20, child: _buildToolbar()),
 
-          // --- Review Mode overlay badge ---
           if (_isReviewMode) _buildReviewModeBadge(),
         ],
       ),
@@ -845,26 +825,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             if (context.mounted) Navigator.pop(context);
           }),
       actions: [
-        // --- Feature 2: Bookmark toggle (offline only) ---
         if (_isOffline)
           IconButton(
             icon: Icon(
-  LucideIcons.bookmark,
-  color: isBookmarked ? AppColors.accentYellow : Colors.white54,
-),
+              LucideIcons.bookmark,
+              color: isBookmarked ? AppColors.accentYellow : Colors.white54,
+            ),
             onPressed: _toggleBookmark,
             tooltip: isBookmarked ? 'إزالة الإشارة' : 'إضافة إشارة',
           ),
-
-        // --- Feature 4: Notes Summary ---
         if (_isOffline)
           IconButton(
             icon: Icon(LucideIcons.fileText, color: AppColors.accentYellow),
             onPressed: _showNotesSummary,
             tooltip: 'ملخص الملاحظات',
           ),
-
-        // --- Feature 7: Review Mode toggle ---
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -874,8 +849,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => setState(() => _isReviewMode = !_isReviewMode),
             tooltip: _isReviewMode ? 'إظهار الـPDF' : 'وضع المراجعة',
           ),
-
-        // --- Page index drawer ---
         IconButton(
           icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
           onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -988,7 +961,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  /// Feature 7: Small badge shown in review mode.
   Widget _buildReviewModeBadge() {
     return Positioned(
       top: 12,
@@ -1014,10 +986,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  // -----------------------------------------------------------
-  // Feature 4: Notes Summary bottom sheet
-  // -----------------------------------------------------------
-
   void _showNotesSummary() {
     showModalBottomSheet(
       context: context,
@@ -1031,10 +999,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
     );
   }
-
-  // -----------------------------------------------------------
-  // Page Drawer (Feature 2: bookmarks, Feature 8: indicators, Feature 9: annotated jump)
-  // -----------------------------------------------------------
 
   Widget _buildPageDrawer() {
     return Drawer(
@@ -1051,7 +1015,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     fontSize: 16)),
           ),
 
-          // --- Feature 9: Quick jump to annotated pages ---
           if (_annotatedPages.isNotEmpty) ...[
             Padding(
               padding:
@@ -1136,7 +1099,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                                 ? AppColors.accentYellow
                                 : AppColors.textSecondary,
                             size: 16),
-                        // --- Feature 8: Indicator row ---
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1166,7 +1128,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   ),
           ),
 
-          // --- Bookmarks section ---
           if (_bookmarks.isNotEmpty) ...[
             const Divider(color: Colors.white10),
             Padding(
@@ -1207,14 +1168,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  // -----------------------------------------------------------
-  // PDF Params (page overlays — palm-rejection integrated)
-  // -----------------------------------------------------------
-
+  // ✅ 4. دالة الـ PDF Params باستخدام FutureBuilder 
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
       backgroundColor: AppColors.backgroundPrimary,
-      // Text selection disabled (security requirement).
       textSelectionParams: const PdfTextSelectionParams(enabled: false),
       scrollPhysics: const BouncingScrollPhysics(),
       loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
@@ -1222,8 +1179,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(12)),
+                color: Colors.black54, borderRadius: BorderRadius.circular(12)),
             child: CircularProgressIndicator(color: AppColors.accentYellow),
           ),
         );
@@ -1231,102 +1187,107 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       onDocumentChanged: (document) {
         if (mounted) {
           setState(() => _totalPages = document?.pages.length ?? 0);
-          // Feature 1: restore last position after document is ready.
           _loadAndApplyLastPosition();
         }
       },
       onPageChanged: (page) {
-        // Feature 1: save progress on every page change.
         if (page != null) _onPageChanged(page);
         if (mounted) setState(() {});
       },
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
-
-        final pageNum = page.pageNumber;
-
-        // ✅ التعديل الجذري: طلب التحميل وعرض واجهة فارغة مؤقتاً بدون FutureBuilder
-        if (!_pageDrawings.containsKey(pageNum)) {
-          _loadAnnotationsForPage(pageNum);
-          return []; 
-        }
-
-        final lines = _pageDrawings[pageNum] ?? [];
-        final allLines = [...lines];
-        if (_isDrawingMode &&
-            _currentLine != null &&
-            _activePage == pageNum) {
-          allLines.add(_currentLine!);
-        }
-
-        final comments = _pageComments[pageNum] ?? [];
-
         return [
           Positioned.fill(
-            child: Stack(
-              children: [
-                // --- Drawing layer with palm rejection (Feature 6) ---
-                _buildDrawingLayer(context, pageRect, page, allLines),
+            child: FutureBuilder(
+              future: _loadAnnotationsForPage(page.pageNumber),
+              builder: (context, snapshot) {
+                final lines = _pageDrawings[page.pageNumber] ?? [];
+                final allLines = [...lines];
+                if (_isDrawingMode &&
+                    _currentLine != null &&
+                    _activePage == page.pageNumber) {
+                  allLines.add(_currentLine!);
+                }
 
-                // --- Comment icons ---
-                if (_isOffline)
-                  ...comments.map((comment) {
-                    Color solidColor = Color(comment.color).withOpacity(1.0);
-                    double currentOpacity = Color(comment.color).opacity;
+                final comments = _pageComments[page.pageNumber] ?? [];
 
-                    return Positioned(
-                      left: (comment.dx * pageRect.width) - (20 * comment.scale),
-                      top: (comment.dy * pageRect.height) - (20 * comment.scale),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onScaleStart: _isDrawingMode ? (_) {} : null,
-                        onScaleEnd: _isDrawingMode ? (_) {} : null,
-                        onScaleUpdate: _isDrawingMode
-                            ? (details) {
-                                if (details.pointerCount == 1) {
-                                  final prevDx = comment.dx;
-                                  final prevDy = comment.dy;
-                                  setState(() {
-                                    comment.dx += details.focalPointDelta.dx / pageRect.width;
-                                    comment.dy += details.focalPointDelta.dy / pageRect.height;
-                                  });
-                                  // Record move for undo (debounced by gesture end).
-                                  _recordAction(
-                                      AnnotationAction.moveComment(
-                                          page.pageNumber,
-                                          comment,
-                                          prevDx,
-                                          prevDy,
-                                          comment.dx,
-                                          comment.dy));
-                                }
-                              }
-                            : null,
-                        onTap: () => _showCommentDialog(page.pageNumber, comment),
-                        child: Transform.scale(
-                          scale: comment.scale,
-                          child: Opacity(
-                            opacity: currentOpacity,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                  color: AppColors.backgroundSecondary.withOpacity(0.85),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: solidColor, width: 1.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Colors.black.withOpacity(0.4),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2))
-                                  ]),
-                              child: Icon(Icons.comment_rounded, color: solidColor, size: 24),
+                return Stack(
+                  children: [
+                    // --- Drawing layer with palm rejection (Feature 6) ---
+                    _buildDrawingLayer(context, pageRect, page, allLines),
+
+                    // --- Comment icons ---
+                    if (_isOffline)
+                      ...comments.map((comment) {
+                        Color solidColor =
+                            Color(comment.color).withOpacity(1.0);
+                        double currentOpacity = Color(comment.color).opacity;
+
+                        return Positioned(
+                          left: (comment.dx * pageRect.width) -
+                              (20 * comment.scale),
+                          top: (comment.dy * pageRect.height) -
+                              (20 * comment.scale),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onScaleStart: _isDrawingMode ? (_) {} : null,
+                            onScaleEnd: _isDrawingMode ? (_) {} : null,
+                            onScaleUpdate: _isDrawingMode
+                                ? (details) {
+                                    if (details.pointerCount == 1) {
+                                      final prevDx = comment.dx;
+                                      final prevDy = comment.dy;
+                                      setState(() {
+                                        comment.dx +=
+                                            details.focalPointDelta.dx /
+                                                pageRect.width;
+                                        comment.dy +=
+                                            details.focalPointDelta.dy /
+                                                pageRect.height;
+                                      });
+                                      _recordAction(
+                                          AnnotationAction.moveComment(
+                                              page.pageNumber,
+                                              comment,
+                                              prevDx,
+                                              prevDy,
+                                              comment.dx,
+                                              comment.dy));
+                                    }
+                                  }
+                                : null,
+                            onTap: () => _showCommentDialog(
+                                page.pageNumber, comment),
+                            child: Transform.scale(
+                              scale: comment.scale,
+                              child: Opacity(
+                                opacity: currentOpacity,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                      color: AppColors.backgroundSecondary
+                                          .withOpacity(0.85),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: solidColor, width: 1.5),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.4),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2))
+                                      ]),
+                                  child: Icon(Icons.comment_rounded,
+                                      color: solidColor, size: 24),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    );
-                  }),
-              ],
+                        );
+                      }),
+                  ],
+                );
+              },
             ),
           ),
         ];
@@ -1334,10 +1295,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  /// Drawing layer separated to cleanly integrate palm rejection (Feature 6).
   Widget _buildDrawingLayer(BuildContext context, Rect pageRect, PdfPage page,
       List<DrawingLine> allLines) {
-    // When not in drawing mode, just paint existing lines passively.
     if (!_isDrawingMode) {
       return IgnorePointer(
         child: CustomPaint(
@@ -1348,7 +1307,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       );
     }
 
-    // Drawing mode active — use Listener for palm rejection (Feature 6).
     return _PalmRejectedDrawingLayer(
       pageRect: pageRect,
       page: page,
@@ -1364,10 +1322,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       },
     );
   }
-
-  // -----------------------------------------------------------
-  // Toolbar (Feature 5: undo/redo buttons added)
-  // -----------------------------------------------------------
 
   Widget _buildToolbar() {
     return Container(
@@ -1392,7 +1346,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 const SizedBox(width: 8),
                 _toolIcon(LucideIcons.messageSquare, 3),
                 const SizedBox(width: 12),
-                // --- Undo button ---
                 IconButton(
                   icon: Icon(LucideIcons.undo,
                       color: _undoStack.isNotEmpty
@@ -1402,7 +1355,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   onPressed: _undoStack.isNotEmpty ? _performUndo : null,
                   tooltip: 'تراجع',
                 ),
-                // --- Redo button (Feature 5 addition) ---
                 IconButton(
                   icon: Icon(LucideIcons.redo,
                       color: _redoStack.isNotEmpty
@@ -1491,8 +1443,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 }
 
 // ================================================================
-// Palm-rejection-aware drawing layer (Feature 6)
-// Stateful widget: tracks active pointer ID internally.
+// Palm-rejection-aware drawing layer
 // ================================================================
 
 class _PalmRejectedDrawingLayer extends StatefulWidget {
@@ -1530,7 +1481,7 @@ class _PalmRejectedDrawingLayerState
   bool _moved = false;
 
   bool _isStylusKind(int kind) =>
-      kind == 2 || kind == 3; // stylus / invertedStylus in Flutter pointer kinds
+      kind == 2 || kind == 3;
 
   @override
   Widget build(BuildContext context) {
@@ -1540,10 +1491,8 @@ class _PalmRejectedDrawingLayerState
         final isStylusInput = _isStylusKind(event.kind.index);
         if (isStylusInput) _sessionHasStylus = true;
 
-        // Palm rejection: if stylus session, reject finger touches.
         if (_sessionHasStylus && !isStylusInput) return;
 
-        // Only one pointer draws at a time.
         if (_activePointerId != null) return;
 
         _activePointerId = event.pointer;
@@ -1567,7 +1516,6 @@ class _PalmRejectedDrawingLayerState
         _activePointerId = null;
 
         if (widget.selectedTool == 3 && !_moved && _downPosition != null) {
-          // Treat as tap for comment tool.
           widget.onTap(_downPosition!);
         } else if (widget.selectedTool != 3) {
           widget.onDrawEnd();
@@ -1591,7 +1539,7 @@ class _PalmRejectedDrawingLayerState
 }
 
 // ================================================================
-// RelativeSketchPainter — unchanged from original
+// RelativeSketchPainter
 // ================================================================
 
 class RelativeSketchPainter extends CustomPainter {
