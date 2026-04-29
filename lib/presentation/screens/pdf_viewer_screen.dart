@@ -847,9 +847,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         if (_isOffline)
           IconButton(
             icon: Icon(
-              isBookmarked ? LucideIcons.bookmark : LucideIcons.bookmarkX,
-              color: isBookmarked ? AppColors.accentYellow : Colors.white54,
-            ),
+  LucideIcons.bookmark,
+  color: isBookmarked ? AppColors.accentYellow : Colors.white54,
+),
             onPressed: _toggleBookmark,
             tooltip: isBookmarked ? 'إزالة الإشارة' : 'إضافة إشارة',
           ),
