@@ -1084,6 +1084,8 @@ Widget _buildPageDrawer() {
                                 child: Icon(LucideIcons.pencil,
                                     color: Colors.blue, size: 12),
                               ),
+                          ],
+                        ),
                             if (isVisited && !isCurrent)
                               Padding(
                                 padding: const EdgeInsets.only(left: 2),
