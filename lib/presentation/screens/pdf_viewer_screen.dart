@@ -812,15 +812,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         children: [
           Expanded(
               child: Text(widget.title,
-                  style:
-                      TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                  style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 8),
-          _buildBadge(),
-          if (_isOffline) ...[
-            const SizedBox(width: 12),
-            _buildPenIcon(),
-          ],
+          _buildBadge(), // شارة Offline
         ],
       ),
       backgroundColor: AppColors.backgroundSecondary,
@@ -831,6 +826,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             if (context.mounted) Navigator.pop(context);
           }),
       actions: [
+        // ✅ 1. زر القلم أصبح هنا كأيقونة قياسية لسهولة الضغط
+        if (_isOffline)
+          IconButton(
+            icon: Icon(
+              _isDrawingMode ? LucideIcons.penTool : LucideIcons.penTool,
+              color: _isDrawingMode ? AppColors.accentYellow : Colors.white54,
+            ),
+            onPressed: () => setState(() => _isDrawingMode = !_isDrawingMode),
+            tooltip: 'وضع الرسم',
+          ),
+        // ✅ 2. الإشارات المرجعية
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -840,12 +846,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: _toggleBookmark,
             tooltip: isBookmarked ? 'إزالة الإشارة' : 'إضافة إشارة',
           ),
-        if (_isOffline)
-          IconButton(
-            icon: Icon(LucideIcons.fileText, color: AppColors.accentYellow),
-            onPressed: _showNotesSummary,
-            tooltip: 'ملخص الملاحظات',
-          ),
+        // ✅ 3. وضع المراجعة
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -855,6 +856,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => setState(() => _isReviewMode = !_isReviewMode),
             tooltip: _isReviewMode ? 'إظهار الـPDF' : 'وضع المراجعة',
           ),
+        // ✅ 4. القائمة الجانبية
         IconButton(
           icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
           onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -1520,7 +1522,8 @@ class _PalmRejectedDrawingLayerState
         if (event.pointer != _activePointerId) return;
         _activePointerId = null;
 
-        if (widget.selectedTool == 3 && !_moved && _downPosition != null) {
+        // ✅ تم إزالة شرط (!_moved) لكي تظهر النافذة حتى لو اهتز الإصبع قليلاً
+        if (widget.selectedTool == 3 && _downPosition != null) {
           widget.onTap(_downPosition!);
         } else if (widget.selectedTool != 3) {
           widget.onDrawEnd();
