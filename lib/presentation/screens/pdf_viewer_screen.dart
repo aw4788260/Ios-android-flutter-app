@@ -297,6 +297,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Future<void> _toggleBookmark() async {
+    // ✅ تأمين زر الإضافة/الإزالة
+    if (!_pdfController.isReady) return; 
+    
     final page = _pdfController.pageNumber ?? 1;
     if (_bookmarkedPages.contains(page)) {
       await PdfBookmarkService.removeBookmark(widget.pdfId, page);
@@ -306,8 +309,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     await _loadBookmarks();
   }
 
-  bool get _isCurrentPageBookmarked =>
-      _bookmarkedPages.contains(_pdfController.pageNumber ?? 1);
+  bool get _isCurrentPageBookmarked {
+    // ✅ الحماية هنا: لا تسأل عن الصفحة إذا لم يكن الـ PDF جاهزاً بعد
+    if (!_pdfController.isReady) return false;
+    return _bookmarkedPages.contains(_pdfController.pageNumber ?? 1);
+  }
 
   // -----------------------------------------------------------
   // PDF preparation (unchanged core)
@@ -1075,8 +1081,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     itemCount: _totalPages,
                     itemBuilder: (context, index) {
                       final pageNum = index + 1;
-                      final isCurrent =
-                          _pdfController.pageNumber == pageNum;
+                      final isCurrent = _pdfController.isReady ? _pdfController.pageNumber == pageNum : false;
                       final isBookmarked =
                           _bookmarkedPages.contains(pageNum);
                       final isVisited = _visitedPages.contains(pageNum);
