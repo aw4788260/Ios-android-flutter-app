@@ -140,11 +140,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
-    // Persist all annotations on exit (unchanged).
     if (_isOffline) _saveAnnotationsToHive();
+    _textSearcher.dispose(); // ✅ تنظيف محرك البحث
+    _searchController.dispose(); // ✅ تنظيف حقل الإدخال
     super.dispose();
   }
-
   // -----------------------------------------------------------
   // Security helpers (unchanged)
   // -----------------------------------------------------------
@@ -846,6 +846,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 bottom: 40, left: 20, right: 20, child: _buildToolbar()),
 
           if (_isReviewMode) _buildReviewModeBadge(),
+          if (_isSearchMode) _buildSearchBar(),
         ],
       ),
     );
@@ -877,6 +878,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             if (context.mounted) Navigator.pop(context);
           }),
       actions: [
+        IconButton(
+          icon: Icon(
+            LucideIcons.search,
+            color: _isSearchMode ? AppColors.accentYellow : Colors.white54,
+          ),
+          onPressed: () {
+            setState(() {
+              _isSearchMode = !_isSearchMode;
+              if (!_isSearchMode) {
+                _searchController.clear();
+                _textSearcher.resetTextSearch();
+              }
+            });
+          },
+          tooltip: 'البحث في المذكرة',
+        ),
         // ✅ 1. زر القلم أصبح هنا كأيقونة قياسية لسهولة الضغط
         if (_isOffline)
           IconButton(
@@ -920,6 +937,75 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   // Widgets
   // -----------------------------------------------------------
 
+  Widget _buildSearchBar() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        color: AppColors.backgroundSecondary,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "ابحث عن كلمة في المذكرة...",
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  if (val.isEmpty) {
+                    _textSearcher.resetTextSearch();
+                  } else {
+                    _textSearcher.startTextSearch(val);
+                  }
+                },
+              ),
+            ),
+            // عدد النتائج (يتحدث تلقائياً)
+            ListenableBuilder(
+              listenable: _textSearcher,
+              builder: (context, _) {
+                if (_textSearcher.hasResult) {
+                  return Text(
+                    '${(_textSearcher.currentIndex ?? 0) + 1}/${_textSearcher.instances.length}',
+                    style: TextStyle(color: AppColors.accentYellow, fontSize: 12, fontWeight: FontWeight.bold),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+            const SizedBox(width: 8),
+            // النتيجة السابقة
+            IconButton(
+              icon: Icon(LucideIcons.chevronUp, color: AppColors.textSecondary),
+              onPressed: () => _textSearcher.goToPrev(),
+            ),
+            // النتيجة التالية
+            IconButton(
+              icon: Icon(LucideIcons.chevronDown, color: AppColors.textSecondary),
+              onPressed: () => _textSearcher.goToNext(),
+            ),
+            // زر إغلاق البحث
+            IconButton(
+              icon: Icon(LucideIcons.x, color: Colors.redAccent),
+              onPressed: () {
+                setState(() {
+                  _isSearchMode = false;
+                  _searchController.clear();
+                  _textSearcher.resetTextSearch();
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
   Widget _buildLoadingView() {
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
@@ -1199,6 +1285,9 @@ Widget _buildPageDrawer() {
       backgroundColor: AppColors.backgroundPrimary,
       textSelectionParams: const PdfTextSelectionParams(enabled: false),
       scrollPhysics: const BouncingScrollPhysics(),
+      viewerOverlayBuilder: (context, size) => [
+        PdfViewerTextSearchOverlay(textSearcher: _textSearcher),
+      ],
       loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
         return Center(
           child: Container(
