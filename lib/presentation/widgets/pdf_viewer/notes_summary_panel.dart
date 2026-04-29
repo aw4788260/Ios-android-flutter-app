@@ -5,8 +5,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/models/comment_model.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/models/comment_model.dart';
 
 enum NotesSortMode { byPage, byNewest }
 
