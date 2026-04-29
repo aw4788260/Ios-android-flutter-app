@@ -225,35 +225,37 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Future<void> _loadAnnotationsForPage(int pageNumber) async {
+    // ✅ القفل: إذا كانت الصفحة موجودة مسبقاً، تجاهل الاستدعاء
+    if (_pageDrawings.containsKey(pageNumber)) return;
+    
+    // إعطاء قيم مبدئية فارغة فوراً لمنع التكرار (Lock)
+    _pageDrawings[pageNumber] = [];
+    _pageComments[pageNumber] = [];
+
     final box = await StorageService.openBox('pdf_drawings_db');
 
-    // Load drawings (unchanged).
-    if (!_pageDrawings.containsKey(pageNumber)) {
-      final dynamic data = box.get('${widget.pdfId}_$pageNumber');
-      List<DrawingLine> lines = [];
-      if (data != null) {
-        lines = (data as List<dynamic>)
-            .map((e) => DrawingLine.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
-      }
-      _pageDrawings[pageNumber] = lines;
+    // Load drawings
+    final dynamic data = box.get('${widget.pdfId}_$pageNumber');
+    List<DrawingLine> lines = [];
+    if (data != null) {
+      lines = (data as List<dynamic>)
+          .map((e) => DrawingLine.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     }
+    _pageDrawings[pageNumber] = lines;
 
-    // Load comments (backward compatible — old comments without pg/tag/ca still load).
-    if (!_pageComments.containsKey(pageNumber)) {
-      final dynamic commentData =
-          box.get('${widget.pdfId}_${pageNumber}_comments');
-      List<CommentModel> comments = [];
-      if (commentData != null) {
-        comments = (commentData as List<dynamic>).map((e) {
-          final c = CommentModel.fromJson(Map<String, dynamic>.from(e));
-          // Migration: stamp pageNumber if missing from old format.
-          if (c.pageNumber == 0) c.pageNumber = pageNumber;
-          return c;
-        }).toList();
-      }
-      _pageComments[pageNumber] = comments;
+    // Load comments 
+    final dynamic commentData =
+        box.get('${widget.pdfId}_${pageNumber}_comments');
+    List<CommentModel> comments = [];
+    if (commentData != null) {
+      comments = (commentData as List<dynamic>).map((e) {
+        final c = CommentModel.fromJson(Map<String, dynamic>.from(e));
+        if (c.pageNumber == 0) c.pageNumber = pageNumber;
+        return c;
+      }).toList();
     }
+    _pageComments[pageNumber] = comments;
 
     // Feature 8: mark page as visited.
     if (mounted) {
