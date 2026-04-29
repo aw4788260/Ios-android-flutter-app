@@ -12,6 +12,8 @@
 //  8. Reading Progress Visual Indicators
 //  9. Favorites / Quick Jump to Annotated Pages
 // 10. Data Structure / Storage Refactor
+// 11. Text Search (Without enabling copy/selection)
+// 12. Save User Settings (Pen size, color, comment scale/opacity)
 //
 // Preserved exactly:
 //  - Encrypted offline PDF reading (_customRead / FileCryptoService)
@@ -145,6 +147,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     _searchController.dispose(); // ✅ تنظيف حقل الإدخال
     super.dispose();
   }
+
   // -----------------------------------------------------------
   // Security helpers (unchanged)
   // -----------------------------------------------------------
@@ -196,15 +199,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (mounted) {
       setState(() => _watermarkText = displayText.isNotEmpty
           ? displayText
-          : AppState().userData?['username'] ?? 'Unknown User'); // ✅ تمت إضافة الحماية هنا
+          : AppState().userData?['username'] ?? 'Unknown User');
     }
   }
 
   // -----------------------------------------------------------
-  // Annotation persistence (unchanged + pageNumber stamp)
+  // Settings persistence
   // -----------------------------------------------------------
 
-  // --- أضف هاتين الدالتين ---
   Future<void> _loadToolSettings() async {
     try {
       final box = await StorageService.openBox('pdf_settings_box');
@@ -234,6 +236,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (_) {}
   }
 
+  // -----------------------------------------------------------
+  // Annotation persistence
+  // -----------------------------------------------------------
+
   Future<void> _saveAnnotationsToHive() async {
     try {
       final box = await StorageService.openBox('pdf_drawings_db');
@@ -250,7 +256,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       for (var entry in _pageComments.entries) {
         if (entry.value.isNotEmpty) {
           final serializedComments = entry.value.map((c) {
-            // Stamp pageNumber before saving (migration guard).
             if (c.pageNumber == 0) c.pageNumber = entry.key;
             return c.toJson();
           }).toList();
@@ -295,7 +300,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       }
       _pageComments[pageNumber] = comments;
     }
-    // ✅ 2. تم إزالة setState() بالكامل من هنا ليعمل FutureBuilder بسلام.
   }
 
   // -----------------------------------------------------------
@@ -317,7 +321,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (mounted) setState(() => _activePage = page);
     PdfProgressService.saveLastPosition(widget.pdfId, page);
 
-    // ✅ 3. نقل ميزة "تتبع الصفحات المقروءة" إلى مكانها الآمن هنا
+    // ✅ 3. تسجيل زيارة الصفحة بأمان
     if (!_visitedPages.contains(page)) {
       PdfPageMetaService.markPageVisited(widget.pdfId, page, _visitedPages).then((_) {
         if (mounted) setState(() {});
@@ -683,7 +687,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         setDialogState(() => comment.scale = val);
                         setState(() {});
                       },
-                      onChangeEnd: (val) { // ✅ أضف هذا السطر للحفظ
+                      onChangeEnd: (val) {
                         _defaultCommentScale = val;
                         _saveToolSettings(); 
                       },
@@ -709,7 +713,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                         });
                         setState(() {});
                       },
-                      onChangeEnd: (val) { // ✅ أضف هذا السطر للحفظ
+                      onChangeEnd: (val) {
                         _defaultCommentOpacity = val;
                         _saveToolSettings(); 
                       },
@@ -853,7 +857,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   // -----------------------------------------------------------
-  // AppBar
+  // AppBar & Search UI
   // -----------------------------------------------------------
 
   PreferredSizeWidget _buildAppBar() {
@@ -894,7 +898,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           },
           tooltip: 'البحث في المذكرة',
         ),
-        // ✅ 1. زر القلم أصبح هنا كأيقونة قياسية لسهولة الضغط
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -904,7 +907,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => setState(() => _isDrawingMode = !_isDrawingMode),
             tooltip: 'وضع الرسم',
           ),
-        // ✅ 2. الإشارات المرجعية
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -914,7 +916,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: _toggleBookmark,
             tooltip: isBookmarked ? 'إزالة الإشارة' : 'إضافة إشارة',
           ),
-        // ✅ 3. وضع المراجعة
         if (_isOffline)
           IconButton(
             icon: Icon(
@@ -924,7 +925,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             onPressed: () => setState(() => _isReviewMode = !_isReviewMode),
             tooltip: _isReviewMode ? 'إظهار الـPDF' : 'وضع المراجعة',
           ),
-        // ✅ 4. القائمة الجانبية
         IconButton(
           icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
           onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -932,10 +932,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ],
     );
   }
-
-  // -----------------------------------------------------------
-  // Widgets
-  // -----------------------------------------------------------
 
   Widget _buildSearchBar() {
     return Positioned(
@@ -965,7 +961,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 },
               ),
             ),
-            // عدد النتائج (يتحدث تلقائياً)
             ListenableBuilder(
               listenable: _textSearcher,
               builder: (context, _) {
@@ -979,17 +974,14 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               },
             ),
             const SizedBox(width: 8),
-            // النتيجة السابقة
             IconButton(
               icon: Icon(LucideIcons.chevronUp, color: AppColors.textSecondary),
               onPressed: () => _textSearcher.goToPrev(),
             ),
-            // النتيجة التالية
             IconButton(
               icon: Icon(LucideIcons.chevronDown, color: AppColors.textSecondary),
               onPressed: () => _textSearcher.goToNext(),
             ),
-            // زر إغلاق البحث
             IconButton(
               icon: Icon(LucideIcons.x, color: Colors.redAccent),
               onPressed: () {
@@ -1005,7 +997,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
     );
   }
-  
+
+  // -----------------------------------------------------------
+  // Widgets
+  // -----------------------------------------------------------
+
   Widget _buildLoadingView() {
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
@@ -1058,24 +1054,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   color: _isOffline ? Colors.green : Colors.blue,
                   fontWeight: FontWeight.bold)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPenIcon() {
-    return GestureDetector(
-      onTap: () => setState(() => _isDrawingMode = !_isDrawingMode),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-            color:
-                _isDrawingMode ? AppColors.accentYellow : Colors.transparent,
-            shape: BoxShape.circle,
-            border:
-                Border.all(color: AppColors.accentYellow.withOpacity(0.5))),
-        child: Icon(LucideIcons.penTool,
-            color: _isDrawingMode ? Colors.black : AppColors.accentYellow,
-            size: 16),
       ),
     );
   }
@@ -1145,8 +1123,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-
-Widget _buildPageDrawer() {
+  Widget _buildPageDrawer() {
     return Drawer(
       backgroundColor: AppColors.backgroundSecondary,
       width: 260,
@@ -1161,20 +1138,17 @@ Widget _buildPageDrawer() {
                     fontSize: 16)),
           ),
           
-          // ✅ تم نقل زر "ملخص الملاحظات" إلى هنا لتوفير مساحة البار العلوي
           if (_isOffline) ...[
             ListTile(
               leading: Icon(LucideIcons.fileText, color: AppColors.accentYellow, size: 18),
               title: Text("ملخص الملاحظات والتعليقات", style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
               onTap: () {
-                Navigator.pop(context); // إغلاق القائمة
-                _showNotesSummary(); // فتح الملخص
+                Navigator.pop(context); 
+                _showNotesSummary(); 
               },
             ),
             const Divider(color: Colors.white10),
           ],
-
-          // ✅ تم إزالة قسم "الصفحات المشروحة" بالكامل بناءً على طلبك
 
           Expanded(
             child: _totalPages == 0
@@ -1185,13 +1159,9 @@ Widget _buildPageDrawer() {
                     itemCount: _totalPages,
                     itemBuilder: (context, index) {
                       final pageNum = index + 1;
-                      final isCurrent =
-                          _pdfController.pageNumber == pageNum;
-                      final isBookmarked =
-                          _bookmarkedPages.contains(pageNum);
-                      final isVisited = _visitedPages.contains(pageNum);
-                      final hasAnnotations =
-                          _annotatedPages.contains(pageNum);
+                      final isCurrent = _pdfController.isReady ? _pdfController.pageNumber == pageNum : false;
+                      final isBookmarked = _bookmarkedPages.contains(pageNum);
+                      final hasAnnotations = _annotatedPages.contains(pageNum);
 
                       return ListTile(
                         dense: true,
@@ -1220,14 +1190,6 @@ Widget _buildPageDrawer() {
                                 padding: const EdgeInsets.only(left: 2),
                                 child: Icon(LucideIcons.pencil,
                                     color: Colors.blue, size: 12),
-                              ),
-                          ],
-                        ),
-                            if (isVisited && !isCurrent)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 2),
-                                child: Icon(LucideIcons.eye,
-                                    color: Colors.green, size: 12),
                               ),
                           ],
                         ),
@@ -1279,11 +1241,12 @@ Widget _buildPageDrawer() {
       ),
     );
   }
+
   // ✅ 4. دالة الـ PDF Params باستخدام FutureBuilder 
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
       backgroundColor: AppColors.backgroundPrimary,
-      textSelectionParams: const PdfTextSelectionParams(enabled: false),
+      textSelectionParams: const PdfTextSelectionParams(enabled: false), // يمنع تحديد ونسخ النص
       scrollPhysics: const BouncingScrollPhysics(),
       viewerOverlayBuilder: (context, size) => [
         PdfViewerTextSearchOverlay(textSearcher: _textSearcher),
@@ -1514,7 +1477,7 @@ Widget _buildPageDrawer() {
         else
           _penSize = val;
       }),
-      onChangeEnd: (val) => _saveToolSettings(), // ✅ أضف هذا السطر للحفظ
+      onChangeEnd: (val) => _saveToolSettings(),
     );
   }
 
@@ -1538,11 +1501,12 @@ Widget _buildPageDrawer() {
 
   Widget _colorCircle(Color color) {
     return GestureDetector(
-      onTap: () => setState(() {
-        _selectedColor = color;
-        if (_selectedTool == 2) _selectedTool = 0;
-      }),
-      _saveToolSettings(); // ✅ حفظ اللون عند الضغط
+      onTap: () {
+        setState(() {
+          _selectedColor = color;
+          if (_selectedTool == 2) _selectedTool = 0;
+        });
+        _saveToolSettings(); 
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -1632,7 +1596,6 @@ class _PalmRejectedDrawingLayerState
         if (event.pointer != _activePointerId) return;
         _activePointerId = null;
 
-        // ✅ تم إزالة شرط (!_moved) لكي تظهر النافذة حتى لو اهتز الإصبع قليلاً
         if (widget.selectedTool == 3 && _downPosition != null) {
           widget.onTap(_downPosition!);
         } else if (widget.selectedTool != 3) {
