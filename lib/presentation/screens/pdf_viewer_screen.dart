@@ -1,30 +1,3 @@
-// ============================================================
-// PdfViewerScreen — Production Upgrade v2
-//
-// Features added (all non-breaking):
-//  1. Auto Resume Last Reading Position
-//  2. Bookmark System
-//  3. Comment Tag System
-//  4. Notes Summary Panel
-//  5. Multi-level Undo / Redo
-//  6. Palm Rejection / Input Filtering
-//  7. Review Mode (hide PDF layer, show annotations only)
-//  8. Reading Progress Visual Indicators
-//  9. Favorites / Quick Jump to Annotated Pages
-// 10. Data Structure / Storage Refactor
-//
-// Preserved exactly:
-//  - Encrypted offline PDF reading (_customRead / FileCryptoService)
-//  - Secure online PDF streaming (PdfViewer.uri + headers)
-//  - Watermark rendering
-//  - Drawing tools (pen / highlighter / eraser)
-//  - Comments system (load / save / dialog)
-//  - Annotations persistence in Hive (pdf_drawings_db)
-//  - Crashlytics logging
-//  - Existing UI theme / AppColors
-//  - Text selection disabled (PdfTextSelectionParams disabled)
-// ============================================================
-
 import 'dart:io';
 import 'dart:async';
 import 'dart:math';
@@ -42,16 +15,8 @@ import '../../core/services/app_state.dart';
 import '../../core/services/file_crypto_service.dart';
 import '../../core/models/drawing_model.dart';
 import '../../core/models/comment_model.dart';
-import '../../core/models/bookmark_model.dart';
-import '../../core/models/annotation_action.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/constants/api_constants.dart';
-import '../../core/services/pdf/pdf_progress_service.dart';
-import '../../core/services/pdf/pdf_bookmark_service.dart';
-import '../../core/services/pdf/pdf_page_meta_service.dart';
-import '../widgets/pdf_viewer/notes_summary_panel.dart';
-
-// ---- Public Widget ------------------------------------------------
 
 class PdfViewerScreen extends StatefulWidget {
   final String pdfId;
@@ -63,18 +28,16 @@ class PdfViewerScreen extends StatefulWidget {
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
-// ---- State --------------------------------------------------------
-
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _pdfController = PdfViewerController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // --- Decryption variables (unchanged) ---
+  // --- متغيرات فك التشفير ---
   File? _encryptedFile;
   int? _originalFileSize;
   String? _sessionToken;
 
-  // --- Online streaming variables (unchanged) ---
+  // --- متغيرات العرض الأونلاين ---
   String? _onlineUrl;
   Map<String, String>? _onlineHeaders;
 
@@ -84,7 +47,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isOffline = false;
   String _watermarkText = '';
 
-  // --- Drawing & annotation tools (unchanged core) ---
+  // --- أدوات الرسم والتعليقات ---
   bool _isDrawingMode = false;
   int _selectedTool = 0; // 0=Pen, 1=Highlighter, 2=Eraser, 3=Comment
   Color _selectedColor = Colors.red;
@@ -96,30 +59,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   Map<int, List<CommentModel>> _pageComments = {};
 
   DrawingLine? _currentLine;
-  List<Offset> _currentPoints = []; // palm-rejection-safe point buffer
   int _activePage = 0;
   int _totalPages = 0;
-
-  // ---- Feature 1: Auto Resume ----
-  int _resumePage = 1;
-
-  // ---- Feature 2: Bookmarks ----
-  List<BookmarkModel> _bookmarks = [];
-  Set<int> _bookmarkedPages = {};
-
-  // ---- Feature 5: Undo / Redo stacks ----
-  final List<AnnotationAction> _undoStack = [];
-  final List<AnnotationAction> _redoStack = [];
-
-  // ---- Feature 7: Review Mode ----
-  bool _isReviewMode = false;
-
-  // ---- Feature 8: Page metadata ----
-  Set<int> _visitedPages = {};
-
-  // -----------------------------------------------------------
-  // Lifecycle
-  // -----------------------------------------------------------
 
   @override
   void initState() {
@@ -131,14 +72,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   void dispose() {
-    // Persist all annotations on exit (unchanged).
     if (_isOffline) _saveAnnotationsToHive();
     super.dispose();
   }
-
-  // -----------------------------------------------------------
-  // Security helpers (unchanged)
-  // -----------------------------------------------------------
 
   String _generateSecureToken() {
     final random = Random.secure();
@@ -165,10 +101,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  // -----------------------------------------------------------
-  // Watermark (unchanged)
-  // -----------------------------------------------------------
-
   Future<void> _initWatermarkText() async {
     String displayText = '';
     if (AppState().userData != null) {
@@ -187,19 +119,16 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     if (mounted) {
       setState(() => _watermarkText = displayText.isNotEmpty
           ? displayText
-          : AppState().userData?['username'] ?? 'Unknown User'); // ✅ تمت إضافة الحماية هنا
+          : AppState().userData!['username'] ?? 'Unknown User');
     }
   }
 
-  // -----------------------------------------------------------
-  // Annotation persistence (unchanged + pageNumber stamp)
-  // -----------------------------------------------------------
-
+  // ✅ حفظ الرسم والتعليقات معاً
   Future<void> _saveAnnotationsToHive() async {
     try {
       final box = await StorageService.openBox('pdf_drawings_db');
 
-      // Save drawings (unchanged).
+      // حفظ الرسومات
       for (var entry in _pageDrawings.entries) {
         if (entry.value.isNotEmpty) {
           final serialized = entry.value.map((l) => l.toJson()).toList();
@@ -207,14 +136,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         }
       }
 
-      // Save comments (now includes pageNumber + tag + createdAt).
+      // حفظ التعليقات
       for (var entry in _pageComments.entries) {
         if (entry.value.isNotEmpty) {
-          final serializedComments = entry.value.map((c) {
-            // Stamp pageNumber before saving (migration guard).
-            if (c.pageNumber == 0) c.pageNumber = entry.key;
-            return c.toJson();
-          }).toList();
+          final serializedComments =
+              entry.value.map((c) => c.toJson()).toList();
           await box.put(
               '${widget.pdfId}_${entry.key}_comments', serializedComments);
         } else {
@@ -224,13 +150,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (_) {}
   }
 
+  // ✅ جلب الرسومات والتعليقات معاً
   Future<void> _loadAnnotationsForPage(int pageNumber) async {
-    // ✅ 1. القفل الأهم: منع إعادة التحميل لو البيانات موجودة بالفعل لمنع Infinite Loop
-    if (_pageDrawings.containsKey(pageNumber) && _pageComments.containsKey(pageNumber)) return;
-
     final box = await StorageService.openBox('pdf_drawings_db');
 
-    // Load drawings
+    // جلب الرسومات
     if (!_pageDrawings.containsKey(pageNumber)) {
       final dynamic data = box.get('${widget.pdfId}_$pageNumber');
       List<DrawingLine> lines = [];
@@ -242,82 +166,19 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       _pageDrawings[pageNumber] = lines;
     }
 
-    // Load comments
+    // جلب التعليقات
     if (!_pageComments.containsKey(pageNumber)) {
       final dynamic commentData =
           box.get('${widget.pdfId}_${pageNumber}_comments');
       List<CommentModel> comments = [];
       if (commentData != null) {
-        comments = (commentData as List<dynamic>).map((e) {
-          final c = CommentModel.fromJson(Map<String, dynamic>.from(e));
-          if (c.pageNumber == 0) c.pageNumber = pageNumber;
-          return c;
-        }).toList();
+        comments = (commentData as List<dynamic>)
+            .map((e) => CommentModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
       }
       _pageComments[pageNumber] = comments;
     }
-    // ✅ 2. تم إزالة setState() بالكامل من هنا ليعمل FutureBuilder بسلام.
   }
-
-  // -----------------------------------------------------------
-  // Feature 1 & 8: Auto Resume & Tracking helpers
-  // -----------------------------------------------------------
-
-  Future<void> _loadAndApplyLastPosition() async {
-    _resumePage = await PdfProgressService.loadLastPosition(widget.pdfId);
-    // Navigate after a short delay to let the controller attach.
-    if (_resumePage > 1) {
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (mounted && _pdfController.isReady) {
-        _pdfController.goToPage(pageNumber: _resumePage);
-      }
-    }
-  }
-
-  void _onPageChanged(int page) {
-    if (mounted) setState(() => _activePage = page);
-    PdfProgressService.saveLastPosition(widget.pdfId, page);
-
-    // ✅ 3. نقل ميزة "تتبع الصفحات المقروءة" إلى مكانها الآمن هنا
-    if (!_visitedPages.contains(page)) {
-      PdfPageMetaService.markPageVisited(widget.pdfId, page, _visitedPages).then((_) {
-        if (mounted) setState(() {});
-      });
-    }
-  }
-
-  // -----------------------------------------------------------
-  // Feature 2: Bookmark helpers
-  // -----------------------------------------------------------
-
-  Future<void> _loadBookmarks() async {
-    _bookmarks = await PdfBookmarkService.loadBookmarks(widget.pdfId);
-    _bookmarkedPages = _bookmarks.map((b) => b.pageNumber).toSet();
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _toggleBookmark() async {
-    // ✅ تأمين زر الإضافة/الإزالة
-    if (!_pdfController.isReady) return; 
-    
-    final page = _pdfController.pageNumber ?? 1;
-    if (_bookmarkedPages.contains(page)) {
-      await PdfBookmarkService.removeBookmark(widget.pdfId, page);
-    } else {
-      await PdfBookmarkService.addBookmark(widget.pdfId, page);
-    }
-    await _loadBookmarks();
-  }
-
-  bool get _isCurrentPageBookmarked {
-    // ✅ الحماية هنا: لا تسأل عن الصفحة إذا لم يكن الـ PDF جاهزاً بعد
-    if (!_pdfController.isReady) return false;
-    return _bookmarkedPages.contains(_pdfController.pageNumber ?? 1);
-  }
-
-  // -----------------------------------------------------------
-  // PDF preparation (unchanged core)
-  // -----------------------------------------------------------
 
   Future<void> _preparePdf() async {
     setState(() {
@@ -335,6 +196,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         final file = File(downloadItem['path']);
         if (await file.exists()) {
           final totalSize = await file.length();
+
           int numChunks =
               (totalSize / FileCryptoService.ENCRYPTED_CHUNK_SIZE).ceil();
           int originalSize =
@@ -348,13 +210,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               _loading = false;
             });
           }
-
-          // Load metadata after file is ready.
-          await _loadBookmarks();
-          final visited =
-              await PdfPageMetaService.loadVisitedPages(widget.pdfId);
-          if (mounted) setState(() => _visitedPages = visited);
-          await _loadAndApplyLastPosition();
           return;
         }
       }
@@ -381,382 +236,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (e, stack) {
       FirebaseCrashlytics.instance
           .recordError(e, stack, reason: "PDF Secure Load Failed");
-      if (mounted) {
+      if (mounted)
         setState(() {
           _error = "فشل فتح الملف المحمي.";
           _loading = false;
         });
-      }
     }
   }
-
-  // -----------------------------------------------------------
-  // Feature 5: Undo / Redo
-  // -----------------------------------------------------------
-
-  void _recordAction(AnnotationAction action) {
-    _undoStack.add(action);
-    _redoStack.clear(); // New action invalidates redo history.
-  }
-
-  void _performUndo() {
-    if (_undoStack.isEmpty) return;
-    final action = _undoStack.removeLast();
-    _redoStack.add(action);
-    _applyActionReverse(action);
-    setState(() {});
-  }
-
-  void _performRedo() {
-    if (_redoStack.isEmpty) return;
-    final action = _redoStack.removeLast();
-    _undoStack.add(action);
-    _applyActionForward(action);
-    setState(() {});
-  }
-
-  void _applyActionReverse(AnnotationAction action) {
-    final page = action.pageNumber;
-    switch (action.type) {
-      case AnnotationActionType.addStroke:
-        _pageDrawings[page]?.remove(action.stroke);
-        break;
-      case AnnotationActionType.eraseStroke:
-        final idx = action.strokeIndex ?? (_pageDrawings[page]?.length ?? 0);
-        _pageDrawings[page]?.insert(idx, action.stroke!);
-        break;
-      case AnnotationActionType.addComment:
-        _pageComments[page]?.remove(action.comment);
-        break;
-      case AnnotationActionType.deleteComment:
-        (_pageComments[page] ??= []).add(action.comment!);
-        break;
-      case AnnotationActionType.moveComment:
-        action.comment!.dx = action.prevDx!;
-        action.comment!.dy = action.prevDy!;
-        break;
-    }
-  }
-
-  void _applyActionForward(AnnotationAction action) {
-    final page = action.pageNumber;
-    switch (action.type) {
-      case AnnotationActionType.addStroke:
-        (_pageDrawings[page] ??= []).add(action.stroke!);
-        break;
-      case AnnotationActionType.eraseStroke:
-        _pageDrawings[page]?.remove(action.stroke);
-        break;
-      case AnnotationActionType.addComment:
-        (_pageComments[page] ??= []).add(action.comment!);
-        break;
-      case AnnotationActionType.deleteComment:
-        _pageComments[page]?.remove(action.comment);
-        break;
-      case AnnotationActionType.moveComment:
-        action.comment!.dx = action.nextDx!;
-        action.comment!.dy = action.nextDy!;
-        break;
-    }
-  }
-
-  // -----------------------------------------------------------
-  // Drawing logic (palm-rejection-aware)
-  // -----------------------------------------------------------
-
-  void _startStroke(Offset localPos, Rect pageRect, PdfPage page) {
-    if (!_isDrawingMode) return;
-    final relativePoint =
-        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
-    setState(() {
-      _activePage = page.pageNumber;
-      _currentPoints = [relativePoint];
-      double width = _selectedTool == 2
-          ? _eraserSize
-          : (_selectedTool == 1 ? _highlightSize : _penSize);
-      _currentLine = DrawingLine(
-        points: _currentPoints,
-        color: _selectedTool == 2 ? 0 : _selectedColor.value,
-        strokeWidth: width,
-        isHighlighter: _selectedTool == 1,
-        isEraser: _selectedTool == 2,
-      );
-    });
-  }
-
-  void _updateStroke(Offset localPos, Rect pageRect) {
-    if (!_isDrawingMode || _currentLine == null) return;
-    final relativePoint =
-        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
-    setState(() => _currentPoints.add(relativePoint));
-  }
-
-  void _endStroke(PdfPage page) {
-    if (_currentLine != null && _currentPoints.isNotEmpty) {
-      final finishedLine = DrawingLine(
-        points: List.from(_currentPoints),
-        color: _currentLine!.color,
-        strokeWidth: _currentLine!.strokeWidth,
-        isHighlighter: _currentLine!.isHighlighter,
-        isEraser: _currentLine!.isEraser,
-      );
-      setState(() {
-        (_pageDrawings[page.pageNumber] ??= []).add(finishedLine);
-        _recordAction(
-            AnnotationAction.addStroke(page.pageNumber, finishedLine));
-        _currentLine = null;
-        _currentPoints = [];
-      });
-    }
-  }
-
-  // -----------------------------------------------------------
-  // Comment logic (updated with tag + undo)
-  // -----------------------------------------------------------
-
-  void _addComment(
-      Offset localPos, BuildContext context, Rect pageRect, int pageNumber) {
-    if (!_isDrawingMode || _selectedTool != 3) return;
-    final relativePoint =
-        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
-    final newComment = CommentModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      text: '',
-      dx: relativePoint.dx,
-      dy: relativePoint.dy,
-      color: _selectedColor.value,
-      pageNumber: pageNumber,
-    );
-    _showCommentDialog(pageNumber, newComment, isNew: true);
-  }
-
-  void _showCommentDialog(int pageNumber, CommentModel comment,
-      {bool isNew = false}) {
-    TextEditingController controller =
-        TextEditingController(text: comment.text);
-    CommentTag? selectedTag = comment.tag;
-
-    showDialog(
-      context: context,
-      barrierDismissible: !isNew,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: AppColors.backgroundSecondary,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                Icon(Icons.comment_rounded,
-                    color: Color(comment.color).withOpacity(1.0)),
-                const SizedBox(width: 8),
-                Text(isNew ? "إضافة تعليق" : "التعليق",
-                    style: TextStyle(
-                        color: AppColors.textPrimary, fontSize: 16)),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: controller,
-                    maxLines: 4,
-                    enabled: _isDrawingMode,
-                    style: TextStyle(color: AppColors.textPrimary),
-                    decoration: InputDecoration(
-                      hintText: _isDrawingMode
-                          ? "اكتب ملاحظاتك هنا..."
-                          : "لا يوجد نص...",
-                      hintStyle: TextStyle(color: AppColors.textSecondary),
-                      filled: true,
-                      fillColor: AppColors.backgroundPrimary,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none),
-                    ),
-                  ),
-
-                  if (_isDrawingMode) ...[
-                    const SizedBox(height: 14),
-                    Text("التصنيف:",
-                        style: TextStyle(
-                            color: AppColors.textSecondary, fontSize: 12)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        _tagChip(
-                          label: 'بدون',
-                          color: Colors.grey,
-                          isSelected: selectedTag == null,
-                          onTap: () =>
-                              setDialogState(() => selectedTag = null),
-                        ),
-                        ...CommentTag.values.map((tag) => _tagChip(
-                              label: tag.label,
-                              color: Color(tag.colorValue),
-                              isSelected: selectedTag == tag,
-                              onTap: () =>
-                                  setDialogState(() => selectedTag = tag),
-                            )),
-                      ],
-                    ),
-                  ] else if (comment.tag != null) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color:
-                            Color(comment.tag!.colorValue).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(comment.tag!.label,
-                          style: TextStyle(
-                              color: Color(comment.tag!.colorValue),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-
-                  if (_isDrawingMode) ...[
-                    const SizedBox(height: 20),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                          "حجم الأيقونة: ${comment.scale.toStringAsFixed(1)}",
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 12)),
-                    ),
-                    Slider(
-                      value: comment.scale,
-                      min: 0.5,
-                      max: 4.0,
-                      activeColor: AppColors.accentYellow,
-                      inactiveColor: AppColors.accentYellow.withOpacity(0.3),
-                      onChanged: (val) {
-                        setDialogState(() => comment.scale = val);
-                        setState(() {});
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                          "الشفافية: ${(Color(comment.color).opacity * 100).toInt()}%",
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 12)),
-                    ),
-                    Slider(
-                      value: Color(comment.color).opacity,
-                      min: 0.1,
-                      max: 1.0,
-                      activeColor: AppColors.accentYellow,
-                      inactiveColor: AppColors.accentYellow.withOpacity(0.3),
-                      onChanged: (val) {
-                        setDialogState(() {
-                          Color baseColor = Color(comment.color);
-                          comment.color = baseColor.withOpacity(val).value;
-                        });
-                        setState(() {});
-                      },
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              if (!isNew && _isDrawingMode)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _pageComments[pageNumber]?.remove(comment);
-                      _recordAction(AnnotationAction.deleteComment(
-                          pageNumber, comment));
-                    });
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text("حذف",
-                      style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold)),
-                ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(_isDrawingMode ? "إلغاء" : "إغلاق",
-                    style: const TextStyle(color: Colors.grey)),
-              ),
-              if (_isDrawingMode)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentYellow,
-                      foregroundColor: Colors.black),
-                  onPressed: () {
-                    setState(() {
-                      comment.text = controller.text;
-                      comment.tag = selectedTag;
-                      if (comment.pageNumber == 0) {
-                        comment.pageNumber = pageNumber;
-                      }
-                      if (isNew && comment.text.trim().isNotEmpty) {
-                        (_pageComments[pageNumber] ??= []).add(comment);
-                        _recordAction(
-                            AnnotationAction.addComment(pageNumber, comment));
-                      }
-                    });
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text("حفظ",
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _tagChip(
-      {required String label,
-      required Color color,
-      required bool isSelected,
-      required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? color : Colors.white24),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: isSelected ? color : Colors.white54,
-                fontSize: 11,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal)),
-      ),
-    );
-  }
-
-  List<int> get _annotatedPages {
-    final pages = <int>{};
-    for (final e in _pageDrawings.entries) {
-      if (e.value.isNotEmpty) pages.add(e.key);
-    }
-    for (final e in _pageComments.entries) {
-      if (e.value.isNotEmpty) pages.add(e.key);
-    }
-    return pages.toList()..sort();
-  }
-
-  // -----------------------------------------------------------
-  // Build
-  // -----------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -770,104 +256,29 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          if (!_isReviewMode)
-            _isOffline && _encryptedFile != null && _originalFileSize != null
-                ? PdfViewer.custom(
-                    fileSize: _originalFileSize!,
-                    read: _customRead,
-                    sourceName: _encryptedFile!.path,
-                    controller: _pdfController,
-                    params: _buildPdfParams(),
-                  )
-                : PdfViewer.uri(
-                    Uri.parse(_onlineUrl!),
-                    headers: _onlineHeaders,
-                    controller: _pdfController,
-                    params: _buildPdfParams(),
-                  )
-          else
-            Container(color: AppColors.backgroundPrimary),
-
+          _isOffline && _encryptedFile != null && _originalFileSize != null
+              ? PdfViewer.custom(
+                  fileSize: _originalFileSize!,
+                  read: _customRead,
+                  sourceName: _encryptedFile!.path,
+                  controller: _pdfController,
+                  params: _buildPdfParams(),
+                )
+              : PdfViewer.uri(
+                  Uri.parse(_onlineUrl!),
+                  headers: _onlineHeaders,
+                  controller: _pdfController,
+                  params: _buildPdfParams(),
+                ),
           _buildWatermark(),
-
           if (_isDrawingMode && _isOffline)
-            Positioned(
-                bottom: 40, left: 20, right: 20, child: _buildToolbar()),
-
-          if (_isReviewMode) _buildReviewModeBadge(),
+            Positioned(bottom: 40, left: 20, right: 20, child: _buildToolbar()),
         ],
       ),
     );
   }
 
-  // -----------------------------------------------------------
-  // AppBar
-  // -----------------------------------------------------------
-
-  PreferredSizeWidget _buildAppBar() {
-    final isBookmarked = _isCurrentPageBookmarked;
-
-    return AppBar(
-      title: Row(
-        children: [
-          Expanded(
-              child: Text(widget.title,
-                  style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
-                  overflow: TextOverflow.ellipsis)),
-          const SizedBox(width: 8),
-          _buildBadge(), // شارة Offline
-        ],
-      ),
-      backgroundColor: AppColors.backgroundSecondary,
-      leading: BackButton(
-          color: AppColors.accentYellow,
-          onPressed: () async {
-            if (_isOffline) await _saveAnnotationsToHive();
-            if (context.mounted) Navigator.pop(context);
-          }),
-      actions: [
-        // ✅ 1. زر القلم أصبح هنا كأيقونة قياسية لسهولة الضغط
-        if (_isOffline)
-          IconButton(
-            icon: Icon(
-              _isDrawingMode ? LucideIcons.penTool : LucideIcons.penTool,
-              color: _isDrawingMode ? AppColors.accentYellow : Colors.white54,
-            ),
-            onPressed: () => setState(() => _isDrawingMode = !_isDrawingMode),
-            tooltip: 'وضع الرسم',
-          ),
-        // ✅ 2. الإشارات المرجعية
-        if (_isOffline)
-          IconButton(
-            icon: Icon(
-              LucideIcons.bookmark,
-              color: isBookmarked ? AppColors.accentYellow : Colors.white54,
-            ),
-            onPressed: _toggleBookmark,
-            tooltip: isBookmarked ? 'إزالة الإشارة' : 'إضافة إشارة',
-          ),
-        // ✅ 3. وضع المراجعة
-        if (_isOffline)
-          IconButton(
-            icon: Icon(
-              _isReviewMode ? LucideIcons.eye : LucideIcons.eyeOff,
-              color: _isReviewMode ? AppColors.accentYellow : Colors.white54,
-            ),
-            onPressed: () => setState(() => _isReviewMode = !_isReviewMode),
-            tooltip: _isReviewMode ? 'إظهار الـPDF' : 'وضع المراجعة',
-          ),
-        // ✅ 4. القائمة الجانبية
-        IconButton(
-          icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
-          onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-        ),
-      ],
-    );
-  }
-
-  // -----------------------------------------------------------
-  // Widgets
-  // -----------------------------------------------------------
+  // --- Widgets ---
 
   Widget _buildLoadingView() {
     return Scaffold(
@@ -895,8 +306,39 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             backgroundColor: Colors.transparent,
             leading: const BackButton(color: Colors.white)),
         body: Center(
-            child:
-                Text(_error!, style: const TextStyle(color: Colors.white))));
+            child: Text(_error!, style: const TextStyle(color: Colors.white))));
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Row(
+        children: [
+          Expanded(
+              child: Text(widget.title,
+                  style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: 8),
+          _buildBadge(),
+          if (_isOffline) ...[
+            const SizedBox(width: 12),
+            _buildPenIcon(),
+          ]
+        ],
+      ),
+      backgroundColor: AppColors.backgroundSecondary,
+      leading: BackButton(
+          color: AppColors.accentYellow,
+          onPressed: () async {
+            if (_isOffline) await _saveAnnotationsToHive();
+            if (context.mounted) Navigator.pop(context);
+          }),
+      actions: [
+        IconButton(
+          icon: Icon(LucideIcons.list, color: AppColors.accentYellow),
+          onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+        ),
+      ],
+    );
   }
 
   Widget _buildBadge() {
@@ -907,8 +349,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
             ? Colors.green.withOpacity(0.2)
             : Colors.blue.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
-        border:
-            Border.all(color: _isOffline ? Colors.green : Colors.blue, width: 1),
+        border: Border.all(
+            color: _isOffline ? Colors.green : Colors.blue, width: 1),
       ),
       child: Row(
         children: [
@@ -931,11 +373,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-            color:
-                _isDrawingMode ? AppColors.accentYellow : Colors.transparent,
+            color: _isDrawingMode ? AppColors.accentYellow : Colors.transparent,
             shape: BoxShape.circle,
-            border:
-                Border.all(color: AppColors.accentYellow.withOpacity(0.5))),
+            border: Border.all(color: AppColors.accentYellow.withOpacity(0.5))),
         child: Icon(LucideIcons.penTool,
             color: _isDrawingMode ? Colors.black : AppColors.accentYellow,
             size: 16),
@@ -969,76 +409,21 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     );
   }
 
-  Widget _buildReviewModeBadge() {
-    return Positioned(
-      top: 12,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.accentYellow.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text(
-            'وضع المراجعة — PDF مخفي',
-            style: TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                fontSize: 12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showNotesSummary() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => NotesSummaryPanel(
-        pageComments: _pageComments,
-        onJumpToPage: (page) {
-          _pdfController.goToPage(pageNumber: page);
-        },
-      ),
-    );
-  }
-
-
-Widget _buildPageDrawer() {
+  Widget _buildPageDrawer() {
     return Drawer(
       backgroundColor: AppColors.backgroundSecondary,
-      width: 260,
+      width: 250,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 40, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
             child: Text("فهرس الصفحات",
                 style: TextStyle(
                     color: AppColors.accentYellow,
                     fontWeight: FontWeight.bold,
                     fontSize: 16)),
           ),
-          
-          // ✅ تم نقل زر "ملخص الملاحظات" إلى هنا لتوفير مساحة البار العلوي
-          if (_isOffline) ...[
-            ListTile(
-              leading: Icon(LucideIcons.fileText, color: AppColors.accentYellow, size: 18),
-              title: Text("ملخص الملاحظات والتعليقات", style: TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-              onTap: () {
-                Navigator.pop(context); // إغلاق القائمة
-                _showNotesSummary(); // فتح الملخص
-              },
-            ),
-            const Divider(color: Colors.white10),
-          ],
-
-          // ✅ تم إزالة قسم "الصفحات المشروحة" بالكامل بناءً على طلبك
-
+          const Divider(color: Colors.white10),
           Expanded(
             child: _totalPages == 0
                 ? Center(
@@ -1048,16 +433,8 @@ Widget _buildPageDrawer() {
                     itemCount: _totalPages,
                     itemBuilder: (context, index) {
                       final pageNum = index + 1;
-                      final isCurrent =
-                          _pdfController.pageNumber == pageNum;
-                      final isBookmarked =
-                          _bookmarkedPages.contains(pageNum);
-                      final isVisited = _visitedPages.contains(pageNum);
-                      final hasAnnotations =
-                          _annotatedPages.contains(pageNum);
-
+                      final isCurrent = _pdfController.pageNumber == pageNum;
                       return ListTile(
-                        dense: true,
                         title: Text("صفحة $pageNum",
                             style: TextStyle(
                                 color: isCurrent
@@ -1065,34 +442,12 @@ Widget _buildPageDrawer() {
                                     : AppColors.textPrimary,
                                 fontWeight: isCurrent
                                     ? FontWeight.bold
-                                    : FontWeight.normal,
-                                fontSize: 13)),
+                                    : FontWeight.normal)),
                         leading: Icon(LucideIcons.fileText,
                             color: isCurrent
                                 ? AppColors.accentYellow
                                 : AppColors.textSecondary,
-                            size: 16),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (isBookmarked)
-                              Icon(LucideIcons.bookmark,
-                                  color: AppColors.accentYellow, size: 12),
-                            if (hasAnnotations)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 2),
-                                child: Icon(LucideIcons.pencil,
-                                    color: Colors.blue, size: 12),
-                              ),
-                          
-                            if (isVisited && !isCurrent)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 2),
-                                child: Icon(LucideIcons.eye,
-                                    color: Colors.green, size: 12),
-                              ),
-                          ],
-                        ),
+                            size: 18),
                         onTap: () {
                           _pdfController.goToPage(pageNumber: pageNum);
                           Navigator.pop(context);
@@ -1101,47 +456,11 @@ Widget _buildPageDrawer() {
                     },
                   ),
           ),
-
-          if (_bookmarks.isNotEmpty) ...[
-            const Divider(color: Colors.white10),
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(LucideIcons.bookmark,
-                      color: AppColors.accentYellow, size: 14),
-                  const SizedBox(width: 6),
-                  Text("الإشارات المرجعية",
-                      style: TextStyle(
-                          color: AppColors.accentYellow,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-            ..._bookmarks.map((bm) => ListTile(
-                  dense: true,
-                  leading: Icon(LucideIcons.bookmark,
-                      color: AppColors.accentYellow, size: 14),
-                  title: Text(
-                      bm.label?.isNotEmpty == true
-                          ? bm.label!
-                          : 'صفحة ${bm.pageNumber}',
-                      style: TextStyle(
-                          color: AppColors.textPrimary, fontSize: 12)),
-                  onTap: () {
-                    _pdfController.goToPage(pageNumber: bm.pageNumber);
-                    Navigator.pop(context);
-                  },
-                )),
-            const SizedBox(height: 8),
-          ],
         ],
       ),
     );
   }
-  // ✅ 4. دالة الـ PDF Params باستخدام FutureBuilder 
+
   PdfViewerParams _buildPdfParams() {
     return PdfViewerParams(
       backgroundColor: AppColors.backgroundPrimary,
@@ -1158,14 +477,7 @@ Widget _buildPageDrawer() {
         );
       },
       onDocumentChanged: (document) {
-        if (mounted) {
-          setState(() => _totalPages = document?.pages.length ?? 0);
-          _loadAndApplyLastPosition();
-        }
-      },
-      onPageChanged: (page) {
-        if (page != null) _onPageChanged(page);
-        if (mounted) setState(() {});
+        if (mounted) setState(() => _totalPages = document?.pages.length ?? 0);
       },
       pageOverlaysBuilder: (context, pageRect, page) {
         if (!_isOffline) return [];
@@ -1174,6 +486,7 @@ Widget _buildPageDrawer() {
             child: FutureBuilder(
               future: _loadAnnotationsForPage(page.pageNumber),
               builder: (context, snapshot) {
+                // 1. تجهيز الرسومات
                 final lines = _pageDrawings[page.pageNumber] ?? [];
                 final allLines = [...lines];
                 if (_isDrawingMode &&
@@ -1182,16 +495,45 @@ Widget _buildPageDrawer() {
                   allLines.add(_currentLine!);
                 }
 
+                // 2. تجهيز التعليقات
                 final comments = _pageComments[page.pageNumber] ?? [];
 
                 return Stack(
                   children: [
-                    // --- Drawing layer with palm rejection (Feature 6) ---
-                    _buildDrawingLayer(context, pageRect, page, allLines),
+                    // طبقة الرسم والخلفية (تضيف تعليقات جديدة)
+                    IgnorePointer(
+                      ignoring: !_isDrawingMode,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapUp: (details) {
+                          if (_selectedTool == 3) {
+                            _addComment(
+                                details, context, pageRect, page.pageNumber);
+                          }
+                        },
+                        onPanStart: (details) {
+                          if (_selectedTool != 3)
+                            _startStroke(details, context, pageRect, page);
+                        },
+                        onPanUpdate: (details) {
+                          if (_selectedTool != 3)
+                            _updateStroke(details, context, pageRect);
+                        },
+                        onPanEnd: (details) {
+                          if (_selectedTool != 3) _endStroke(page);
+                        },
+                        child: CustomPaint(
+                          painter: RelativeSketchPainter(
+                              lines: allLines, pageSize: pageRect.size),
+                          size: Size.infinite,
+                        ),
+                      ),
+                    ),
 
-                    // --- Comment icons ---
+                    // طبقة أيقونات التعليقات المضافة مسبقاً
                     if (_isOffline)
                       ...comments.map((comment) {
+                        // استخراج اللون الأساسي والشفافية
                         Color solidColor =
                             Color(comment.color).withOpacity(1.0);
                         double currentOpacity = Color(comment.color).opacity;
@@ -1207,34 +549,26 @@ Widget _buildPageDrawer() {
                             onScaleEnd: _isDrawingMode ? (_) {} : null,
                             onScaleUpdate: _isDrawingMode
                                 ? (details) {
-                                    if (details.pointerCount == 1) {
-                                      final prevDx = comment.dx;
-                                      final prevDy = comment.dy;
-                                      setState(() {
+                                    setState(() {
+                                      if (details.pointerCount == 1) {
+                                        // ✅ سحب وتحريك فقط (تم إلغاء التكبير بالأصابع)
                                         comment.dx +=
                                             details.focalPointDelta.dx /
                                                 pageRect.width;
                                         comment.dy +=
                                             details.focalPointDelta.dy /
                                                 pageRect.height;
-                                      });
-                                      _recordAction(
-                                          AnnotationAction.moveComment(
-                                              page.pageNumber,
-                                              comment,
-                                              prevDx,
-                                              prevDy,
-                                              comment.dx,
-                                              comment.dy));
-                                    }
+                                      }
+                                    });
                                   }
                                 : null,
-                            onTap: () => _showCommentDialog(
-                                page.pageNumber, comment),
+                            onTap: () =>
+                                _showCommentDialog(page.pageNumber, comment),
                             child: Transform.scale(
                               scale: comment.scale,
                               child: Opacity(
-                                opacity: currentOpacity,
+                                opacity:
+                                    currentOpacity, // ✅ تطبيق الشفافية المحددة
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
@@ -1268,32 +602,217 @@ Widget _buildPageDrawer() {
     );
   }
 
-  Widget _buildDrawingLayer(BuildContext context, Rect pageRect, PdfPage page,
-      List<DrawingLine> allLines) {
-    if (!_isDrawingMode) {
-      return IgnorePointer(
-        child: CustomPaint(
-          painter:
-              RelativeSketchPainter(lines: allLines, pageSize: pageRect.size),
-          size: Size.infinite,
-        ),
-      );
-    }
+  // --- منطق التعليقات ---
 
-    return _PalmRejectedDrawingLayer(
-      pageRect: pageRect,
-      page: page,
-      allLines: allLines,
-      selectedTool: _selectedTool,
-      onDrawStart: (localPos) => _startStroke(localPos, pageRect, page),
-      onDrawUpdate: (localPos) => _updateStroke(localPos, pageRect),
-      onDrawEnd: () => _endStroke(page),
-      onTap: (localPos) {
-        if (_selectedTool == 3) {
-          _addComment(localPos, context, pageRect, page.pageNumber);
-        }
-      },
+  void _addComment(TapUpDetails details, BuildContext context, Rect pageRect,
+      int pageNumber) {
+    if (!_isDrawingMode || _selectedTool != 3) return;
+
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+    final relativePoint =
+        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
+
+    final newComment = CommentModel(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: '',
+      dx: relativePoint.dx,
+      dy: relativePoint.dy,
+      color: _selectedColor.value, // يبدأ باللون المختار مع شفافية كاملة
     );
+    // تعيين الحجم الافتراضي إذا لم يكن مهيأ
+    newComment.scale = 1.0;
+
+    _showCommentDialog(pageNumber, newComment, isNew: true);
+  }
+
+  void _showCommentDialog(int pageNumber, CommentModel comment,
+      {bool isNew = false}) {
+    TextEditingController controller =
+        TextEditingController(text: comment.text);
+
+    showDialog(
+        context: context,
+        barrierDismissible: !isNew,
+        builder: (ctx) => StatefulBuilder(
+                // ✅ استخدام StatefulBuilder لتحديث أشرطة التحكم فوراً
+                builder: (context, setDialogState) {
+              return AlertDialog(
+                  backgroundColor: AppColors.backgroundSecondary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  title: Row(
+                    children: [
+                      Icon(Icons.comment_rounded,
+                          color: Color(comment.color).withOpacity(1.0)),
+                      const SizedBox(width: 8),
+                      Text(isNew ? "إضافة تعليق" : "التعليق",
+                          style: TextStyle(
+                              color: AppColors.textPrimary, fontSize: 16)),
+                    ],
+                  ),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: controller,
+                          maxLines: 4,
+                          enabled:
+                              _isDrawingMode, // لا يمكن التعديل إذا كان القلم مغلقاً
+                          style: TextStyle(color: AppColors.textPrimary),
+                          decoration: InputDecoration(
+                            hintText: _isDrawingMode
+                                ? "اكتب ملاحظاتك هنا..."
+                                : "لا يوجد نص...",
+                            hintStyle:
+                                TextStyle(color: AppColors.textSecondary),
+                            filled: true,
+                            fillColor: AppColors.backgroundPrimary,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none),
+                          ),
+                        ),
+                        if (_isDrawingMode) ...[
+                          const SizedBox(height: 20),
+                          // ✅ شريط التحكم في حجم التعليق
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                                "حجم الأيقونة: ${(comment.scale).toStringAsFixed(1)}",
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12)),
+                          ),
+                          Slider(
+                              value: comment.scale,
+                              min: 0.5,
+                              max: 4.0,
+                              activeColor: AppColors.accentYellow,
+                              inactiveColor:
+                                  AppColors.accentYellow.withOpacity(0.3),
+                              onChanged: (val) {
+                                setDialogState(() => comment.scale = val);
+                                setState(
+                                    () {}); // تحديث الشاشة الرئيسية لرؤية التغيير فوراً
+                              }),
+                          const SizedBox(height: 10),
+                          // ✅ شريط التحكم في الشفافية
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                                "الشفافية: ${(Color(comment.color).opacity * 100).toInt()}%",
+                                style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12)),
+                          ),
+                          Slider(
+                              value: Color(comment.color).opacity,
+                              min: 0.1,
+                              max: 1.0,
+                              activeColor: AppColors.accentYellow,
+                              inactiveColor:
+                                  AppColors.accentYellow.withOpacity(0.3),
+                              onChanged: (val) {
+                                setDialogState(() {
+                                  // تغيير قيمة الألفا للون وحفظه
+                                  Color baseColor = Color(comment.color);
+                                  comment.color =
+                                      baseColor.withOpacity(val).value;
+                                });
+                                setState(
+                                    () {}); // تحديث الشاشة الرئيسية لرؤية التغيير فوراً
+                              }),
+                        ]
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    if (!isNew &&
+                        _isDrawingMode) // يظهر زر الحذف فقط في وضع القلم
+                      TextButton(
+                        onPressed: () {
+                          setState(
+                              () => _pageComments[pageNumber]?.remove(comment));
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text("حذف",
+                            style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(_isDrawingMode ? "إلغاء" : "إغلاق",
+                          style: const TextStyle(color: Colors.grey)),
+                    ),
+                    if (_isDrawingMode) // يظهر زر الحفظ فقط في وضع التعديل
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accentYellow,
+                            foregroundColor: Colors.black),
+                        onPressed: () {
+                          setState(() {
+                            comment.text = controller.text;
+                            if (isNew && comment.text.trim().isNotEmpty) {
+                              if (_pageComments[pageNumber] == null)
+                                _pageComments[pageNumber] = [];
+                              _pageComments[pageNumber]!.add(comment);
+                            }
+                          });
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text("حفظ",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                  ]);
+            }));
+  }
+
+  // --- منطق الرسم ---
+
+  void _startStroke(DragStartDetails details, BuildContext context,
+      Rect pageRect, PdfPage page) {
+    if (!_isDrawingMode) return;
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+    final relativePoint =
+        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
+    setState(() {
+      _activePage = page.pageNumber;
+      double width = _selectedTool == 2
+          ? _eraserSize
+          : (_selectedTool == 1 ? _highlightSize : _penSize);
+      _currentLine = DrawingLine(
+        points: [relativePoint],
+        color: _selectedTool == 2 ? 0 : _selectedColor.value,
+        strokeWidth: width,
+        isHighlighter: _selectedTool == 1,
+        isEraser: _selectedTool == 2,
+      );
+    });
+  }
+
+  void _updateStroke(
+      DragUpdateDetails details, BuildContext context, Rect pageRect) {
+    if (!_isDrawingMode || _currentLine == null) return;
+    final renderBox = context.findRenderObject() as RenderBox;
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+    final relativePoint =
+        Offset(localPos.dx / pageRect.width, localPos.dy / pageRect.height);
+    setState(() => _currentLine!.points.add(relativePoint));
+  }
+
+  void _endStroke(PdfPage page) {
+    if (_currentLine != null) {
+      setState(() {
+        if (_pageDrawings[page.pageNumber] == null)
+          _pageDrawings[page.pageNumber] = [];
+        _pageDrawings[page.pageNumber]!.add(_currentLine!);
+        _currentLine = null;
+      });
+    }
   }
 
   Widget _buildToolbar() {
@@ -1320,33 +839,24 @@ Widget _buildPageDrawer() {
                 _toolIcon(LucideIcons.messageSquare, 3),
                 const SizedBox(width: 12),
                 IconButton(
-                  icon: Icon(LucideIcons.undo,
-                      color: _undoStack.isNotEmpty
-                          ? Colors.white
-                          : Colors.white30,
-                      size: 20),
-                  onPressed: _undoStack.isNotEmpty ? _performUndo : null,
-                  tooltip: 'تراجع',
-                ),
-                IconButton(
-                  icon: Icon(LucideIcons.redo,
-                      color: _redoStack.isNotEmpty
-                          ? Colors.white
-                          : Colors.white30,
-                      size: 20),
-                  onPressed: _redoStack.isNotEmpty ? _performRedo : null,
-                  tooltip: 'إعادة',
+                  icon: const Icon(LucideIcons.undo,
+                      color: Colors.white, size: 20),
+                  onPressed: () {
+                    if (_pageDrawings[_activePage]?.isNotEmpty ?? false) {
+                      setState(() => _pageDrawings[_activePage]!.removeLast());
+                    }
+                  },
                 ),
                 const SizedBox(width: 8),
                 Container(width: 1, height: 24, color: Colors.grey),
                 const SizedBox(width: 12),
-                if (_selectedTool != 2) ...{
+                if (_selectedTool != 2) ...[
                   _colorCircle(Colors.red),
                   _colorCircle(Colors.blue),
                   _colorCircle(Colors.green),
                   _colorCircle(Colors.yellow),
                   _colorCircle(Colors.white),
-                },
+                ],
               ],
             ),
           ),
@@ -1385,9 +895,8 @@ Widget _buildPageDrawer() {
           borderRadius: BorderRadius.circular(8)),
       child: IconButton(
         icon: Icon(icon,
-            color: _selectedTool == index
-                ? AppColors.accentYellow
-                : Colors.grey,
+            color:
+                _selectedTool == index ? AppColors.accentYellow : Colors.grey,
             size: 20),
         onPressed: () => setState(() => _selectedTool = index),
       ),
@@ -1414,107 +923,6 @@ Widget _buildPageDrawer() {
     );
   }
 }
-
-// ================================================================
-// Palm-rejection-aware drawing layer
-// ================================================================
-
-class _PalmRejectedDrawingLayer extends StatefulWidget {
-  final Rect pageRect;
-  final PdfPage page;
-  final List<DrawingLine> allLines;
-  final int selectedTool;
-  final void Function(Offset) onDrawStart;
-  final void Function(Offset) onDrawUpdate;
-  final VoidCallback onDrawEnd;
-  final void Function(Offset) onTap;
-
-  const _PalmRejectedDrawingLayer({
-    required this.pageRect,
-    required this.page,
-    required this.allLines,
-    required this.selectedTool,
-    required this.onDrawStart,
-    required this.onDrawUpdate,
-    required this.onDrawEnd,
-    required this.onTap,
-  });
-
-  @override
-  State<_PalmRejectedDrawingLayer> createState() =>
-      _PalmRejectedDrawingLayerState();
-}
-
-class _PalmRejectedDrawingLayerState
-    extends State<_PalmRejectedDrawingLayer> {
-  int? _activePointerId;
-  bool _isStylus = false;
-  bool _sessionHasStylus = false;
-  Offset? _downPosition;
-  bool _moved = false;
-
-  bool _isStylusKind(int kind) =>
-      kind == 2 || kind == 3;
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (event) {
-        final isStylusInput = _isStylusKind(event.kind.index);
-        if (isStylusInput) _sessionHasStylus = true;
-
-        if (_sessionHasStylus && !isStylusInput) return;
-
-        if (_activePointerId != null) return;
-
-        _activePointerId = event.pointer;
-        _isStylus = isStylusInput;
-        _downPosition = event.localPosition;
-        _moved = false;
-
-        if (widget.selectedTool != 3) {
-          widget.onDrawStart(event.localPosition);
-        }
-      },
-      onPointerMove: (event) {
-        if (event.pointer != _activePointerId) return;
-        _moved = true;
-        if (widget.selectedTool != 3) {
-          widget.onDrawUpdate(event.localPosition);
-        }
-      },
-      onPointerUp: (event) {
-        if (event.pointer != _activePointerId) return;
-        _activePointerId = null;
-
-        // ✅ تم إزالة شرط (!_moved) لكي تظهر النافذة حتى لو اهتز الإصبع قليلاً
-        if (widget.selectedTool == 3 && _downPosition != null) {
-          widget.onTap(_downPosition!);
-        } else if (widget.selectedTool != 3) {
-          widget.onDrawEnd();
-        }
-        _downPosition = null;
-        _moved = false;
-      },
-      onPointerCancel: (event) {
-        if (event.pointer == _activePointerId) {
-          _activePointerId = null;
-          if (widget.selectedTool != 3) widget.onDrawEnd();
-        }
-      },
-      child: CustomPaint(
-        painter: RelativeSketchPainter(
-            lines: widget.allLines, pageSize: widget.pageRect.size),
-        size: Size.infinite,
-      ),
-    );
-  }
-}
-
-// ================================================================
-// RelativeSketchPainter
-// ================================================================
 
 class RelativeSketchPainter extends CustomPainter {
   final List<DrawingLine> lines;
