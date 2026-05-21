@@ -1,9 +1,8 @@
-
 import 'package:Medaad/core/services/security_manager.dart';
 import 'package:Medaad/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SecurityAlertScreen extends StatelessWidget {
   const SecurityAlertScreen({
