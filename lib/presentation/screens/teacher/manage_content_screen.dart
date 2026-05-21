@@ -34,6 +34,11 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _urlController = TextEditingController();
 
+  // ✅ إضافة متحكمات الوقت للفيديو
+  final TextEditingController _hoursController = TextEditingController();
+  final TextEditingController _minutesController = TextEditingController();
+  final TextEditingController _secondsController = TextEditingController();
+
   File? _selectedFile;
   String? _selectedFileName;
   String? _uploadedFileUrl;
@@ -59,6 +64,21 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
 
       if (widget.contentType == ContentType.video) {
         _urlController.text = widget.initialData!['youtube_video_id'] ?? '';
+        
+        // ✅ توزيع الوقت الموجود مسبقاً على الحقول في حالة التعديل
+        String? dur = widget.initialData!['duration'];
+        if (dur != null && dur.isNotEmpty) {
+          List<String> parts = dur.split(':');
+          if (parts.length == 3) { // حالة (ساعات:دقائق:ثواني)
+            _hoursController.text = parts[0];
+            _minutesController.text = parts[1];
+            _secondsController.text = parts[2];
+          } else if (parts.length == 2) { // حالة (دقائق:ثواني) فقط
+            _hoursController.text = '00';
+            _minutesController.text = parts[0];
+            _secondsController.text = parts[1];
+          }
+        }
       }
       if (widget.contentType == ContentType.pdf) {
         _uploadedFileUrl = widget.initialData!['file_path'] ?? widget.initialData!['file_url'];
@@ -67,6 +87,33 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
         }
       }
     }
+  }
+
+  // ✅ دالة مساعدة لإنشاء حقل إدخال الوقت (ساعات/دقائق/ثواني)
+  Widget _buildTimeField(String label, TextEditingController controller) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 65,
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppColors.backgroundPrimary,
+              hintText: "00",
+              hintStyle: TextStyle(color: AppColors.textSecondary.withOpacity(0.5)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold)),
+      ],
+    );
   }
 
   Future<void> _pickPdfFile() async {
@@ -107,6 +154,26 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // ✅ التحقق الإجباري من الوقت قبل بدء التحميل للفيديو
+    if (widget.contentType == ContentType.video) {
+      int hVal = int.tryParse(_hoursController.text) ?? 0;
+      int mVal = int.tryParse(_minutesController.text) ?? 0;
+      int sVal = int.tryParse(_secondsController.text) ?? 0;
+
+      if (hVal == 0 && mVal == 0 && sVal == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text("⚠️ يرجى إدخال مدة الفيديو الفعلية (لا يمكن تركها أصفاراً)"), backgroundColor: AppColors.error),
+        );
+        return;
+      }
+      if (mVal > 59 || sVal > 59) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text("⚠️ الدقائق والثواني يجب ألا تتجاوز 59"), backgroundColor: AppColors.error),
+        );
+        return;
+      }
+    }
 
     if (widget.contentType == ContentType.pdf && !isEditing && _selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -163,13 +230,22 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
           String? videoId = _extractYoutubeId(_urlController.text);
           if (videoId == null) throw Exception("رابط الفيديو غير صحيح");
           data['youtube_video_id'] = videoId;
-          // ✅ إرسال خيار الإشعار إذا كان إضافة جديدة
           if (!isEditing) data['notifyStudents'] = _notifyStudents;
+
+          // ✅ تجميع الوقت وتنسيقه وإرساله
+          int hVal = int.tryParse(_hoursController.text) ?? 0;
+          int mVal = int.tryParse(_minutesController.text) ?? 0;
+          int sVal = int.tryParse(_secondsController.text) ?? 0;
+          
+          String hStr = hVal.toString().padLeft(2, '0');
+          String mStr = mVal.toString().padLeft(2, '0');
+          String sStr = sVal.toString().padLeft(2, '0');
+          
+          data['duration'] = hStr == '00' ? '$mStr:$sStr' : '$hStr:$mStr:$sStr';
           break;
         case ContentType.pdf:
           data['chapter_id'] = widget.parentId;
           if (finalFileUrl != null) data['file_path'] = finalFileUrl;
-          // ✅ إرسال خيار الإشعار إذا كان إضافة جديدة
           if (!isEditing) data['notifyStudents'] = _notifyStudents;
           break;
       }
@@ -193,19 +269,14 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
       // 4. تحديث الكاش المحلي
       await _updateLocalCache();
 
-      // ✅ 5. التحديث المركزي (Race Condition Fix)
-      // ننتظر ثانية واحدة لضمان أن السيرفر قام بحفظ البيانات في قاعدة البيانات
+      // 5. التحديث المركزي
       await Future.delayed(const Duration(seconds: 1));
-
-      // نقوم بتحديث الحالة العامة للتطبيق (كورسات ومواد)
       await AppState().reloadAppInit();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(isEditing ? "Updated Successfully" : "Created Successfully"), backgroundColor: AppColors.success),
         );
-
-        // ✅ إرجاع true ليتم استقباله في الشاشات السابقة وإجراء التحديث اللازم
         Navigator.pop(context, true);
       }
 
@@ -260,15 +331,11 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
 
       await _updateLocalCache();
 
-      // ✅ التحديث المركزي عند الحذف (Race Condition Fix)
-      // انتظار لضمان الحذف من السيرفر
       await Future.delayed(const Duration(seconds: 1));
-      // تحديث الحالة العامة
       await AppState().reloadAppInit();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Deleted Successfully"), backgroundColor: AppColors.success));
-        // ✅ إرجاع true
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -379,13 +446,45 @@ class _ManageContentScreenState extends State<ManageContentScreen> {
 
                   if (widget.contentType == ContentType.video) ...[
                     CustomTextField(
-                      label: "YouTube Video Link",
+                      label: "رابط فيديو يوتيوب",
                       controller: _urlController,
                       hintText: "https://youtu.be/...",
                       prefixIcon: Icons.video_library,
                     ),
+                    const SizedBox(height: 16),
+                    
+                    // ✅ واجهة الوقت (ساعات : دقائق : ثواني) الأنيقة
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text("مدة الفيديو الفعلية ⏱️", style: TextStyle(color: AppColors.accentYellow, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.backgroundSecondary,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.textSecondary.withOpacity(0.1)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildTimeField("ساعات", _hoursController),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(":", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          _buildTimeField("دقائق", _minutesController),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(":", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          _buildTimeField("ثواني", _secondsController),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text("Paste the full YouTube link or just the ID",
+                    Text("الصق رابط يوتيوب كاملاً وحدد مدته لتظهر للطلاب",
                       style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withOpacity(0.6))),
                   ],
 
