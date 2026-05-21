@@ -25,7 +25,7 @@ dependencies:
   google_fonts: ^7.0.2
   flutter_svg: ^2.2.3
   url_launcher: ^6.3.2
-  lucide_icons: ^0.257.0 
+  lucide_icons_flutter: ^3.1.14
   cached_network_image: ^3.4.1
   percent_indicator: ^4.2.5 # شريط التقدم للتحميل
   device_info_plus: ^12.3.0
