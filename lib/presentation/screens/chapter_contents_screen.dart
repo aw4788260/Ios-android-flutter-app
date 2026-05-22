@@ -192,7 +192,8 @@ class _ChapterContentsScreenState extends State<ChapterContentsScreen> {
                 IconData icon = LucideIcons.playCircle;
                 if (player.id == 'player_1') icon = LucideIcons.rocket;
                 if (player.id == 'player_2') icon = LucideIcons.server;
-                if (player.id == 'player_3') icon = LucideIcons.youtube;
+                if (player.id == 'player_3') icon = LucideIcons.playSquare; 
+// أو يمكنك استخدام LucideIcons.video أو LucideIcons.tv
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16.0),
