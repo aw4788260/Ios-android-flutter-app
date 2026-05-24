@@ -147,6 +147,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         data: {
           'code': _discountController.text.trim(),
           'teacher_id': tId,
+          'selectedItems': widget.selectedItems, // ✅ إضافة السلة ليفحصها الباك إند
         },
         options: Options(headers: {
           'Authorization': 'Bearer ${box.get('jwt_token')}',
@@ -154,7 +155,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           'x-app-secret': const String.fromEnvironment('APP_SECRET'),
         }),
       );
-
       if (response.statusCode == 200 && response.data['success']) {
         final discountData = response.data['discount'];
 
