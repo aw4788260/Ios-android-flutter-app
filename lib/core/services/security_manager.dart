@@ -40,7 +40,7 @@ class SecurityManager {
     });
   }
 
-  // فحص الأمان للروت وخيارات المطور
+  // فحص الأمان للروت، خيارات المطور، والمحاكي
   Future<bool> checkSecurity() async {
     // إذا كان هناك سبب مسجل بالفعل، نعتبر الجهاز مخترقاً ولا نعيد الفحص
     if (securityBreachReason.value != null) return false;
@@ -48,13 +48,21 @@ class SecurityManager {
     try {
       bool isJailBroken = await SafeDevice.isJailBroken;
       bool isDevMode = await SafeDevice.isDevelopmentModeEnable;
+      bool isRealDevice = await SafeDevice.isRealDevice; // ✅ إضافة فحص المحاكي
 
-      // ✅ تحديد السبب بدقة
-      // if (isJailBroken) {
-      //   _triggerBreach("الجهاز مكسور الحماية (Root)");
-      //   return false;
-      // }
+      // ✅ منع المحاكي (Emulator) نهائياً
+      if (!isRealDevice) {
+        _triggerBreach("غير مسموح بتشغيل التطبيق على المحاكي (Emulator)");
+        return false;
+      }
 
+      // ✅ منع الروت أو الجيلبريك نهائياً
+      if (isJailBroken) {
+        _triggerBreach("عفواً، الجهاز مكسور الحماية (Root / Jailbreak)");
+        return false;
+      }
+
+      // ✅ منع خيارات المطور
       if (isDevMode) {
         _triggerBreach("خيارات المطور مفعلة (Developer Options)");
         return false;
@@ -65,7 +73,7 @@ class SecurityManager {
     return true;
   }
 
-  // Start periodic check for jailbreak/dev mode
+  // Start periodic check for jailbreak/dev mode/emulator
   void startPeriodicCheck() {
     Timer.periodic(const Duration(seconds: 2), (timer) async {
       await checkSecurity();
@@ -92,19 +100,21 @@ class SecurityManager {
 
   Future<bool> forceReCheck() async {
     // إعادة فحص حقيقية من الـ Native لكل الأسباب
-    bool isRecording = await _audioProtection
-        .checkRecordingStatus(); // تأكد أن هذه تنادي الـ MethodChannel
+    bool isRecording = await _audioProtection.checkRecordingStatus(); // تأكد أن هذه تنادي الـ MethodChannel
     bool isDevMode = await SafeDevice.isDevelopmentModeEnable;
     bool isJailBroken = await SafeDevice.isJailBroken;
+    bool isRealDevice = await SafeDevice.isRealDevice; // ✅ فحص المحاكي
 
-    if (!isRecording) //&& !isDevMode && !isJailBroken
-    {
+    // ✅ تفعيل جميع الشروط معاً للتأكد من الأمان الكامل قبل إخفاء الشاشة الحمراء
+    if (!isRecording && !isDevMode && !isJailBroken && isRealDevice) {
       securityBreachReason.value = null; // سيؤدي لإخفاء الشاشة الحمراء
       return true;
     } else {
       // تحديث السبب سيجعل الواجهة "تنفض" نفسها وتظهر النص الجديد
       if (isRecording) {
         securityBreachReason.value = "لا يزال تسجيل الشاشة قيد العمل!";
+      } else if (!isRealDevice) {
+        securityBreachReason.value = "لا يمكنك استخدام المحاكي، استخدم هاتف حقيقي!";
       } else if (isDevMode) {
         securityBreachReason.value = "خيارات المطور لا تزال مفعلة!";
       } else if (isJailBroken) {
